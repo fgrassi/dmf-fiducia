@@ -1,0 +1,61 @@
+# Pré-requisitos:
+#   docker network create symfony_network
+#   stack tracking em execução (container tracking_mysql)
+#
+# Acesso ao MySQL do tracking (mesmo padrão do dmf-crm):
+#   host: tracking_mysql
+#   porta: 3306 (porta interna do container)
+#   database: producao
+#   user/pass: root/root
+#
+# No .env da aplicação:
+#   DB_CONNECTION=mysql
+#   DB_HOST=tracking_mysql
+#   DB_PORT=3306
+#   DB_DATABASE=producao
+#   DB_USERNAME=root
+#   DB_PASSWORD=root
+
+name: dmf-fiducia
+
+services:
+  app: &fiducia_app_base
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        UID: "${UID:-1000}"
+        GID: "${GID:-1000}"
+    container_name: fiducia_app
+    volumes:
+      - ../src:/var/www/html
+      - ./php-ini-overrides.ini:/usr/local/etc/php/conf.d/php-ini-overrides.ini
+    networks:
+      - app-network
+      - symfony_network
+
+  queue:
+    <<: *fiducia_app_base
+    container_name: fiducia_queue
+    restart: unless-stopped
+    command: php artisan queue:work --queue=fiducia --sleep=3 --tries=3 --timeout=90
+
+  nginx:
+    image: nginx:1.23-alpine
+    container_name: fiducia_http
+    ports:
+      - "8095:80"
+    volumes:
+      - ../src:/var/www/html
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - app-network
+    depends_on:
+      - app
+
+networks:
+  app-network:
+    driver: bridge
+  symfony_network:
+    external: true
+    name: symfony_network
