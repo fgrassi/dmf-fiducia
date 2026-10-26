@@ -63,7 +63,8 @@ return [
 
     'providers' => [
         'users' => [
-            'driver' => 'eloquent',
+            // Paridade tracking: retrieveByLogin filtra status > 0.
+            'driver' => 'legacy-usuario',
             'model' => env('AUTH_MODEL', User::class),
         ],
 
