@@ -118,16 +118,16 @@ class InvoiceGate
             'cliente' => (string) DB::table('pessoa')->where('pessoa_id', $b->cliente_id)->value('nome'),
             'mbl' => $mbl,
             'situacao' => $situation,
-            'created_at' => $this->date($createdAt),
-            'etd' => $this->date($b->saida_prevista),
-            'eta' => $this->date($b->chegada_prevista),
-            'liberado_at' => $this->date($releasedAt),
+            'created_at' => self::date($createdAt),
+            'etd' => self::date($b->saida_prevista),
+            'eta' => self::date($b->chegada_prevista),
+            'liberado_at' => self::date($releasedAt),
             'sort' => (string) ($b->chegada_prevista ?: $b->saida_prevista),
         ];
     }
 
     /** ControleInvoiceMasterLogService::formatarData: d/m/Y, com hora quando houver. */
-    private function date(mixed $value): string
+    public static function date(mixed $value): string
     {
         if (blank($value) || str_starts_with((string) $value, '0000-00-00')) {
             return '';
