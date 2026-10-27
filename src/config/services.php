@@ -28,6 +28,22 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    // Sistema legado (tracking): links para telas que ainda não foram portadas e arquivos de uploads/.
+    'tracking' => [
+        'url' => rtrim((string) env('TRACKING_URL'), '/'),
+    ],
+
+    // API de NFS-e: por padrão a do config_nfse (banco). Em dev/homologação, apontar aqui para não emitir em produção.
+    'nfse' => [
+        'url' => env('NFSE_API_URL'),
+        'token' => env('NFSE_API_TOKEN'),
+    ],
+
+    // Geração automática das ICs (cobranca:gerar no agendador). Ligar só quando o cron do tracking for desligado.
+    'cobranca' => [
+        'automatic_generation' => env('COBRANCA_GERACAO_AUTOMATICA', false),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

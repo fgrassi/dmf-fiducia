@@ -2,14 +2,19 @@
 
 namespace App\Filament\Resources\Charges\Tables;
 
+use App\Actions\Cobranca\Items\DeleteItems;
 use App\Actions\Cobranca\Listing\BuildChargeListQuery;
+use App\Actions\Cobranca\Maintenance\DeleteCharge;
 use App\Enums\Cobranca\ChargeStatus;
 use App\Filament\Resources\Charges\ChargeResource;
 use App\Models\FinCharges;
 use App\Models\FinChargesTypes;
+use DomainException;
+use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Fieldset;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
@@ -18,6 +23,7 @@ use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class ChargesTable
 {
@@ -69,12 +75,15 @@ class ChargesTable
                             TextInput::make('num_nota_fiscal')->label('Número NF'),
                             TextInput::make('id_fpr')->label('Número Recibo'),
                         ]),
-                        Fieldset::make('Classificação')->columns(4)->schema([
+                        Fieldset::make('Classificação')->columns(5)->schema([
                             Select::make('ref_type')->label('Tipo')->options(fn () => FinChargesTypes::pluck('name', 'id')),
                             Select::make('status')->label('Status')
                                 ->options(collect(ChargeStatus::cases())->mapWithKeys(fn ($s) => [$s->value => $s->label()])),
                             Select::make('status_nfse')->label('Status NFSe')->options(BuildChargeListQuery::NFSE_OPTIONS),
                             TextInput::make('valor_total')->label('Valor Total')->placeholder('1.234,56'),
+                            Select::make('grupo_empresa_id')
+                                ->label('Grupo de Empresa')
+                                ->options(fn () => DB::table('grupo_empresa')->orderBy('nome')->pluck('nome', 'grupo_empresa_id')),
                         ]),
                         Fieldset::make('Datas')->columns(5)->schema([
                             DatePicker::make('created_at')->label('Criação'),
@@ -88,6 +97,39 @@ class ChargesTable
                     ->query(fn (Builder $query, array $data) => app(BuildChargeListQuery::class)->applyFilters($query, $data)),
             ], layout: FiltersLayout::AboveContentCollapsible)
             ->filtersFormColumns(1)
+            ->recordActions([
+                // lixeira do listSuccess (legado): com permissão, cobrança aberta e sem NFS-e emitida
+                Action::make('excluir')
+                    ->label('Excluir')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->iconButton()
+                    ->visible(fn (FinCharges $record) => DeleteCharge::allowed(auth()->user())
+                        && $record->status === ChargeStatus::Open
+                        && ! DeleteItems::hasIssuedNfse($record))
+                    ->requiresConfirmation()
+                    ->modalHeading('Excluir cobrança')
+                    ->modalDescription(fn (FinCharges $record) => ($reasons = DeleteCharge::blockingReasons($record))
+                        ? 'Não é possível excluir a cobrança: '.implode(' ', $reasons)
+                        : 'Tem certeza que deseja excluir esta cobrança? Itens, documentos, boletos e cotações negociadas também serão removidos.')
+                    ->modalSubmitAction(fn (Action $action, FinCharges $record) => $action->disabled((bool) DeleteCharge::blockingReasons($record)))
+                    ->action(function (Action $action, FinCharges $record) {
+                        try {
+                            app(DeleteCharge::class)($record, auth()->user());
+                        } catch (DomainException $e) {
+                            Notification::make()
+                                ->title($e->getMessage())
+                                ->danger()
+                                ->send();
+                            $action->halt();
+                        }
+
+                        Notification::make()
+                            ->title('Registro excluído com sucesso.')
+                            ->success()
+                            ->send();
+                    }),
+            ])
             ->recordUrl(fn (FinCharges $record) => ChargeResource::getUrl('view', ['record' => $record]));
     }
 }

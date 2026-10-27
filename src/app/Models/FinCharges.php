@@ -44,6 +44,11 @@ class FinCharges extends Model
         return $this->hasMany(FinChargesFiles::class, 'ref_charge', 'id');
     }
 
+    public function nfFiles(): HasMany
+    {
+        return $this->hasMany(FinChargesArquivoNota::class, 'cobranca_id', 'id');
+    }
+
     public function nfses(): HasMany
     {
         return $this->hasMany(FinChargesNfse::class, 'ref_charge', 'id');
@@ -82,6 +87,22 @@ class FinCharges extends Model
     public function latestNfse(): HasOne
     {
         return $this->hasOne(FinChargesNfse::class, 'ref_charge', 'id')->ofMany('fin_charges_nfse_id', 'max');
+    }
+
+    /** setEmailsEnvioFromArray: e-mails do cliente escolhidos na baixa/emissão (minúsculos, sem repetição). */
+    public function selectRecipients(array $emails): void
+    {
+        $this->emails_envio_json = json_encode(collect($emails)->map(fn ($m) => strtolower(trim((string) $m)))->filter()->unique()->values()->all());
+    }
+
+    /** resumoEmailsDestinoLog do legado. */
+    public static function recipientsLogSummary(?array $emails): string
+    {
+        return match (true) {
+            $emails === null => '',
+            $emails === [] => ' E-mails cliente: nenhum selecionado.',
+            default => ' E-mails cliente ('.count($emails).'): '.implode(', ', $emails),
+        };
     }
 
     /** Semáforo de idade (FinCharges::getStatusColor): success < 3 dias ou baixada, warning 3–7, danger > 7. */

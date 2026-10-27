@@ -47,6 +47,15 @@ return [
             'report' => false,
         ],
 
+        // web/uploads do tracking (legado), montado no container; servido pelo próprio tracking.
+        'tracking_uploads' => [
+            'driver' => 'local',
+            'root' => env('TRACKING_UPLOADS_PATH') ?: storage_path('app/tracking-uploads'),
+            'url' => rtrim((string) env('TRACKING_URL'), '/').'/uploads',
+            'throw' => true,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FinPaymentReceipt extends Model
 {
@@ -17,5 +18,10 @@ class FinPaymentReceipt extends Model
         return [
             'valor' => 'decimal:2',
         ];
+    }
+
+    public function file(): BelongsTo
+    {
+        return $this->belongsTo(CmnFile::class, 'ref_file', 'id');
     }
 }

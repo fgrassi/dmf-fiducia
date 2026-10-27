@@ -36,8 +36,24 @@
         <tfoot>
             <tr class="iof">
                 <th colspan="4">Despesas Financeiras/IOF</th>
-                <th class="num">{{ $t['iof'] }}</th>
-                <th class="center">{{ $t['iof_manual'] ? 'IOF manual' : '' }}</th>
+                <th class="num">
+                    {{ $t['iof'] }}
+                    <x-filament::icon-button
+                        icon="heroicon-o-pencil-square"
+                        size="sm"
+                        label="Alterar IOF"
+                        wire:click="mountAction('editarIof')"
+                    />
+                </th>
+                <th class="center">
+                    <label class="iof-manual" title="Ligar/desligar o controle manual do valor do IOF">
+                        <x-filament::input.checkbox
+                            :checked="$t['iof_manual']"
+                            wire:click="mountAction('alternarIofManual')"
+                        />
+                        IOF manual
+                    </label>
+                </th>
             </tr>
             <tr class="total">
                 <th colspan="4">Total</th>
@@ -53,6 +69,7 @@
     .charge-items th, .charge-items td { padding: 0.35rem 0.6rem; text-align: left; }
     .charge-items .num { text-align: right; white-space: nowrap; }
     .charge-items .center { text-align: center; }
+    .charge-items .iof-manual { display: inline-flex; align-items: center; gap: 0.35rem; font-weight: 400; cursor: pointer; white-space: nowrap; }
     .charge-items thead th { background: #474b4e; color: #fff; text-align: center; font-weight: 600; }
     .charge-items tbody tr:nth-child(even) { background: rgba(0, 0, 0, 0.04); }
     .charge-items tfoot .iof th { font-weight: 600; border-top: 1px solid rgba(0, 0, 0, 0.15); }

@@ -3,8 +3,10 @@
 namespace App\Services\Cobranca;
 
 use App\Models\FinCharges;
+use App\Models\FinChargesNfse;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use stdClass;
 
 /**
@@ -26,9 +28,6 @@ class ChargeDetails
         'autorizada' => 'Autorizada', 'enfileirada' => 'Enfileirada', 'processando' => 'Processando', 'rejeitada' => 'Rejeitada',
         'erro_http' => 'Erro', 'erro' => 'Erro', 'cancelada' => 'Cancelada', 'substituida' => 'Substituída', 'rascunho' => 'Rascunho',
     ];
-
-    /** Notas com valor igual ou superior a este não podem ser canceladas (FinChargesNfse::LIMITE_VALOR_CANCELAMENTO). */
-    private const NFSE_CANCEL_LIMIT = 50000.00;
 
     private const FIELD_LABELS = [
         'due_date' => 'Vencimento', 'obs' => 'Observação', 'ref_type' => 'Tipo de Cobrança',
@@ -56,7 +55,7 @@ class ChargeDetails
      * Linhas de "Informações financeiras", em trechos para intercalar os campos editáveis
      * (Dados do Exportador/Importador e Escritório) que a página renderiza à parte.
      *
-     * @return array<'head'|'importer'|'agent'|'tail', list<array{label:string, value:?string}>>
+     * @return array<'head'|'importer'|'agent'|'tail', list<array{label:string, value:?string, url:?string}>>
      */
     public function booking(FinCharges $charge): array
     {
@@ -71,7 +70,7 @@ class ChargeDetails
             ['BLs (numeros)', $e->house_bl],
             ['BLs (qtd.)', (string) $e->qtd_bl],
             ['Ton. / Met.', $lcl ? number_format($lcl, 4, ',', '.') : null],
-            ['Reserva', $e->booking],
+            ['Reserva', $e->booking, $this->trackingUrl("booking/show?id={$e->embarque_id}")],
         ];
 
         if ($bl) {
@@ -102,7 +101,7 @@ class ChargeDetails
             'tail' => $tail,
         ];
 
-        return array_map(fn ($rows) => array_map(fn ($r) => ['label' => $r[0], 'value' => filled($r[1]) ? (string) $r[1] : null], $rows), $segments);
+        return array_map(fn ($rows) => array_map(fn ($r) => ['label' => $r[0], 'value' => filled($r[1]) ? (string) $r[1] : null, 'url' => $r[2] ?? null], $rows), $segments);
     }
 
     /** @return list<array{type:?string, number:?string, factor:string}> */
@@ -134,7 +133,7 @@ class ChargeDetails
             ])->all();
     }
 
-    /** Itens da cobrança (Despesas): rótulo, cotação, valor unitário, índice, valor e isenção de IOF. */
+    /** Itens da cobrança (Despesas): id, rótulo, cotação, valor unitário, índice, valor e isenção de IOF. */
     public function items(FinCharges $charge): array
     {
         $bl = $charge->ref_bl ? DB::table('bl')->where('bl_id', $charge->ref_bl)->first() : null;
@@ -145,19 +144,23 @@ class ChargeDetails
             ->leftJoin('fin_expenses_unities as u', 'u.id', '=', 'e.ref_unity')
             ->leftJoin('cmn_currencies as c', 'c.id', '=', 'i.ref_currency')
             ->where('i.ref_charge', $charge->id)->orderBy('i.id')
-            ->select('i.*', 'v.ref_equipment', 'v.ref_bl as v_bl', 'v.ref_container', 'v.sr_min', 'v.ref_expense as expense_value_expense', 'e.name as expense_name', 'e.ref_unity', 'u.acronym as unity_name', 'c.symbol')
+            ->select('i.*', 'v.ref_due_to', 'v.ref_equipment', 'v.ref_bl as v_bl', 'v.ref_container', 'v.sr_min', 'v.ref_expense as expense_value_expense', 'e.name as expense_name', 'e.ref_unity', 'u.acronym as unity_name', 'c.symbol')
             ->get()->map(function (stdClass $i) use ($charge, $bl) {
                 $index = $this->itemIndex($i, $charge, $bl);
                 $unit = (float) $i->unitary_value;
                 $shown = (float) $i->sr_min > 0 ? max((float) $i->sr_min, $unit * $index) : $unit;
 
                 return [
+                    'id' => (int) $i->id,
                     'expense' => $this->expenseLabel($i),
                     'rate' => number_format((float) $i->current_rate_value, 4, ',', '.'),
                     'unit' => trim(($i->symbol ?? '').' '.number_format($shown, 2, ',', '.')),
                     'index' => number_format($index, 4, ',', '.'),
                     'value' => 'R$ '.number_format((float) $i->item_value, 2, ',', '.'),
                     'exempt_iof' => $this->exemptFromIof($i) ? 'Sim' : 'Não',
+                    // valores crus para a Nota de Débito (xls) e o PDF do recibo
+                    'raw' => ['rate' => (float) $i->current_rate_value, 'unit' => $unit, 'index' => $index, 'value' => (float) $i->item_value,
+                        'symbol' => (string) $i->symbol, 'service' => (int) $i->ref_due_to === 7, 'name' => (string) $i->expense_name],
                 ];
             })->all();
     }
@@ -274,7 +277,7 @@ class ChargeDetails
     {
         return DB::table('fin_payment_receipt as r')->leftJoin('cmn_files as f', 'f.id', '=', 'r.ref_file')
             ->where('r.ref_charge', $charge->id)->orderByDesc('r.id')->select('r.id', 'r.valor', 'f.name')->get()
-            ->map(fn ($r) => ['id' => $r->id, 'file' => $r->name ? "{$r->name}.pdf" : null,
+            ->map(fn ($r) => ['id' => $r->id, 'file' => $r->name ? "{$r->name}.pdf" : null, 'url' => $this->upload('recibo', $r->name),
                 'value' => $r->valor !== null && $r->valor !== '' ? 'R$ '.number_format((float) $r->valor, 2, ',', '.') : null])->all();
     }
 
@@ -284,14 +287,14 @@ class ChargeDetails
         $b = DB::table('fin_payment_boleto as b')->leftJoin('cmn_files as f', 'f.id', '=', 'b.ref_file')
             ->where('b.ref_charge', $charge->id)->orderByDesc('b.id')->select('f.name', 'b.due_to')->first();
 
-        return $b ? [['file' => $b->name ? "{$b->name}.pdf" : null, 'due' => $b->due_to ? Carbon::parse($b->due_to)->format('d/m/Y') : null]] : [];
+        return $b ? [['file' => $b->name ? "{$b->name}.pdf" : null, 'url' => $this->upload('declaracao', $b->name), 'due' => $b->due_to ? Carbon::parse($b->due_to)->format('d/m/Y') : null]] : [];
     }
 
     /** @return list<array{file:string}> */
     public function boletoReceipts(FinCharges $charge): array
     {
         return DB::table('recibo_boleto as r')->join('cmn_files as f', 'f.id', '=', 'r.arquivo_id')
-            ->where('r.cobranca_id', $charge->id)->pluck('f.name')->map(fn ($n) => ['file' => "{$n}.pdf"])->all();
+            ->where('r.cobranca_id', $charge->id)->pluck('f.name')->map(fn ($n) => ['file' => "{$n}.pdf", 'url' => $this->upload('recibo', $n)])->all();
     }
 
     /** Documentos enviados (PDF da instrução etc.), mais recente primeiro. */
@@ -299,43 +302,69 @@ class ChargeDetails
     {
         return DB::table('fin_charges_files as x')->join('cmn_files as f', 'f.id', '=', 'x.ref_file')
             ->where('x.ref_charge', $charge->id)->orderByDesc('x.id')->select('f.name', 'f.created_at')->get()
-            ->map(fn ($f) => ['file' => "{$f->name}.pdf", 'date' => $f->created_at ? Carbon::parse($f->created_at)->format('d/m/Y') : null])->all();
+            ->map(fn ($f) => ['file' => "{$f->name}.pdf", 'url' => $this->upload('cobranca', $f->name), 'date' => $f->created_at ? Carbon::parse($f->created_at)->format('d/m/Y') : null])->all();
     }
 
-    /** Histórico de NFS-e da cobrança (mais recente primeiro). */
+    /** Histórico de NFS-e da cobrança (mais recente primeiro), com o que cada nota permite fazer. */
     public function nfses(FinCharges $charge): array
     {
-        return DB::table('fin_charges_nfse')->where('ref_charge', $charge->id)->orderByDesc('fin_charges_nfse_id')->get()
-            ->map(function ($n) {
-                $value = $n->valor_servicos;
-                $notes = $this->nfseErrors($n->erros_json);
+        return FinChargesNfse::where('ref_charge', $charge->id)->orderByDesc('fin_charges_nfse_id')->get()
+            ->map(function (FinChargesNfse $n) {
+                $notes = $n->readableErrors();
 
-                if ($n->status === 'autorizada' && $n->nfse_uuid && filled($n->chave_acesso) && $value !== null && (float) $value >= self::NFSE_CANCEL_LIMIT) {
+                if ($n->blockedByCancelLimit()) {
                     array_unshift($notes, 'Cancelamento indisponível: notas com valor igual ou superior a R$ 50.000,00 não podem ser canceladas.');
                 }
 
+                if ($n->hasPendingCancellation()) {
+                    array_unshift($notes, 'Cancelamento em andamento.');
+                }
+
+                if ($n->hasPendingSubstitution()) {
+                    array_unshift($notes, 'Substituição em andamento.');
+                }
+
                 return [
+                    'id' => $n->getKey(),
                     'external_id' => $n->id_externo.($n->nfse_substituida_id ? " — substitui #{$n->nfse_substituida_id}" : ''),
                     'key' => $n->chave_acesso,
-                    'value' => $value !== null && $value !== '' ? 'R$ '.number_format((float) $value, 2, ',', '.') : '—',
+                    'value' => $n->valor_servicos !== null && $n->valor_servicos !== '' ? 'R$ '.number_format((float) $n->valor_servicos, 2, ',', '.') : '—',
                     'status' => self::NFSE_LABELS[$n->status] ?? ($n->status !== '' ? ucfirst((string) $n->status) : 'Enviada'),
                     'date' => $this->dateTime($n->created_at),
                     'danfse' => $n->status !== 'autorizada' ? null
-                        : (filled($n->danfse_url) ? $n->danfse_url
-                            : (filled($n->chave_acesso) ? 'https://www.nfse.gov.br/ConsultaPublica/?tpc=1&chave='.$n->chave_acesso : null)),
-                    'notes' => implode("\n", $notes),
+                        : (filled($n->danfse_url) ? $n->danfse_url : $n->publicConsultationUrl()),
+                    'notes' => $notes,
+                    'can_download' => $n->canDownload(),
+                    'can_refresh' => $n->canRefreshStatus(),
+                    'can_cancel' => $n->canCancel(),
+                    'can_substitute' => $n->canSubstitute(),
+                    'can_reprocess' => $n->canReprocess(),
                 ];
             })->all();
     }
 
     // ---------------------------------------------------------------- helpers
 
+    /** Tela do tracking (legado) ainda não portada; null sem TRACKING_URL. */
+    private function trackingUrl(string $path): ?string
+    {
+        return filled($base = config('services.tracking.url')) ? "{$base}/gerenciador.php/{$path}" : null;
+    }
+
+    /** Arquivo em web/uploads do tracking; null sem TRACKING_URL. */
+    private function upload(string $folder, ?string $name, string $extension = '.pdf'): ?string
+    {
+        return filled($name) && filled(config('services.tracking.url'))
+            ? Storage::disk('tracking_uploads')->url("{$folder}/".rawurlencode($name).$extension)
+            : null;
+    }
+
     private function person(?int $id): string
     {
         return $id ? (string) DB::table('pessoa')->where('pessoa_id', $id)->value('nome') : '';
     }
 
-    private function port(?int $id): string
+    public function port(?int $id): string
     {
         $port = $id ? DB::table('porto as p')->leftJoin('paises as c', 'c.paises_id', '=', 'p.ref_pais')->where('p.porto_id', $id)->select('p.nome', 'c.nome as pais')->first() : null;
 
@@ -350,32 +379,6 @@ class ChargeDetails
     private function dateTime(mixed $value): string
     {
         return $value ? Carbon::parse($value)->format('d/m/Y H:i:s') : '';
-    }
-
-    private function nfseErrors(?string $json): array
-    {
-        $raw = trim((string) $json);
-
-        if ($raw === '') {
-            return [];
-        }
-
-        $decoded = json_decode($raw, true);
-
-        if (! is_array($decoded)) {
-            return [$raw];
-        }
-
-        return collect($decoded)->map(function ($error) {
-            if (! is_array($error)) {
-                return (string) $error;
-            }
-
-            $code = (string) ($error['codigo'] ?? '');
-            $message = (string) (($error['descricao'] ?? '') ?: ($error['mensagem'] ?? ''));
-
-            return $code && $message ? "{$code} — {$message}" : ($message ?: $code);
-        })->filter()->values()->all();
     }
 
     /** FinExpensesValues::__toString: nome/unidade (equipamento) (BL) container. */
@@ -427,8 +430,10 @@ class ChargeDetails
         return (float) str_replace(',', '.', (string) $value);
     }
 
+    // ------------------------------------------- fatores de BL/container (também usados no recálculo)
+
     /** Bl::getFatorLcl. */
-    private function blLclFactor(stdClass $bl): float
+    public function blLclFactor(stdClass $bl): float
     {
         $weight = (float) str_replace(',', '.', str_replace('.', '', (string) $bl->gross_weight));
         $volume = (float) str_replace(',', '.', str_replace('.', '', (string) $bl->volume));
@@ -437,7 +442,7 @@ class ChargeDetails
     }
 
     /** Container::getFatorLclCtn. */
-    private function containerLclFactor(?stdClass $c): float
+    public function containerLclFactor(?stdClass $c): float
     {
         if (! $c) {
             return 0.0;
@@ -447,7 +452,7 @@ class ChargeDetails
     }
 
     /** Container::getFatorCtn — fração do volume do container sobre o total do mesmo container físico. */
-    private function containerFactor(?stdClass $container): float
+    public function containerFactor(?stdClass $container): float
     {
         if (! $container) {
             return 0.0;
@@ -466,7 +471,7 @@ class ChargeDetails
     }
 
     /** Bl::getFatorCtn. */
-    private function blFactor(stdClass $bl): float
+    public function blFactor(stdClass $bl): float
     {
         $embarque = DB::table('embarque')->where('embarque_id', $bl->embarque_id)->first();
         $sum = 0.0;
@@ -485,7 +490,7 @@ class ChargeDetails
     }
 
     /** Bl::getFatorCtnTipo. */
-    private function blFactorByType(stdClass $bl, int $type): float
+    public function blFactorByType(stdClass $bl, int $type): float
     {
         return DB::table('container')->where('bl_id', $bl->bl_id)->where('tipo_container_id', $type)->get()
             ->sum(fn ($c) => $this->containerFactor($c));

@@ -4,6 +4,13 @@
 @source '../../../../resources/views/filament/**/*';
 
 /*
+ * Fonte global menor: o Filament usa rem, então tudo escala junto (16px → 14px).
+ */
+html {
+    font-size: 87.5%;
+}
+
+/*
  * Densidade global do Filament: espaçamentos ~metade do padrão.
  */
 .fi-sc.fi-sc-has-gap {

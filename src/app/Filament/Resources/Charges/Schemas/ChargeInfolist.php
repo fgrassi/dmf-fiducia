@@ -2,10 +2,17 @@
 
 namespace App\Filament\Resources\Charges\Schemas;
 
+use App\Actions\Cobranca\Documents\DebitNote;
+use App\Actions\Cobranca\Documents\DeclarationPdf;
+use App\Actions\Cobranca\Items\DeleteItems;
 use App\Actions\Cobranca\Listing\ChargeDueDate;
 use App\Actions\Cobranca\Maintenance\EditDueDate;
 use App\Actions\Cobranca\Maintenance\EditPartyData;
+use App\Actions\Cobranca\Nfse\IssueNfse;
 use App\Actions\Cobranca\Rates\SaveCustomRate;
+use App\Actions\Cobranca\Receipts\CalculateReceiptValues;
+use App\Actions\Cobranca\Receipts\DeleteReceipts;
+use App\Actions\Cobranca\Receipts\SendBoletoReceipt;
 use App\Enums\Cobranca\ChargeStatus;
 use App\Models\Escritorio;
 use App\Models\FinCharges;
@@ -13,6 +20,7 @@ use App\Services\Cobranca\ChargeDetails;
 use Carbon\CarbonInterface;
 use DomainException;
 use Filament\Actions\Action;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -55,6 +63,50 @@ class ChargeInfolist
                 }
 
                 Notification::make()->title('Cotação negociada cadastrada.')->success()->send();
+            });
+    }
+
+    /** Excluir despesas (excluirItensIc do legado): cobrança em aberto com mais de um item; nunca todos. */
+    private static function deleteItems(): Action
+    {
+        return Action::make('excluirDespesas')
+            ->label('Excluir despesas')
+            ->icon(Heroicon::Trash)
+            ->color('danger')
+            ->link()
+            ->visible(fn (FinCharges $record) => $record->status === ChargeStatus::Open && $record->items()->count() > 1)
+            ->modalHeading('Excluir despesas da cobrança')
+            ->modalDescription(fn (FinCharges $record) => DeleteItems::hasIssuedNfse($record)
+                ? 'Atenção: esta IC já possui NFS-e autorizada. Após a exclusão, recalcule a cobrança e atualize a NFS-e com o valor atual (substituição ou cancelamento, conforme permitido para a nota).'
+                : null)
+            ->modalSubmitActionLabel('Excluir selecionadas')
+            ->modalWidth('2xl')
+            ->schema(fn (FinCharges $record) => [
+                CheckboxList::make('item_ids')
+                    ->label('Selecione as despesas que deseja remover desta cobrança')
+                    ->options(collect(app(ChargeDetails::class)->items($record))
+                        ->mapWithKeys(fn (array $i) => [$i['id'] => "{$i['expense']} ({$i['value']})"]))
+                    ->required(),
+                Textarea::make('justificativa')
+                    ->label('Justificativa')
+                    ->helperText('Obrigatória, mínimo 15 caracteres.')
+                    ->required()
+                    ->minLength(15)
+                    ->maxLength(500)
+                    ->rows(3),
+            ])
+            ->action(function (array $data, FinCharges $record, Action $action) {
+                try {
+                    $message = app(DeleteItems::class)($record, $data['item_ids'], $data['justificativa'], auth()->user());
+                } catch (DomainException $e) {
+                    Notification::make()->title($e->getMessage())->danger()->send();
+                    $action->halt();
+                }
+
+                Notification::make()
+                    ->title($message)
+                    ->status(DeleteItems::hasIssuedNfse($record) ? 'warning' : 'success')
+                    ->send();
             });
     }
 
@@ -142,10 +194,93 @@ class ChargeInfolist
             });
     }
 
+    /** deleteRecibo do legado: remove recibos/declarações e a cobrança volta para "em aberto". */
+    private static function deleteReceipts(): Action
+    {
+        return Action::make('removerRecibo')
+            ->label('Remover')
+            ->icon(Heroicon::Trash)
+            ->color('danger')
+            ->link()
+            ->visible(fn (FinCharges $record) => DeleteReceipts::allowed($record, auth()->user()))
+            ->requiresConfirmation()
+            ->modalHeading('Remover recibo/declaração')
+            ->modalDescription('Todos os recibos e declarações desta cobrança serão removidos e ela voltará para "em aberto". Deseja continuar?')
+            ->action(function (FinCharges $record, Action $action) {
+                try {
+                    app(DeleteReceipts::class)($record, auth()->user());
+                } catch (DomainException $e) {
+                    Notification::make()->title($e->getMessage())->danger()->send();
+                    $action->halt();
+                }
+
+                Notification::make()->title('Registro excluído com sucesso.')->success()->send();
+            });
+    }
+
+    /** calcularValorRecibos do legado: regrava o valor de todos os recibos (um por grupo de NFS-e). */
+    private static function calculateReceipts(): Action
+    {
+        return Action::make('calcularRecibos')
+            ->label('Calcular')
+            ->icon(Heroicon::Calculator)
+            ->link()
+            ->visible(fn (FinCharges $record) => $record->receipts()->exists())
+            ->requiresConfirmation()
+            ->modalHeading('Calcular recibos')
+            ->modalDescription('Recalcular e gravar o total de todos os recibos desta cobrança?')
+            ->modalSubmitActionLabel('Sim, calcular')
+            ->action(function (FinCharges $record, Action $action) {
+                try {
+                    app(CalculateReceiptValues::class)($record);
+                } catch (DomainException $e) {
+                    Notification::make()->title($e->getMessage())->danger()->send();
+                    $action->halt();
+                }
+
+                Notification::make()->title('Valores dos recibos recalculados.')->success()->send();
+            });
+    }
+
+    /** "Enviar declaração" do legado: chama enviaReciboBoleto, que gera e envia um novo Recibo do Boleto. */
+    private static function sendDeclaration(): Action
+    {
+        return Action::make('enviarDeclaracao')
+            ->label('Enviar declaração')
+            ->icon(Heroicon::Envelope)
+            ->link()
+            ->visible(fn (FinCharges $record) => $record->boletoPayments()->exists())
+            ->requiresConfirmation()
+            ->modalHeading('Enviar declaração')
+            ->modalDescription('Tem certeza que deseja enviar o recibo?')
+            ->modalSubmitActionLabel('Sim, enviar')
+            ->action(function (FinCharges $record) {
+                app(SendBoletoReceipt::class)($record);
+                Notification::make()->title('Recibo do boleto gerado e enviado.')->success()->send();
+            });
+    }
+
+    /** Imprimir a justificativa da baixa manual (imprimirDiv do legado). */
+    private static function printJustification(): Action
+    {
+        return Action::make('imprimirJustificativa')
+            ->label('Imprimir')
+            ->icon(Heroicon::Printer)
+            ->link()
+            ->alpineClickHandler(<<<'JS'
+                const w = window.open('', '', 'height=600,width=800');
+                w.document.write('<html><head><title>Impressão</title></head><body>' + document.getElementById('justificativa').innerHTML + '</body></html>');
+                w.document.close();
+                w.print();
+                JS);
+    }
+
     public static function configure(Schema $schema): Schema
     {
         $details = fn () => app(ChargeDetails::class);
         $brl = fn (mixed $value) => 'R$ '.number_format((float) $value, 2, ',', '.');
+        // url do próprio item num RepeatableEntry (state de cada linha é um array com 'url')
+        $itemUrl = fn (TextEntry $component) => $component->getContainer()->getConstantState()['url'] ?? null;
         $rows = fn (string $name, callable $source) => RepeatableEntry::make($name)
             ->hiddenLabel()
             ->contained(false)
@@ -158,7 +293,9 @@ class ChargeInfolist
                 TextEntry::make('value')
                     ->hiddenLabel()
                     ->placeholder('—')
-                    ->alignEnd(),
+                    ->alignEnd()
+                    ->url($itemUrl)
+                    ->openUrlInNewTab(),
             ]);
         // linha rótulo/valor no mesmo formato de $rows, com ação de edição no valor
         $editable = fn (string $label, TextEntry $value) => Grid::make(['default' => 2])
@@ -227,18 +364,10 @@ class ChargeInfolist
                                 ]),
                             Section::make('Containers')
                                 ->schema([
-                                    RepeatableEntry::make('containers')
+                                    ViewEntry::make('containers')
                                         ->hiddenLabel()
-                                        ->columns(3)
-                                        ->state(fn (FinCharges $r) => $details()->containers($r))
-                                        ->schema([
-                                            TextEntry::make('type')
-                                                ->label('Equipamento'),
-                                            TextEntry::make('number')
-                                                ->label('Numero'),
-                                            TextEntry::make('factor')
-                                                ->label('Quantidade'),
-                                        ]),
+                                        ->view('filament.charges.containers-table')
+                                        ->state(fn (FinCharges $r) => $details()->containers($r)),
                                 ]),
                             Section::make('Cotações Negociadas')
                                 ->key('cotacoes')
@@ -250,6 +379,8 @@ class ChargeInfolist
                                         ->state(fn (FinCharges $r) => $details()->customRates($r)),
                                 ]),
                             Section::make('Itens da Cobrança')
+                                ->key('itens')
+                                ->headerActions([self::deleteItems()])
                                 ->schema([
                                     ViewEntry::make('items_table')
                                         ->hiddenLabel()
@@ -265,18 +396,10 @@ class ChargeInfolist
                                 ]),
                             Section::make('Contatos da Cobrança')
                                 ->schema([
-                                    RepeatableEntry::make('contacts')
+                                    ViewEntry::make('contacts')
                                         ->hiddenLabel()
-                                        ->columns(3)
-                                        ->state(fn (FinCharges $r) => $details()->contacts($r))
-                                        ->schema([
-                                            TextEntry::make('name')
-                                                ->label('Nome'),
-                                            TextEntry::make('email')
-                                                ->label('Email'),
-                                            TextEntry::make('type')
-                                                ->label('Tipo'),
-                                        ]),
+                                        ->view('filament.charges.contacts-table')
+                                        ->state(fn (FinCharges $r) => $details()->contacts($r)),
                                 ]),
                             Section::make('Histórico da IC')
                                 ->schema([
@@ -308,24 +431,17 @@ class ChargeInfolist
                                     $rows('bank', fn (FinCharges $r) => $details()->bankSettlement($r)),
                                 ]),
                             Section::make('Recibos')
+                                ->key('recibos')
                                 ->visible($status(1))
+                                ->headerActions([
+                                    self::calculateReceipts(),
+                                    self::deleteReceipts(),
+                                ])
                                 ->schema([
-                                    RepeatableEntry::make('receipts')
+                                    ViewEntry::make('receipts')
                                         ->hiddenLabel()
-                                        ->columns(3)
-                                        ->placeholder('Nenhum recibo.')
-                                        ->state(fn (FinCharges $r) => $details()->receipts($r))
-                                        ->schema([
-                                            TextEntry::make('id')
-                                                ->label('Nº'),
-                                            TextEntry::make('file')
-                                                ->label('Arquivo')
-                                                ->placeholder('—'),
-                                            TextEntry::make('value')
-                                                ->label('Valor')
-                                                ->placeholder('—')
-                                                ->alignEnd(),
-                                        ]),
+                                        ->view('filament.charges.receipts-table')
+                                        ->state(fn (FinCharges $r) => $details()->receipts($r)),
                                 ]),
                             Section::make('Baixa Por Boleto')
                                 ->visible($status(2))
@@ -333,7 +449,25 @@ class ChargeInfolist
                                     $rows('boleto', fn (FinCharges $r) => $details()->boletoSettlement($r)),
                                 ]),
                             Section::make('Declarações')
+                                ->key('declaracoes')
                                 ->visible($status(2))
+                                ->headerActions([
+                                    self::sendDeclaration(),
+                                    // xlsRecibo?bid= do legado: a declaração mais recente
+                                    Action::make('declaracaoSemFundo')
+                                        ->label('PDF sem fundo')
+                                        ->icon(Heroicon::DocumentText)
+                                        ->link()
+                                        ->visible(fn (FinCharges $record) => $record->boletoPayments()->exists())
+                                        ->action(fn (FinCharges $record) => app(DeclarationPdf::class)($record)),
+                                    Action::make('notaDebitoDeclaracao')
+                                        ->label('Nota de Débito')
+                                        ->icon(Heroicon::TableCells)
+                                        ->link()
+                                        ->visible(fn (FinCharges $record) => $record->boletoPayments()->exists())
+                                        ->action(fn (FinCharges $record) => app(DebitNote::class)($record, $record->boletoPayments()->max('id'))),
+                                    self::deleteReceipts(),
+                                ])
                                 ->schema([
                                     RepeatableEntry::make('declarations')
                                         ->hiddenLabel()
@@ -343,17 +477,22 @@ class ChargeInfolist
                                         ->schema([
                                             TextEntry::make('file')
                                                 ->label('Arquivo')
-                                                ->placeholder('—'),
+                                                ->placeholder('—')
+                                                ->url($itemUrl)
+                                                ->openUrlInNewTab(),
                                             TextEntry::make('due')
                                                 ->label('Vencimento')
                                                 ->placeholder('—'),
                                         ]),
                                 ]),
                             Section::make('Baixa Manual')
+                                ->key('baixa_manual')
                                 ->visible($status(3))
+                                ->headerActions([self::printJustification()])
                                 ->schema([
                                     TextEntry::make('obs')
                                         ->label('Justificativa')
+                                        ->extraAttributes(['id' => 'justificativa'])
                                         ->placeholder('—')
                                         ->html()
                                         ->formatStateUsing(fn ($state) => nl2br(e((string) $state))),
@@ -366,53 +505,18 @@ class ChargeInfolist
                                         ->state(fn (FinCharges $r) => $details()->boletoReceipts($r))
                                         ->schema([
                                             TextEntry::make('file')
-                                                ->hiddenLabel(),
+                                                ->hiddenLabel()
+                                                ->url($itemUrl)
+                                                ->openUrlInNewTab(),
                                         ]),
                                 ]),
                             Section::make('NFSe')
-                                ->visible(fn (FinCharges $r) => $r->nfses()->exists() || $r->status->isSettled())
+                                ->visible(fn (FinCharges $r) => $r->nfses()->exists() || $r->status->isSettled() || app(IssueNfse::class)->canGenerate($r))
                                 ->schema([
-                                    RepeatableEntry::make('nfse_rows')
+                                    ViewEntry::make('nfse_rows')
                                         ->hiddenLabel()
-                                        ->columns(6)
-                                        ->placeholder('Nenhuma NFSe emitida para esta cobrança.')
-                                        ->state(fn (FinCharges $r) => $details()->nfses($r))
-                                        ->schema([
-                                            TextEntry::make('external_id')
-                                                ->label('Id externo'),
-                                            TextEntry::make('key')
-                                                ->label('Chave de acesso')
-                                                ->placeholder('—')
-                                                ->copyable(),
-                                            TextEntry::make('value')
-                                                ->label('Valor')
-                                                ->alignEnd(),
-                                            TextEntry::make('status')
-                                                ->label('Status')
-                                                ->badge()
-                                                ->color(fn (string $state) => match ($state) {
-                                                    'Autorizada' => 'success',
-                                                    'Rejeitada', 'Erro' => 'danger',
-                                                    'Cancelada' => 'gray',
-                                                    'Substituída' => 'info',
-                                                    default => 'warning',
-                                                }),
-                                            TextEntry::make('date')
-                                                ->label('Data'),
-                                            TextEntry::make('danfse')
-                                                ->label('DANFSe')
-                                                ->placeholder('—')
-                                                ->url(fn ($state) => $state)
-                                                ->openUrlInNewTab()
-                                                ->formatStateUsing(fn ($state) => filled($state) ? 'Abrir' : null),
-                                            TextEntry::make('notes')
-                                                ->hiddenLabel()
-                                                ->color('danger')
-                                                ->columnSpanFull()
-                                                ->visible(fn ($state) => filled($state))
-                                                ->html()
-                                                ->formatStateUsing(fn ($state) => nl2br(e((string) $state))),
-                                        ]),
+                                        ->view('filament.charges.nfse-table')
+                                        ->state(fn (FinCharges $r) => $details()->nfses($r)),
                                 ]),
                             Section::make('Documentos enviados')
                                 ->visible($status(0, 2, 3, 1))
@@ -424,7 +528,9 @@ class ChargeInfolist
                                         ->state(fn (FinCharges $r) => $details()->sentDocuments($r))
                                         ->schema([
                                             TextEntry::make('file')
-                                                ->label('Arquivo'),
+                                                ->label('Arquivo')
+                                                ->url($itemUrl)
+                                                ->openUrlInNewTab(),
                                             TextEntry::make('date')
                                                 ->label('Data')
                                                 ->placeholder('—'),
