@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources\NfseRules\Pages;
 
-use App\Actions\Cobranca\NfseRules\SaveNfseRule;
+use App\Actions\NfseRules\SaveNfseRule;
 use App\Filament\Resources\NfseRules\NfseRuleResource;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ManageRecords;

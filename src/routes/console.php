@@ -1,12 +1,12 @@
 <?php
 
 use App\Actions\Cobranca\Generation\GenerateAllCharges;
-use App\Actions\Cobranca\Notices\ExpenseDueNotice;
 use App\Actions\Cobranca\Notices\HapagPendingNotice;
 use App\Actions\Cobranca\Notices\OpenChargeReminders;
 use App\Actions\Cobranca\Notices\OpenChargesReport;
 use App\Actions\Cobranca\Notices\OpenImportChargesNotice;
 use App\Actions\Cobranca\Notices\ReleaseList;
+use App\Actions\Expenses\ExpenseDueNotice;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;

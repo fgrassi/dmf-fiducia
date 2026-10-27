@@ -2,8 +2,8 @@
 
 namespace App\Filament\Resources\InvoiceControls;
 
-use App\Actions\Cobranca\Generation\ChargeInvoiceControls;
-use App\Actions\Cobranca\Generation\InvoiceGate;
+use App\Actions\InvoiceControls\ChargeInvoiceControls;
+use App\Actions\InvoiceControls\InvoiceGate;
 use App\Enums\Cobranca\InvoiceControlStatus;
 use App\Filament\Resources\InvoiceControls\Pages\ListInvoiceControls;
 use App\Filament\Resources\InvoiceControls\Pages\ViewInvoiceControl;

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Actions\Cobranca\Notices;
+namespace App\Actions\Expenses;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;

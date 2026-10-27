@@ -1,7 +1,9 @@
 <?php
 
-namespace App\Actions\Cobranca\Generation;
+namespace App\Actions\InvoiceControls;
 
+use App\Actions\Cobranca\Generation\BookingChecks;
+use App\Actions\Cobranca\Generation\GenerateCharges;
 use App\Models\Embarque;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;

@@ -12,6 +12,7 @@ use App\Actions\Cobranca\Nfse\IssueNfse;
 use App\Actions\Cobranca\Nfse\NfseAlert;
 use App\Actions\Cobranca\Nfse\ServiceTaker;
 use App\Actions\Cobranca\Recalculation\ChargeRates;
+use App\Actions\InvoiceControls\InvoiceGate;
 use App\Enums\Cobranca\ChargeStatus;
 use App\Models\Embarque;
 use App\Models\FinCharges;

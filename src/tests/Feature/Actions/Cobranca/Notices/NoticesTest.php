@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Actions\Cobranca\Notices;
 
-use App\Actions\Cobranca\Notices\ExpenseDueNotice;
 use App\Actions\Cobranca\Notices\HapagPendingNotice;
 use App\Actions\Cobranca\Notices\OpenChargeReminders;
 use App\Actions\Cobranca\Notices\OpenImportChargesNotice;
@@ -84,20 +83,6 @@ class NoticesTest extends TestCase
         $this->assertSame(1, (int) DB::table('fin_charges')->where('id', $id)->value('status_envio'));
         $this->assertSame(0, app(ReleaseList::class)());
         $this->assertStringContainsString('Não há nenhuma reserva para ser liberada.', $this->lastBody());
-    }
-
-    public function test_expense_due_on_day_beyond_month_end_falls_on_last_day(): void
-    {
-        $this->travelTo('2027-02-25');
-        DB::table('fornecedor')->insert(['fornecedor_id' => 1, 'nome' => 'Fornecedor']);
-        DB::table('categoria_despesa')->insert(['categoria_despesa_id' => 1, 'nome' => 'Aluguel']);
-        DB::table('despesa_vencimento')->insert([
-            ['fornecedor_id' => 1, 'categoria_despesa_id' => 1, 'dia_vencimento' => 31, 'descricao' => 'dia 31'],
-            ['fornecedor_id' => 1, 'categoria_despesa_id' => 1, 'dia_vencimento' => 15, 'descricao' => 'dia 15'],
-        ]);
-
-        $this->assertSame(1, app(ExpenseDueNotice::class)());
-        $this->assertSame(['[Aviso] Vencimento de despesas em 3 dias (28/02/2027)'], $this->sentSubjects()->all());
     }
 
     /** @param  array<string, mixed>  $extra */

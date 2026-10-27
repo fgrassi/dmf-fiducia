@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\NfseRules;
 
 use App\Actions\Cobranca\Nfse\ServiceTaker;
-use App\Actions\Cobranca\NfseRules\SaveNfseRule;
+use App\Actions\NfseRules\SaveNfseRule;
 use App\Filament\Resources\NfseRules\Pages\ManageNfseRules;
 use App\Models\FinClientsNfseRegra;
 use App\Models\Pessoa;

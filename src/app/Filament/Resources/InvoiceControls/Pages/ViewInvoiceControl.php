@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources\InvoiceControls\Pages;
 
-use App\Actions\Cobranca\Generation\ChargeInvoiceControls;
+use App\Actions\InvoiceControls\ChargeInvoiceControls;
 use App\Enums\Cobranca\InvoiceControlStatus;
 use App\Filament\Resources\InvoiceControls\InvoiceControlResource;
 use Filament\Actions\Action;

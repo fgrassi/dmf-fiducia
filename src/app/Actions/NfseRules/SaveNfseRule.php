@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Actions\Cobranca\NfseRules;
+namespace App\Actions\NfseRules;
 
 use App\Models\FinClientsNfseRegra;
 use Illuminate\Support\Facades\DB;

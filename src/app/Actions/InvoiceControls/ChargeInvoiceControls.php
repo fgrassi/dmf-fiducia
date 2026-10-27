@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Actions\Cobranca\Generation;
+namespace App\Actions\InvoiceControls;
 
+use App\Actions\Cobranca\Generation\GenerateCharges;
 use App\Models\ControleInvoiceMaster;
 use App\Models\ControleInvoiceMasterLog;
 use Illuminate\Support\Facades\DB;
