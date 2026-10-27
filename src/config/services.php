@@ -42,6 +42,8 @@ return [
     // Geração automática das ICs (cobranca:gerar no agendador). Ligar só quando o cron do tracking for desligado.
     'cobranca' => [
         'automatic_generation' => env('COBRANCA_GERACAO_AUTOMATICA', false),
+        // avisos e relatórios do módulo cron do legado (cobranca:aviso-*, cobranca:relatorio-aberta, cobranca:relacao-liberacao)
+        'automatic_notices' => env('COBRANCA_ROTINAS_AUTOMATICAS', false),
     ],
 
     'slack' => [
