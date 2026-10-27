@@ -403,25 +403,10 @@ class ChargeInfolist
                                 ]),
                             Section::make('Histórico da IC')
                                 ->schema([
-                                    RepeatableEntry::make('history')
+                                    ViewEntry::make('history_table')
                                         ->hiddenLabel()
-                                        ->columns(5)
-                                        ->state(fn (FinCharges $r) => $details()->history($r))
-                                        ->placeholder('Nenhum evento registrado ainda.')
-                                        ->schema([
-                                            TextEntry::make('date')
-                                                ->label('Data'),
-                                            TextEntry::make('event')
-                                                ->label('Evento')
-                                                ->weight('bold'),
-                                            TextEntry::make('user')
-                                                ->label('Usuário'),
-                                            TextEntry::make('status')
-                                                ->label('Status'),
-                                            TextEntry::make('detail')
-                                                ->label('Detalhe')
-                                                ->placeholder('—'),
-                                        ]),
+                                        ->view('filament.charges.history-table')
+                                        ->state(fn (FinCharges $r) => $details()->history($r)),
                                 ]),
                         ]),
                         Group::make([
