@@ -41,6 +41,17 @@ class ClientBoletoResourceTest extends TestCase
             ->assertHasFormErrors(['ref_client' => 'required']);
     }
 
+    public function test_hides_rows_without_client(): void
+    {
+        $this->actingAs($this->user());
+        $withClient = FinClientsBoleto::forceCreate(['ref_client' => 5]);
+        $orphan = FinClientsBoleto::forceCreate(['ref_client' => null]);
+
+        Livewire::test(ManageClientBoletos::class)
+            ->assertCanSeeTableRecords([$withClient])
+            ->assertCanNotSeeTableRecords([$orphan]);
+    }
+
     public function test_removal_requires_justification_and_notifies_finance(): void
     {
         $this->actingAs($this->user());

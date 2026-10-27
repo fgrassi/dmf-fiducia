@@ -87,13 +87,15 @@ class ClientBoletoResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->with('client'))
+            ->modifyQueryUsing(fn ($query) => $query->has('client')->with('client'))
             ->defaultSort('client.nome')
             ->paginated(false)
             ->emptyStateHeading('Nenhum registro encontrado')
             ->columns([
                 TextColumn::make('client.nome')
                     ->label('Nome')
+                    ->width('40%')
+                    ->wrap()
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('client.cnpj')
