@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FinChargesTypes extends Model
 {
@@ -11,4 +12,11 @@ class FinChargesTypes extends Model
     protected $primaryKey = 'id';
 
     public $timestamps = false;
+
+    protected $guarded = [];
+
+    public function charges(): HasMany
+    {
+        return $this->hasMany(FinCharges::class, 'ref_type');
+    }
 }
