@@ -93,7 +93,7 @@ class RecalculateCharge
 
                 foreach ($charges as $c) {
                     if ($c->isNot($charge)) {
-                        $negotiated->each(fn ($rate) => $rate->replicate()->forceFill(['ref_charge' => $c->id])->save());
+                        $negotiated->each(fn ($rate) => $rate->replicate()->forceFill(['ref_charge' => $c->id, 'created_at' => $rate->getRawOriginal('created_at')])->save());
                     }
 
                     // legado: no "Todas" recalcula sempre, e IC com cotação desatualizada é pulada sem erro
@@ -227,7 +227,8 @@ class RecalculateCharge
         ])->save();
     }
 
-    private function recalculateItems(FinCharges $charge): void
+    /** Recalcula valor unitário, cotação e valor de cada item (compartilhado com o recálculo por serviço). */
+    public function recalculateItems(FinCharges $charge): void
     {
         $embarque = $charge->embarque;
         $clientId = ChargeRates::clientId($embarque);

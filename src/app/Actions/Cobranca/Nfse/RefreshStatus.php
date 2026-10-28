@@ -38,28 +38,35 @@ class RefreshStatus
         $data = is_array($response['body']) ? ($response['body']['data'] ?? $response['body']) : null;
 
         if (is_array($data)) {
-            if (! empty($data['status'])) {
-                $nfse->status = $data['status'];
-            }
+            $this->apply($nfse, $data);
+        } else {
+            $nfse->save();
+            ($this->email)($nfse->charge);
+        }
 
-            $nfse->applyApiData($data);
+        return $nfse;
+    }
 
-            if (! empty($data['erros'])) {
-                $nfse->erros_json = json_encode($data['erros']);
-            } elseif (in_array($data['status'] ?? null, ['autorizada', 'cancelada', 'substituida'], true) && empty($data['cancelamento']['falhou_em'])) {
-                $nfse->erros_json = null;
-            }
+    /** Grava os dados da nota vindos da API (consulta ou webhook): status, erros, vínculo de substituição e e-mail de autorização. */
+    public function apply(FinChargesNfse $nfse, array $data): void
+    {
+        if (! empty($data['status'])) {
+            $nfse->status = $data['status'];
+        }
+
+        $nfse->applyApiData($data);
+
+        if (! empty($data['erros'])) {
+            $nfse->erros_json = json_encode($data['erros']);
+        } elseif (in_array($data['status'] ?? null, ['autorizada', 'cancelada', 'substituida'], true) && empty($data['cancelamento']['falhou_em'])) {
+            $nfse->erros_json = null;
         }
 
         $nfse->save();
 
-        if (is_array($data)) {
-            $this->linkSubstitution($nfse, $data);
-        }
+        $this->linkSubstitution($nfse, $data);
 
         ($this->email)($nfse->charge);
-
-        return $nfse;
     }
 
     /** aplicarVinculoSubstituicao: substituta autorizada → original vira "substituida". */

@@ -44,6 +44,8 @@ return [
         'automatic_generation' => env('COBRANCA_GERACAO_AUTOMATICA', false),
         // avisos e relatórios do módulo cron do legado (cobranca:aviso-*, cobranca:relatorio-aberta, cobranca:relacao-liberacao)
         'automatic_notices' => env('COBRANCA_ROTINAS_AUTOMATICAS', false),
+        // token Bearer do GET /api/cron/recalculaCobranca (job UpdateCharge da intranet); vazio = endpoint recusa (503)
+        'recalculation_token' => env('COBRANCA_RECALCULO_TOKEN'),
     ],
 
     'slack' => [

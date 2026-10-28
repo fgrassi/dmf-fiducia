@@ -100,7 +100,7 @@ class NfseSettings extends Page implements HasTable
                                     ->maxLength(2048),
                                 TextInput::make('webhook_secret')
                                     ->label('Segredo HMAC do webhook')
-                                    ->helperText('Mesmo valor de NFSE_WEBHOOK_SECRET no emissor. Quando preenchido, valida o header X-Nfse-Signature (sha256=HMAC).')
+                                    ->helperText('Mesmo valor de NFSE_WEBHOOK_SECRET no emissor. Obrigatório para o webhook funcionar: valida o header X-Nfse-Signature (sha256=HMAC) e, sem ele, o sistema recusa o callback.')
                                     ->password()
                                     ->revealable()
                                     ->maxLength(255),
