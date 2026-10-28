@@ -269,8 +269,8 @@ class ChargeInfolist
             ->link()
             ->alpineClickHandler(<<<'JS'
                 const w = window.open('', '', 'height=600,width=800');
-                w.document.write('<html><head><title>Impressão</title></head><body>' + document.getElementById('justificativa').innerHTML + '</body></html>');
-                w.document.close();
+                w.document.title = 'Impressão';
+                w.document.body.innerHTML = document.getElementById('justificativa').innerHTML;
                 w.print();
                 JS);
     }

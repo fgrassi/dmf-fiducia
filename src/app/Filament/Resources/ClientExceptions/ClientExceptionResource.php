@@ -24,7 +24,7 @@ class ClientExceptionResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Clientes que não recebem cobrança automática';
 
-    protected static ?string $navigationLabel = 'Clientes de Exceção';
+    protected static ?string $navigationLabel = 'Exceções';
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-no-symbol';
 
