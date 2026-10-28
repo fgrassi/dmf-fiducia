@@ -7,9 +7,9 @@ use App\Actions\Cobranca\Nfse\IssueNfse;
 use App\Actions\Cobranca\Nfse\NfseApi;
 use App\Actions\Cobranca\Nfse\ServiceTaker;
 use App\Actions\Cobranca\Nfse\SubstituteNfse;
+use App\Filament\Actions\SearchCityAction;
 use App\Models\FinCharges;
 use App\Models\FinChargesNfse;
-use Filament\Actions\Action;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
@@ -278,7 +278,7 @@ class NfseEmissionForm
                                 ->helperText('Preenchido pelo CEP ou pela busca de município (ignora acentos).')
                                 ->required()
                                 ->regex('/^\d{7}$/')
-                                ->suffixAction(self::searchCityAction()),
+                                ->suffixAction(SearchCityAction::make('endereco_codigo_municipio', 'endereco_uf')),
                         ]),
                     Grid::make(2)
                         ->visible($enabled)
@@ -420,35 +420,5 @@ class NfseEmissionForm
     private static function documentWarning(Get $get): ?string
     {
         return ServiceTaker::documentWarning((string) ($get('tipo') ?: 'pj'), (string) $get('cpf_cnpj'), manual: $get('pessoa_id') === ServiceTaker::MANUAL);
-    }
-
-    /** "Buscar (IBGE)" do legado: município pelo nome (sem acentos); preenche o código IBGE e a UF. */
-    private static function searchCityAction(): Action
-    {
-        return Action::make('searchCity')
-            ->label('Buscar (IBGE)')
-            ->icon('heroicon-o-magnifying-glass')
-            ->modalHeading('Buscar município (IBGE)')
-            ->modalWidth('md')
-            ->schema([
-                Select::make('city')
-                    ->label('Município')
-                    ->placeholder('Nome da cidade (mín. 2 letras)')
-                    ->searchable()
-                    ->searchDebounce(350)
-                    ->required()
-                    ->getSearchResultsUsing(fn (string $search) => collect(app(AddressLookup::class)->searchCities($search))
-                        ->mapWithKeys(fn (array $c) => [$c['id'] => "{$c['nome']}".($c['uf'] ? " / {$c['uf']}" : '')." ({$c['id']})"])
-                        ->all()),
-            ])
-            ->action(function (array $data, Set $set) {
-                $city = app(AddressLookup::class)->city((string) $data['city']);
-
-                $set('endereco_codigo_municipio', $data['city']);
-
-                if ($city['uf'] ?? null) {
-                    $set('endereco_uf', $city['uf']);
-                }
-            });
     }
 }
