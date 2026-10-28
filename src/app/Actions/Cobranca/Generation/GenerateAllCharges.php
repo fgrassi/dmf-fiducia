@@ -15,6 +15,9 @@ class GenerateAllCharges
 {
     private const LOCK_ID = 5;
 
+    /** Usuário do cron (chamado@dmflog.com.br, o mesmo que o legado grava em transborda): controle de invoice exige created_by. */
+    private const SYSTEM_USER = 1;
+
     /** Importações só entram até este horário. */
     private const IMPORT_CUTOFF = '23:00';
 
@@ -37,6 +40,7 @@ class GenerateAllCharges
         }
 
         try {
+            $userId ??= self::SYSTEM_USER;
             $created = ($this->generate)($this->sources(), null, $userId);
 
             $handling = Embarque::where('tipo_embarque', 'h')->where('ctr_desp', 1)->orderBy('embarque_id')->get();

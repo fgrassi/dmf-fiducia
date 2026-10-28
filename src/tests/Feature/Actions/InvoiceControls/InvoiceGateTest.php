@@ -7,6 +7,7 @@ use App\Actions\InvoiceControls\InvoiceGate;
 use App\Enums\Cobranca\InvoiceControlStatus;
 use App\Models\Embarque;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use stdClass;
 use Tests\Concerns\LegacySchema;
 use Tests\TestCase;
@@ -60,6 +61,28 @@ class InvoiceGateTest extends TestCase
         app(InvoiceGate::class)->sendDigest();
 
         $this->assertSame(['DMF Logistics: Controle de Invoice: pendentes e aguardando arquivo'], $this->sentSubjects()->all());
+    }
+
+    public function test_digest_keeps_legacy_order_where_strtotime_reads_the_formatted_eta_as_month_first(): void
+    {
+        $this->booking(invoiceExpo: 1);
+        DB::table('embarque')->where('embarque_id', 10)->update(['chegada_prevista' => '2026-12-25']);
+        DB::table('embarque')->insert(['embarque_id' => 11, 'booking' => 'BKG2', 'tipo_embarque' => 'm', 'impor_expor' => 'e', 'armador_id' => 19, 'chegada_prevista' => '2026-01-10']);
+        foreach ([10 => 'MBLA', 11 => 'MBLB'] as $embarque => $mbl) {
+            DB::table('controle_invoice_master')->insert([
+                'embarque_id' => $embarque,
+                'armador_id' => 19,
+                'mbl_number' => $mbl,
+                'status' => InvoiceControlStatus::ReleasedAwaitingFile->value,
+                'created_at' => now(),
+                'created_by' => 1,
+            ]);
+        }
+
+        app(InvoiceGate::class)->sendDigest();
+
+        $body = Mail::mailer('array')->getSymfonyTransport()->messages()->last()->getOriginalMessage()->getHtmlBody();
+        $this->assertLessThan(strpos($body, 'MBLB'), strpos($body, 'MBLA'));
     }
 
     public function test_digest_is_not_sent_when_nothing_is_pending(): void

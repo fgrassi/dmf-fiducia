@@ -8,10 +8,8 @@ use App\Actions\Cobranca\Generation\GenerateManualCharge;
 use App\Actions\Cobranca\Listing\BuildChargeListQuery;
 use App\Actions\Cobranca\Listing\ExportCharges;
 use App\Actions\Cobranca\Nfse\SyncPendingNfse;
-use App\Enums\Cobranca\ChargeStatus;
 use App\Filament\Resources\Charges\ChargeResource;
 use App\Models\Embarque;
-use App\Models\FinCharges;
 use DomainException;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
@@ -21,7 +19,11 @@ use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Illuminate\Contracts\Pagination\CursorPaginator;
+use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
+use Livewire\Attributes\Locked;
 
 class ListCharges extends ListRecords
 {
@@ -30,29 +32,47 @@ class ListCharges extends ListRecords
     /** Máximo de consultas à API de NFS-e ao abrir a lista (sincronizarStatusNfsePendentes do legado). */
     private const NFSE_SYNC_LIMIT = 15;
 
+    /** Chave (filtros, busca, aba, página, ordem) da última página sincronizada: a lista só sincroniza quando ela muda. */
+    #[Locked]
+    public string $nfseSyncedFor = '';
+
     /**
-     * executeList (legado): alinha com a API as NFS-e pendentes da primeira página (Abertos, mais recentes)
+     * executeList (legado): a cada carga da lista, alinha com a API as NFS-e pendentes da página exibida (até 15 consultas)
      * e reenvia o e-mail de autorização que não saiu.
      */
-    public function mount(): void
+    public function getTableRecords(): Collection|Paginator|CursorPaginator
     {
-        parent::mount();
+        $records = parent::getTableRecords();
+        $key = md5(json_encode([$this->tableFilters, $this->tableSearch, $this->activeTab, $this->getTablePage(), $this->tableSort]));
 
+        if ($key === $this->nfseSyncedFor) {
+            return $records;
+        }
+
+        $this->nfseSyncedFor = $key;
+        $this->syncNfse($records instanceof Paginator || $records instanceof CursorPaginator ? $records->getCollection() : $records);
+        $this->cachedTableRecords = null;
+
+        return parent::getTableRecords();
+    }
+
+    /** sincronizarStatusNfsePendentes: 1º laço consulta a API (limite de 15), 2º laço reenvia o e-mail de todas as da página. */
+    private function syncNfse(Collection $charges): void
+    {
         $sync = app(SyncPendingNfse::class);
         $refreshed = 0;
 
-        FinCharges::where('status', ChargeStatus::Open->value)
-            ->whereHas('nfses')
-            ->orderByDesc('id')
-            ->limit(50)
-            ->get()
-            ->each(function (FinCharges $charge) use ($sync, &$refreshed) {
-                if ($refreshed >= self::NFSE_SYNC_LIMIT) {
-                    return false;
-                }
+        foreach ($charges as $charge) {
+            if ($refreshed >= self::NFSE_SYNC_LIMIT) {
+                break;
+            }
 
-                $refreshed += (int) $sync($charge);
-            });
+            $refreshed += (int) $sync->refresh($charge);
+        }
+
+        foreach ($charges as $charge) {
+            $sync->retryEmail($charge);
+        }
     }
 
     protected function getHeaderActions(): array

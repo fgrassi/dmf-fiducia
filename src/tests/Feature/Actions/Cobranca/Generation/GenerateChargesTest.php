@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Actions\Cobranca\Generation;
 
+use App\Actions\Cobranca\Generation\GenerateAllCharges;
 use App\Actions\Cobranca\Generation\GenerateCharges;
 use App\Actions\InvoiceControls\ChargeInvoiceControls;
 use App\Enums\Cobranca\InvoiceControlStatus;
@@ -71,6 +72,35 @@ class GenerateChargesTest extends TestCase
         $this->assertSame('MBL1', $control->mbl_number);
         $this->assertSame(['criacao'], $control->logs()->pluck('acao')->all());
         $this->assertContains('DMF Logistics: Controle de Invoice: pendentes e aguardando arquivo', $this->sentSubjects());
+    }
+
+    public function test_round_without_bookings_does_not_send_invoice_digest(): void
+    {
+        $this->maritimeExportBooking(carrierRequiresInvoice: true);
+        ControleInvoiceMaster::forceCreate([
+            'embarque_id' => self::BOOKING,
+            'armador_id' => self::CARRIER,
+            'mbl_number' => 'MBL1',
+            'status' => InvoiceControlStatus::ReleasedAwaitingFile,
+            'created_at' => now(),
+            'created_by' => self::USER,
+        ]);
+
+        app(GenerateCharges::class)([], null, self::USER);
+
+        $this->assertSame([], $this->sentSubjects()->all());
+    }
+
+    public function test_automatic_round_without_user_creates_invoice_control_as_system_user(): void
+    {
+        $this->maritimeExportBooking(carrierRequiresInvoice: true);
+        DB::table('embarque')->where('embarque_id', self::BOOKING)->update(['finalizado' => 'a']);
+        DB::table('configuracoes')->insert(['configuracoes_id' => 5, 'valor' => '0']);
+        DB::table('departure_confirmation')->insert(['ref_embarque' => self::BOOKING, 'control' => 0, 'created_by' => self::USER]);
+
+        $this->assertSame(0, app(GenerateAllCharges::class)(null));
+
+        $this->assertSame(self::USER, (int) ControleInvoiceMaster::sole()->created_by);
     }
 
     public function test_charges_once_invoice_control_is_released(): void

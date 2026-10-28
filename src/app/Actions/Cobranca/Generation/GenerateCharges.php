@@ -82,8 +82,10 @@ class GenerateCharges
     public function __invoke(iterable $sources, ?array $only, ?int $userId): int
     {
         $this->start($userId);
+        $received = false;
 
         foreach ($sources as [$embarqueId, $markGenerated]) {
+            $received = true;
             $b = Embarque::find($embarqueId);
 
             if ($b && $this->booking($b, $only)) {
@@ -91,7 +93,7 @@ class GenerateCharges
             }
         }
 
-        return $this->finish();
+        return $this->finish($received);
     }
 
     /**
@@ -137,12 +139,20 @@ class GenerateCharges
         $this->userId = $userId;
     }
 
-    /** Fim da rodada: resumo, alertas de NFS-e e digest de invoice ao financeiro. @return int ICs criadas */
-    private function finish(): int
+    /**
+     * Fim da rodada: resumo, alertas de NFS-e e digest de invoice ao financeiro.
+     * Como no legado (count($reservas) > 0), rodada sem nenhuma reserva não envia o digest.
+     *
+     * @return int ICs criadas
+     */
+    private function finish(bool $received): int
     {
         $this->summary();
         ($this->alert)($this->nfseAlerts);
-        $this->invoices->sendDigest();
+
+        if ($received) {
+            $this->invoices->sendDigest();
+        }
 
         return count($this->created);
     }

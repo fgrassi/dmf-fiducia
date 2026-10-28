@@ -25,11 +25,11 @@ class ListInvoiceControls extends ListRecords
         ];
     }
 
-    /** Abas do legado: Pendentes / OK / Liberados (aguardando arquivos). */
+    /** Abas do legado: Pendentes / OK / Liberados (aguardando arquivos), com o contador respeitando os filtros (contarPorStatus). */
     public function getTabs(): array
     {
         $tab = fn (string $label, InvoiceControlStatus $status) => Tab::make($label)
-            ->badge(ControleInvoiceMaster::where('status', $status)->count())
+            ->badge(fn () => $this->filterTableQuery(ControleInvoiceMaster::query())->where('status', $status)->count())
             ->badgeColor($status->getColor())
             ->modifyQueryUsing(fn ($query) => $query->where('status', $status));
 

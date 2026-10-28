@@ -40,6 +40,24 @@ class InvoiceControlResourceTest extends TestCase
             ->assertCanNotSeeTableRecords([$pending]);
     }
 
+    public function test_tab_counters_follow_the_search(): void
+    {
+        $this->actingAs($this->user());
+        $this->control(InvoiceControlStatus::Pending, 'MBL1');
+        $this->control(InvoiceControlStatus::Pending, 'MBL2');
+        $this->control(InvoiceControlStatus::Ok, 'MBL1OK');
+
+        $list = Livewire::test(ListInvoiceControls::class);
+
+        $this->assertEquals(2, $list->instance()->getTabs()['pendentes']->getBadge());
+
+        $list->searchTable('MBL1');
+
+        $this->assertEquals(1, $list->instance()->getTabs()['pendentes']->getBadge());
+        $this->assertEquals(1, $list->instance()->getTabs()['ok']->getBadge());
+        $this->assertEquals(0, $list->instance()->getTabs()['liberados']->getBadge());
+    }
+
     public function test_bulk_release_without_invoice_marks_released_controls_ok(): void
     {
         $this->actingAs($this->user());

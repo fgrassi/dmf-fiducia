@@ -73,7 +73,7 @@ class InvoiceGate
         $rows = $this->blocked;
         $this->blocked = [];
 
-        $released = DB::table('controle_invoice_master')->where('status', self::RELEASED_AWAITING_FILE)->get();
+        $released = DB::table('controle_invoice_master')->where('status', self::RELEASED_AWAITING_FILE)->orderBy('controle_invoice_master_id')->get();
 
         foreach ($released as $control) {
             $b = Embarque::find($control->embarque_id);
@@ -97,9 +97,10 @@ class InvoiceGate
             return;
         }
 
-        // NotificationDigest ordena pela data (ETA, senão ETD)
+        $rows = array_values($rows);
+        usort($rows, fn (array $a, array $b) => self::legacyOrder($a, $b));
+
         $lines = collect($rows)
-            ->sortBy('sort')
             ->map(fn (array $r) => '<tr>'.collect(['armador', 'reserva', 'cliente', 'mbl', 'created_at', 'etd', 'eta', 'liberado_at', 'situacao'])
                 ->map(fn ($k) => '<td>'.e($r[$k]).'</td>')
                 ->implode('').'</tr>')
@@ -124,8 +125,23 @@ class InvoiceGate
             'etd' => self::date($b->saida_prevista),
             'eta' => self::date($b->chegada_prevista),
             'liberado_at' => self::date($releasedAt),
-            'sort' => (string) ($b->chegada_prevista ?: $b->saida_prevista),
         ];
+    }
+
+    /**
+     * NotificationDigest::sendViaFiducia (legado): ordena por strtotime do ETA (senão ETD) já formatado em d/m/Y.
+     * Como no legado, strtotime lê d/m/Y como m/d/Y (dia > 12 vira false) e o comparador mistura false com inteiros,
+     * então a ordem real é quase sempre a de inserção. Mantido igual de propósito.
+     *
+     * @param  array<string, string>  $a
+     * @param  array<string, string>  $b
+     */
+    private static function legacyOrder(array $a, array $b): int
+    {
+        $date = fn (array $r) => ($r['eta'] ?? '') ? strtotime($r['eta']) : (($r['etd'] ?? '') ? strtotime($r['etd']) : 0);
+        [$da, $db] = [$date($a), $date($b)];
+
+        return $da === $db ? 0 : ($da < $db ? -1 : 1);
     }
 
     /** ControleInvoiceMasterLogService::formatarData: d/m/Y, com hora quando houver. */
