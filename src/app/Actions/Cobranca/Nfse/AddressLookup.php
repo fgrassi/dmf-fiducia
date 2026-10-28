@@ -135,21 +135,22 @@ class AddressLookup
     /**
      * buildEnderecoTomadorFromOpenCnpj: endereço do CNPJ (o IBGE vem da API ou é resolvido pelo nome do município).
      *
-     * @return array{endereco:array<string, string>, erro:?string}
+     * @return array{endereco:array<string, string>, erro:?string, razao_social:string, municipio:string, pais:string}
      */
     public function openCnpj(string $cnpj): array
     {
         $empty = ['cep' => '', 'logradouro' => '', 'numero' => '', 'bairro' => '', 'codigo_municipio' => '', 'uf' => ''];
+        $extra = ['razao_social' => '', 'municipio' => '', 'pais' => ''];
         $cnpj = ServiceTaker::normalizeCnpj($cnpj);
 
         if (! ServiceTaker::validCnpj($cnpj)) {
-            return ['endereco' => $empty, 'erro' => 'CNPJ do tomador inválido para consulta na OpenCNPJ.'];
+            return ['endereco' => $empty, 'erro' => 'CNPJ do tomador inválido para consulta na OpenCNPJ.'] + $extra;
         }
 
         try {
             $response = Http::timeout(self::TIMEOUT)->connectTimeout(3)->acceptJson()->get("https://api.opencnpj.org/{$cnpj}");
         } catch (ConnectionException) {
-            return ['endereco' => $empty, 'erro' => 'Não foi possível consultar o CNPJ na OpenCNPJ. Tente novamente em instantes.'];
+            return ['endereco' => $empty, 'erro' => 'Não foi possível consultar o CNPJ na OpenCNPJ. Tente novamente em instantes.'] + $extra;
         }
 
         $data = $response->json();
@@ -162,7 +163,7 @@ class AddressLookup
         };
 
         if ($error) {
-            return ['endereco' => $empty, 'erro' => $error];
+            return ['endereco' => $empty, 'erro' => $error] + $extra;
         }
 
         $uf = strtoupper(trim((string) ($data['uf'] ?? '')));
@@ -183,6 +184,9 @@ class AddressLookup
                 'uf' => $uf,
             ],
             'erro' => null,
+            'razao_social' => trim((string) ($data['razao_social'] ?? '')),
+            'municipio' => $city,
+            'pais' => trim((string) ($data['pais']['descricao'] ?? '')) ?: ($uf !== '' ? 'Brasil' : ''),
         ];
     }
 }

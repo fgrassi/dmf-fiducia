@@ -5,6 +5,7 @@ use App\Actions\Cobranca\Notices\HapagPendingNotice;
 use App\Actions\Cobranca\Notices\OpenChargeReminders;
 use App\Actions\Cobranca\Notices\OpenChargesReport;
 use App\Actions\Cobranca\Notices\OpenImportChargesNotice;
+use App\Actions\Cobranca\Notices\PendingTakersNotice;
 use App\Actions\Cobranca\Notices\ReleaseList;
 use App\Actions\Expenses\ExpenseDueNotice;
 use Illuminate\Foundation\Inspiring;
@@ -43,6 +44,7 @@ $notices = [
     ['cobranca:aviso-hapag', HapagPendingNotice::class, 'Avisa o financeiro das exportações Hapag pendentes de cobrança (avisoCobrancaHapag)', '08:00'],
     ['cobranca:relatorio-aberta', OpenChargesReport::class, 'Relatório interno das cobranças em aberto há 7 dias ou mais (relatorioCobrancaAberta)', '08:00'],
     ['cobranca:relacao-liberacao', ReleaseList::class, 'Relação de reservas autorizadas para liberação de BL (relacaoCobrancaReservaExpo)', '18:00'],
+    ['cobranca:aviso-pendencia-tomador', PendingTakersNotice::class, 'Avisa o TI dos tomadores com pendência de cadastro nos próximos 5 dias (avisoPendenciaTomador)', '08:00'],
     ['cobranca:aviso-vencimento-despesa', ExpenseDueNotice::class, 'Lembrete dos vencimentos de despesas em 3 dias (avisoVencimentoDespesa)', '08:00'],
 ];
 
@@ -53,8 +55,10 @@ foreach ($notices as [$command, $action, $purpose, $time]) {
 
     // ponytail: horários chutados (o crontab do tracking não está no repo); confirmar com produção antes de ligar
     // desligado até o cron do tracking parar de chamar cron/<rotina> (COBRANCA_ROTINAS_AUTOMATICAS=true)
+    // avisoPendenciaTomador rodava só em dias úteis (0 8 * * 1-5)
     Schedule::command($command)
         ->dailyAt($time)
         ->withoutOverlapping()
-        ->when(fn () => (bool) config('services.cobranca.automatic_notices'));
+        ->when(fn () => (bool) config('services.cobranca.automatic_notices')
+            && ($command !== 'cobranca:aviso-pendencia-tomador' || ! now()->isWeekend()));
 }
