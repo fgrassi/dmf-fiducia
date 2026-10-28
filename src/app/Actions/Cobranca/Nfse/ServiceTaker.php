@@ -5,6 +5,7 @@ namespace App\Actions\Cobranca\Nfse;
 use App\Actions\Cobranca\Recalculation\ChargeRates;
 use App\Models\Embarque;
 use App\Models\FinCharges;
+use App\Models\FinChargesNfse;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -32,7 +33,7 @@ class ServiceTaker
 
     private const FORMATTED_CNPJ = '/\b\d{2}\.+\d{3}\.+\d{3}\s?\/\s?\d{4}\s?\-\s?\d{2}\b/';
 
-    private const UF_NAMES = [
+    public const UF_NAMES = [
         'ACRE' => 'AC', 'ALAGOAS' => 'AL', 'AMAPA' => 'AP', 'AMAZONAS' => 'AM', 'BAHIA' => 'BA', 'CEARA' => 'CE',
         'DISTRITO FEDERAL' => 'DF', 'ESPIRITO SANTO' => 'ES', 'GOIAS' => 'GO', 'MARANHAO' => 'MA', 'MATO GROSSO DO SUL' => 'MS',
         'MATO GROSSO' => 'MT', 'MINAS GERAIS' => 'MG', 'PARA' => 'PA', 'PARAIBA' => 'PB', 'PARANA' => 'PR', 'PERNAMBUCO' => 'PE',
@@ -111,7 +112,11 @@ class ServiceTaker
             $t = $this->fromClient($charge);
             $choices[self::CLIENT] = "Cliente da reserva: {$t['nome']} ({$t['cpf_cnpj']})";
         } catch (DomainException) {
-            $choices[self::CLIENT] = 'Cliente da reserva (dados inconsistentes no cadastro)';
+            if (($id = ChargeRates::clientId($charge->embarque)) > 0) {
+                $person = DB::table('pessoa')->where('pessoa_id', $id)->first(['razao_social', 'nome']);
+                $name = trim((string) $person?->razao_social) ?: trim((string) $person?->nome);
+                $choices[self::CLIENT] = 'Cliente da reserva'.($name !== '' ? ": {$name}" : '').' (dados inconsistentes no cadastro)';
+            }
         }
 
         return $choices + [self::MANUAL => 'Digitar tomador'];
@@ -247,6 +252,12 @@ class ServiceTaker
         $name = trim(preg_replace('/[\s,;\-\/]*\b(C\.?N\.?P\.?J|C\.?N\.?J\.?P|C\.?P\.?F)\b\s*:?\s*$/i', '', $name), " \t.,;:-");
 
         return $name === '' ? null : ['nome' => $name, 'cpf_cnpj' => $number, 'tipo' => $type];
+    }
+
+    /** avaliarDocumentoTextoBl: só o número (CNPJ/CPF válido) do texto do BL, ou null. */
+    public static function documentIn(string $text): ?string
+    {
+        return self::findDocument(str_replace(["\r\n", "\r"], "\n", $text))[0] ?? null;
     }
 
     /** achaDocumentoNoTextoBl: [número, pj|pf, posição]. */
@@ -425,7 +436,7 @@ class ServiceTaker
             },
             'bairro' => match (true) {
                 $len('bairro') === 0 => 'Bairro do tomador é obrigatório.',
-                $len('bairro') > 100 => 'Bairro do tomador deve ter no máximo 100 caracteres.',
+                $len('bairro') > 60 => 'Bairro do tomador deve ter no máximo 60 caracteres.',
                 default => null,
             },
             'codigo_municipio' => strlen(preg_replace('/\D+/', '', (string) ($a['codigo_municipio'] ?? ''))) !== 7 ? 'Código IBGE do município do tomador deve ter 7 dígitos.' : null,
@@ -444,14 +455,14 @@ class ServiceTaker
             $uf = $state ? self::uf((string) $state->uf, (string) $state->nome) : '';
         }
 
-        return $this->splitNumber([
+        return self::sanitizedAddress($this->splitNumber([
             'cep' => preg_replace('/\D+/', '', (string) $person->cep),
             'logradouro' => trim((string) $person->endereco),
             'numero' => '',
             'bairro' => trim((string) $person->bairro),
             'codigo_municipio' => preg_replace('/\D+/', '', (string) $person->codigo_municipio_ibge),
             'uf' => $uf,
-        ]);
+        ]));
     }
 
     /** Campos endereco_* do formulário (defaultsFormularioEndereco). */
@@ -492,6 +503,46 @@ class ServiceTaker
     public static function normalizeCnpj(string $value): string
     {
         return strtoupper(preg_replace('/[\s.\-\/]/', '', $value));
+    }
+
+    /** crmValidatorCnpj::format: máscara só no CNPJ numérico de 14 dígitos; o resto volta normalizado. */
+    public static function formatDocument(string $value): string
+    {
+        $doc = self::normalizeCnpj($value);
+
+        return preg_match('/^\d{14}$/', $doc) ? preg_replace('/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/', '$1.$2.$3/$4-$5', $doc) : $doc;
+    }
+
+    /**
+     * NfseTomadorDocValidator.js (legado): aviso enquanto o documento é digitado. Vazio só avisa no "Digitar tomador".
+     *
+     * @param  string  $type  pj|pf
+     */
+    public static function documentWarning(string $type, string $value, bool $manual = true): ?string
+    {
+        $value = trim($value);
+
+        if ($value === '') {
+            return $manual ? 'Informe o CPF ou CNPJ do tomador.' : null;
+        }
+
+        if ($type === 'pf') {
+            $cpf = preg_replace('/\D+/', '', $value);
+
+            return match (true) {
+                strlen($cpf) !== 11 => 'CPF deve conter 11 dígitos.',
+                ! self::validCpf($cpf) => "CPF inválido (dígito verificador): {$cpf}.",
+                default => null,
+            };
+        }
+
+        $cnpj = self::normalizeCnpj($value);
+
+        return match (true) {
+            strlen($cnpj) !== 14 => 'CNPJ deve conter 14 caracteres (numérico ou alfanumérico).',
+            ! self::validCnpj($cnpj) => "CNPJ inválido (dígito verificador): {$cnpj}.",
+            default => null,
+        };
     }
 
     /** crmValidatorCnpj::isValid: numérico ou alfanumérico (12 alfanuméricos + 2 DV, valor ASCII − 48). */
@@ -588,6 +639,16 @@ class ServiceTaker
             ->first();
     }
 
+    /** O endereço já nasce saneado (TSString, 255/60/60), como no legado: a validação e o payload veem o texto cortado. */
+    private static function sanitizedAddress(array $a): array
+    {
+        return array_merge($a, [
+            'logradouro' => FinChargesNfse::tsString($a['logradouro'], 255),
+            'numero' => FinChargesNfse::tsString($a['numero'], 60),
+            'bairro' => FinChargesNfse::tsString($a['bairro'], 60),
+        ]);
+    }
+
     /** enderecoTomadorComChaves. @return Address */
     private function addressWithKeys(array $address): array
     {
@@ -596,11 +657,11 @@ class ServiceTaker
         $a['codigo_municipio'] = preg_replace('/\D+/', '', $a['codigo_municipio']);
         $a['uf'] = strtoupper($a['uf']);
 
-        return $a;
+        return self::sanitizedAddress($a);
     }
 
     /** aplicarNumeroDoLogradouro + separarNumeroLogradouro: "Rua X, 123, sala 2" → número 123 quando o número está vazio. @return Address */
-    private function splitNumber(array $address): array
+    public function splitNumber(array $address): array
     {
         if (trim((string) $address['numero']) !== '') {
             return $address;

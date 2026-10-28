@@ -321,7 +321,11 @@ class IssueNfse
             + array_filter(['telefone' => ServiceTaker::phone($taker['telefone'] ?? ''), 'email' => ServiceTaker::email($taker['email'] ?? '')]);
 
         if (! empty($taker['endereco'])) {
-            $takerPayload['endereco'] = $taker['endereco'];
+            $takerPayload['endereco'] = array_merge($taker['endereco'], [
+                'logradouro' => FinChargesNfse::tsString($taker['endereco']['logradouro'] ?? '', 255),
+                'numero' => FinChargesNfse::tsString($taker['endereco']['numero'] ?? '', 60),
+                'bairro' => FinChargesNfse::tsString($taker['endereco']['bairro'] ?? '', 60),
+            ]);
         }
 
         $values = ['valor_servicos' => $amount, 'trib_issqn' => $issqn, 'iss_retido' => $issqn !== '4' && (bool) $operation->iss_retido];
@@ -358,8 +362,8 @@ class IssueNfse
                 'codigo_nbs' => $nbs,
             ], fn ($v) => $v !== null),
             'valores' => $values,
-            'informacoes_complementares' => 'Reserva: '.(trim((string) $e->booking) ?: '-')." ({$charge->id})"
-                .(filled(trim((string) $e->house_bl)) ? ' | BLs (numeros): '.trim((string) $e->house_bl) : ''),
+            'informacoes_complementares' => FinChargesNfse::tsString('Reserva: '.(trim((string) $e->booking) ?: '-')." ({$charge->id})"
+                .(filled(trim((string) $e->house_bl)) ? ' | BLs (numeros): '.trim((string) $e->house_bl) : ''), 2000),
             'webhook_url' => trim((string) $config->webhook_url),
             'serie_dps' => (string) $config->serie_dps,
             // a API exige codigo_nbs junto com ibs_cbs

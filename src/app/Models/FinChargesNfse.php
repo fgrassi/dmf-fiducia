@@ -38,6 +38,19 @@ class FinChargesNfse extends Model
         return isset(self::SUBSTITUTION_REASONS[$code]) ? $code : '';
     }
 
+    /**
+     * sanitizarTsString: TSString do XSD nacional ([!-ÿ][ -ÿ]*[!-ÿ]). Travessão, aspas tipográficas e o que passa de U+00FF
+     * quebram o pattern e a SEFIN rejeita com E1235.
+     */
+    public static function tsString(mixed $text, int $max = 255): string
+    {
+        $text = preg_replace('/\p{Pd}/u', '-', (string) $text) ?? (string) $text;
+        $text = strtr($text, ['−' => '-', '‘' => "'", '’' => "'", '‚' => "'", '“' => '"', '”' => '"', '„' => '"', '…' => '...', '•' => '-', "\u{a0}" => ' ']);
+        $text = preg_replace(['/[\r\n\t\f\v]+/', '/[\x{200B}-\x{200D}\x{FEFF}]/u', '/[^\x20-\x7E\x{A0}-\x{FF}]/u'], [' ', '', ''], $text) ?? '';
+
+        return rtrim(mb_substr(trim(preg_replace('/ +/', ' ', $text)), 0, $max));
+    }
+
     /** IDs de operação com emissão ativa na IC (listarOperacaoIdsComEmissaoAtiva), ou só autorizadas. @return array<int, true> */
     public static function activeOperations(int $chargeId, bool $authorizedOnly = false): array
     {

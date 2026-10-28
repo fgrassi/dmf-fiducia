@@ -6,6 +6,7 @@ use App\Actions\Cobranca\Nfse\IssueNfse;
 use App\Actions\Cobranca\Nfse\ServiceTaker;
 use App\Models\FinChargesNfse;
 use DomainException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class NfseRulesTest extends TestCase
@@ -66,5 +67,26 @@ class NfseRulesTest extends TestCase
 
         $this->expectException(DomainException::class);
         IssueNfse::competence('31/02/2026');
+    }
+
+    /** @return array<string, array{string, string, bool, ?string}> */
+    public static function documents(): array
+    {
+        return [
+            'PJ vazio no tomador digitado' => ['pj', '', true, 'Informe o CPF ou CNPJ do tomador.'],
+            'PJ vazio com tomador do BL não avisa' => ['pj', '', false, null],
+            'PJ com tamanho errado' => ['pj', '11.222.333', true, 'CNPJ deve conter 14 caracteres (numérico ou alfanumérico).'],
+            'PJ com dígito errado' => ['pj', '11.222.333/0001-82', true, 'CNPJ inválido (dígito verificador): 11222333000182.'],
+            'PJ válido' => ['pj', '11.222.333/0001-81', true, null],
+            'PF com tamanho errado' => ['pf', '123.456', true, 'CPF deve conter 11 dígitos.'],
+            'PF com dígito errado' => ['pf', '529.982.247-26', true, 'CPF inválido (dígito verificador): 52998224726.'],
+            'PF válido' => ['pf', '529.982.247-25', true, null],
+        ];
+    }
+
+    #[DataProvider('documents')]
+    public function test_warns_about_the_typed_taker_document_like_the_legacy_screen(string $type, string $value, bool $manual, ?string $expected): void
+    {
+        $this->assertSame($expected, ServiceTaker::documentWarning($type, $value, $manual));
     }
 }

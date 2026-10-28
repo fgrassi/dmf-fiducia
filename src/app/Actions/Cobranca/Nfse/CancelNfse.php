@@ -97,9 +97,9 @@ class CancelNfse
         return $message;
     }
 
-    /** FinChargesNfse::sanitizarXMotivo: o XSD nacional não aceita CR/LF/TAB. */
+    /** FinChargesNfse::sanitizarXMotivo. */
     public static function sanitize(?string $text): string
     {
-        return trim(preg_replace('/ +/', ' ', preg_replace('/[\r\n\t]+/', ' ', (string) $text)));
+        return FinChargesNfse::tsString($text, 255);
     }
 }
