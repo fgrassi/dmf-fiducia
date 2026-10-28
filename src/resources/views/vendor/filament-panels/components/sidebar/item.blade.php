@@ -1,0 +1,182 @@
+@props([
+    'active' => false,
+    'activeChildItems' => false,
+    'activeIcon' => null,
+    'badge' => null,
+    'badgeColor' => null,
+    'badgeTooltip' => null,
+    'childItems' => [],
+    'first' => false,
+    'grouped' => false,
+    'icon' => null,
+    'label' => null,
+    'last' => false,
+    'shouldOpenUrlInNewTab' => false,
+    'sidebarCollapsible' => true,
+    'subGrouped' => false,
+    'subNavigation' => false,
+    'url',
+])
+
+@php
+    use Filament\Support\Enums\IconSize;
+    use Filament\Support\View\ComponentAttributeBag;
+    use Illuminate\Contracts\Support\Htmlable;
+
+    $sidebarCollapsible = $sidebarCollapsible && filament()->isSidebarCollapsibleOnDesktop();
+    $collapsible = filled($childItems) && blank($url);
+    $tooltip = $label ?? $slot;
+    $labelText = ($tooltip instanceof Htmlable) ? trim(html_entity_decode(strip_tags($tooltip->toHtml()), ENT_QUOTES | ENT_HTML5, 'UTF-8')) : $tooltip;
+@endphp
+
+<li
+    @if ($collapsible)
+        x-data="{ open: $persist(true).as('sidebar-item-{{ \Illuminate\Support\Str::slug($labelText) }}') }"
+    @endif
+    {{
+        $attributes->class([
+            'fi-sidebar-item',
+            'fi-active' => $active,
+            'fi-sidebar-item-has-active-child-items' => $activeChildItems,
+            'fi-sidebar-item-has-url' => filled($url),
+        ])
+    }}
+>
+    <a
+        {{ \Filament\Support\generate_href_html($url, $shouldOpenUrlInNewTab) }}
+        @if ($active)
+            aria-current="page"
+        @endif
+        @if ($collapsible)
+            role="button"
+            x-on:click="open = ! open"
+            style="cursor: pointer"
+        @else
+            x-on:click="$store.sidebar.isMobile && $store.sidebar.close()"
+        @endif
+        @if ($sidebarCollapsible && (! $subNavigation))
+            x-bind:aria-label="$store.sidebar.isOpen ? null : @js($labelText)"
+            x-data="filamentSidebarTooltip"
+            x-tooltip="
+                getTooltip({
+                    content: @js(($tooltip instanceof Htmlable) ? $tooltip->toHtml() : $tooltip),
+                    allowHTML: @js($tooltip instanceof Htmlable),
+                })
+            "
+        @endif
+        class="fi-sidebar-item-btn"
+    >
+        @if (filled($icon) && ((! $subGrouped) || ($sidebarCollapsible && (! $subNavigation))))
+            {{
+                \Filament\Support\generate_icon_html(($active && $activeIcon) ? $activeIcon : $icon, attributes: (new ComponentAttributeBag([
+                    'x-show' => ($subGrouped && $sidebarCollapsible) ? '! $store.sidebar.isOpen' : false,
+                ]))->class(['fi-sidebar-item-icon']), size: IconSize::Large)
+            }}
+        @endif
+
+        @if ((blank($icon) && $grouped) || $subGrouped)
+            <div
+                @if (filled($icon) && $subGrouped && $sidebarCollapsible && (! $subNavigation))
+                    x-show="$store.sidebar.isOpen"
+                @endif
+                class="fi-sidebar-item-grouped-border"
+            >
+                @if (! $first)
+                    <div
+                        class="fi-sidebar-item-grouped-border-part-not-first"
+                    ></div>
+                @endif
+
+                @if (! $last)
+                    <div
+                        class="fi-sidebar-item-grouped-border-part-not-last"
+                    ></div>
+                @endif
+
+                <div class="fi-sidebar-item-grouped-border-part"></div>
+            </div>
+        @endif
+
+        <span
+            @if ($sidebarCollapsible && (! $subNavigation))
+                x-show="$store.sidebar.isOpen"
+                x-transition:enter="fi-transition-enter"
+                x-transition:enter-start="fi-transition-enter-start"
+                x-transition:enter-end="fi-transition-enter-end"
+            @endif
+            class="fi-sidebar-item-label"
+        >
+            {{ $label ?? $slot }}
+        </span>
+
+        @if ($collapsible)
+            <x-filament::icon
+                icon="heroicon-m-chevron-down"
+                class="size-4"
+                x-bind:class="{ 'rotate-180': open }"
+            />
+        @endif
+
+        @if (filled($badge))
+            <span
+                @if ($sidebarCollapsible && (! $subNavigation))
+                    x-show="$store.sidebar.isOpen"
+                    x-transition:enter="fi-transition-enter"
+                    x-transition:enter-start="fi-transition-enter-start"
+                    x-transition:enter-end="fi-transition-enter-end"
+                @endif
+                class="fi-sidebar-item-badge-ctn"
+            >
+                <x-filament::badge
+                    :color="$badgeColor"
+                    :tooltip="$badgeTooltip"
+                >
+                    {{ $badge }}
+                </x-filament::badge>
+            </span>
+        @endif
+    </a>
+
+    @if ($childItems && (blank($url) || $active || $activeChildItems))
+        <ul
+            class="fi-sidebar-sub-group-items"
+            @if ($collapsible)
+                x-show="open"
+            @endif
+        >
+            @foreach ($childItems as $childItem)
+                @php
+                    $isChildItemChildItemsActive = $childItem->isChildItemsActive();
+                    $isChildActive = (! $isChildItemChildItemsActive) && $childItem->isActive();
+                    $childItemActiveIcon = $childItem->getActiveIcon();
+                    $childItemBadge = $childItem->getBadge();
+                    $childItemBadgeColor = $childItem->getBadgeColor($childItemBadge);
+                    $childItemBadgeTooltip = $childItem->getBadgeTooltip($childItemBadge);
+                    $childItemIcon = $childItem->getIcon();
+                    $shouldChildItemOpenUrlInNewTab = $childItem->shouldOpenUrlInNewTab();
+                    $childItemUrl = $childItem->getUrl();
+                    $childItemExtraAttributes = $childItem->getExtraAttributeBag();
+                @endphp
+
+                <x-filament-panels::sidebar.item
+                    :active="$isChildActive"
+                    :active-child-items="$isChildItemChildItemsActive"
+                    :active-icon="$childItemActiveIcon"
+                    :badge="$childItemBadge"
+                    :badge-color="$childItemBadgeColor"
+                    :badge-tooltip="$childItemBadgeTooltip"
+                    :first="$loop->first"
+                    grouped
+                    :icon="$childItemIcon"
+                    :label="$childItem->getLabel()"
+                    :last="$loop->last"
+                    :should-open-url-in-new-tab="$shouldChildItemOpenUrlInNewTab"
+                    sub-grouped
+                    :sub-navigation="$subNavigation"
+                    :url="$childItemUrl"
+                    :attributes="\Filament\Support\prepare_inherited_attributes($childItemExtraAttributes)"
+                />
+            @endforeach
+        </ul>
+    @endif
+</li>
