@@ -95,7 +95,7 @@ class ExpenseTracking
 
     private function expenseName(array $a): string
     {
-        return (string) FinExpenses::find($a['ref_expense'] ?? null)?->label;
+        return e((string) FinExpenses::find($a['ref_expense'] ?? null)?->label);
     }
 
     private function symbol(mixed $id): string
@@ -105,6 +105,6 @@ class ExpenseTracking
 
     private function lookup(string $table, string $key, string $column, mixed $id): string
     {
-        return $id ? (string) DB::table($table)->where($key, $id)->value($column) : '';
+        return $id ? e((string) DB::table($table)->where($key, $id)->value($column)) : '';
     }
 }

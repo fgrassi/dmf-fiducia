@@ -245,9 +245,10 @@ class SaveExpense
             return;
         }
 
-        $name = $expense->despesa->label;
+        $name = e($expense->despesa->label);
+        $bookingNumber = e($booking->booking);
 
-        Mail::html("<p>A seguinte despesa foi alterada: {$name}</p><p>O embarque {$booking->booking} possui Notas Cadastradas</p>", fn ($mail) => $mail
+        Mail::html("<p>A seguinte despesa foi alterada: {$name}</p><p>O embarque {$bookingNumber} possui Notas Cadastradas</p>", fn ($mail) => $mail
             ->to(BookingChecks::FINANCE_EMAIL)
             ->subject("[FINANCEIRO] Alerta de Alterações: {$booking->booking}"));
     }

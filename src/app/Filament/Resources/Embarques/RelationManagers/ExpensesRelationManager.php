@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Embarques\RelationManagers;
 use App\Actions\Booking\DeleteExpense;
 use App\Actions\Booking\ExpenseTracking;
 use App\Actions\Booking\SaveExpense;
+use App\Actions\Booking\ToggleExpenseReview;
 use App\Models\CmnCurrency;
 use App\Models\FinExpenses;
 use App\Models\FinExpensesValues;
@@ -216,6 +217,22 @@ class ExpensesRelationManager extends RelationManager
                 ->orderBy('fin_expenses_values.id'))
             ->paginated(false)
             ->headerActions([
+                Action::make('revisao')
+                    ->label(fn () => $this->getOwnerRecord()->revisao_despesas === 's' ? 'Revisado (desfazer)' : 'Marcar como revisado')
+                    ->icon(fn () => $this->getOwnerRecord()->revisao_despesas === 's' ? 'heroicon-o-check-badge' : 'heroicon-o-clipboard-document-check')
+                    ->color(fn () => $this->getOwnerRecord()->revisao_despesas === 's' ? 'success' : 'gray')
+                    ->visible(fn () => ToggleExpenseReview::applies($this->getOwnerRecord()))
+                    ->requiresConfirmation()
+                    ->action(function (Action $action) {
+                        try {
+                            $reviewed = app(ToggleExpenseReview::class)($this->getOwnerRecord(), auth()->id());
+                        } catch (DomainException $e) {
+                            Notification::make()->title($e->getMessage())->danger()->send();
+                            $action->halt();
+                        }
+
+                        Notification::make()->title($reviewed ? 'Despesas revisadas.' : 'Revisão desfeita.')->success()->send();
+                    }),
                 CreateAction::make()
                     ->label('Adicionar despesa')
                     ->modalWidth('5xl')

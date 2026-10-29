@@ -55,16 +55,9 @@ class ChargeDueDateTest extends TestCase
         $this->assertSame('2026-10-01', app(ChargeDueDate::class)->final($charge)->toDateString());
     }
 
-    public function test_displays_on_presentation_when_due_date_is_today_or_past(): void
+    public function test_displays_real_due_date_even_when_past(): void
     {
-        $this->travelTo('2026-10-10');
-
-        $this->assertSame(ChargeDueDate::ON_PRESENTATION, app(ChargeDueDate::class)->display($this->charge(term: ['prazo_exp' => 10])));
-    }
-
-    public function test_displays_future_due_date(): void
-    {
-        $this->travelTo('2026-10-09');
+        $this->travelTo('2026-10-20');
 
         $this->assertSame('2026-10-10', app(ChargeDueDate::class)->display($this->charge(term: ['prazo_exp' => 10]))->toDateString());
     }

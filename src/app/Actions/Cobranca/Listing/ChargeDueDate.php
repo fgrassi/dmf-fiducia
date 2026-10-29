@@ -9,7 +9,7 @@ use Carbon\CarbonImmutable;
 /** Port de FinCharges::getPrazoFinal / getDataVencimento / resolverPrazoDiasCliente (legado). */
 class ChargeDueDate
 {
-    public const ON_PRESENTATION = 'Na apresentação';
+    public const EMPTY = 'N/D';
 
     /** Vencimento efetivo considerando o prazo negociado do cliente. */
     public function final(FinCharges $charge): ?CarbonImmutable
@@ -30,12 +30,10 @@ class ChargeDueDate
         return ($created ?? $due)?->addDays(max(0, $days - 1)); // o dia-base conta como dia 1 do prazo
     }
 
-    /** Data a exibir: "Na apresentação" quando sem data ou já vencida/hoje. */
+    /** Data a exibir na tela da cobrança: a real, mesmo vencida (só PDFs/notas usam "Na apresentação"). */
     public function display(FinCharges $charge): CarbonImmutable|string
     {
-        $due = $this->final($charge);
-
-        return $due && $due->greaterThan(CarbonImmutable::today()) ? $due : self::ON_PRESENTATION;
+        return $this->final($charge) ?? self::EMPTY;
     }
 
     private function clientTermDays(FinCharges $charge): ?int
