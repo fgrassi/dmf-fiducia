@@ -7,6 +7,7 @@ use App\Actions\Booking\ExpenseTracking;
 use App\Actions\Booking\SaveExpense;
 use App\Actions\Booking\SellCost;
 use App\Actions\Booking\ToggleExpenseReview;
+use App\Actions\Cobranca\Generation\GenerateManualCharge;
 use App\Models\CmnCurrency;
 use App\Models\FinExpenses;
 use App\Models\FinExpensesValues;
@@ -14,6 +15,8 @@ use App\Models\FinExpensesValuesDueTo;
 use Carbon\Carbon;
 use DomainException;
 use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
+use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -30,6 +33,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 /** Aba de despesas da reserva (embarqueExpenses / updateEmbarqueExpenses do legado). */
@@ -186,6 +190,35 @@ class ExpensesRelationManager extends RelationManager
             .($expense->min_value ? ' (S/R: '.number_format($expense->min_value, 2, ',', '.').')' : '');
     }
 
+    /** Na tela do legado, "Cobrança Manual" só aparece para gerente, administrador e financeiro. */
+    private function canGenerateCharge(): bool
+    {
+        return (bool) auth()->user()?->hasLegacyCredential(['manager', 'financial']);
+    }
+
+    /**
+     * geraCobrancaManual (legado): sem despesas marcadas, gera com todas as pendentes da reserva.
+     *
+     * @param  ?list<int>  $expenseIds
+     */
+    private function generateCharge(?array $expenseIds, Action $action): void
+    {
+        try {
+            $created = app(GenerateManualCharge::class)($this->getOwnerRecord(), $expenseIds, auth()->user());
+        } catch (DomainException $e) {
+            Notification::make()->title($e->getMessage())->danger()->send();
+            $action->halt();
+        }
+
+        $created
+            ? Notification::make()->title($created === 1 ? '1 cobrança gerada com sucesso!' : "{$created} cobranças geradas com sucesso!")->success()->send()
+            : Notification::make()
+                ->title('Nenhuma cobrança gerada!')
+                ->body('Os motivos (despesas, cotações, liberação, invoice ou tomador) foram enviados por e-mail ao financeiro.')
+                ->warning()
+                ->send();
+    }
+
     /** Detalhes (ícone de informação da linha): quem criou e quem atualizou, e quando. */
     private function audit(FinExpensesValues $expense): string
     {
@@ -239,6 +272,15 @@ class ExpensesRelationManager extends RelationManager
                 ->orderBy('fin_expenses_values.id'))
             ->paginated(false)
             ->headerActions([
+                Action::make('gerarCobrancaTodas')
+                    ->label('Gerar cobrança (todas as pendentes)')
+                    ->icon('heroicon-o-document-plus')
+                    ->color('gray')
+                    ->visible(fn () => $this->canGenerateCharge())
+                    ->requiresConfirmation()
+                    ->modalHeading('Gerar cobrança manualmente')
+                    ->modalDescription('A IC é gerada com todas as despesas pendentes da reserva e o documento é enviado ao cliente.')
+                    ->action(fn (Action $action) => $this->generateCharge(null, $action)),
                 Action::make('revisao')
                     ->label(fn () => $this->getOwnerRecord()->revisao_despesas === 's' ? 'Revisado (desfazer)' : 'Marcar como revisado')
                     ->icon(fn () => $this->getOwnerRecord()->revisao_despesas === 's' ? 'heroicon-o-check-badge' : 'heroicon-o-clipboard-document-check')
@@ -259,6 +301,19 @@ class ExpensesRelationManager extends RelationManager
                     ->label('Adicionar despesa')
                     ->modalWidth('5xl')
                     ->using(fn (array $data, CreateAction $action) => $this->save(null, $data, $action)),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    BulkAction::make('gerarCobrancaManual')
+                        ->label('Gerar cobrança manual')
+                        ->icon('heroicon-o-document-plus')
+                        ->visible(fn () => $this->canGenerateCharge())
+                        ->requiresConfirmation()
+                        ->modalHeading('Gerar cobrança manualmente')
+                        ->modalDescription('A IC é gerada só com as despesas marcadas e o documento é enviado ao cliente.')
+                        ->deselectRecordsAfterCompletion()
+                        ->action(fn (Collection $records, BulkAction $action) => $this->generateCharge($records->modelKeys(), $action)),
+                ]),
             ])
             ->recordActions([
                 EditAction::make()

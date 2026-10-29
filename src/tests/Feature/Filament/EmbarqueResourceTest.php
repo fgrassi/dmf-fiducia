@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Actions\Cobranca\Generation\GenerateManualCharge;
 use App\Filament\Resources\Embarques\EmbarqueResource;
 use App\Filament\Resources\Embarques\Pages\ListEmbarques;
 use App\Filament\Resources\Embarques\Pages\ViewEmbarque;
@@ -157,6 +158,128 @@ class EmbarqueResourceTest extends TestCase
             ->assertNotified('Não foi possível excluir essa despesa. Existe uma Cobrança associada a ela.');
 
         $this->assertModelExists($expense);
+    }
+
+    public function test_manual_charge_is_generated_for_the_marked_expenses_only(): void
+    {
+        $booking = $this->booking();
+        $first = $this->expense($booking, ['buying_rate' => 1]);
+        $second = $this->expense($booking, ['buying_rate' => 2]);
+        $this->expense($booking, ['buying_rate' => 3]);
+        $user = $this->user('financial,booking');
+        $this->actingAs($user);
+        $this->mock(GenerateManualCharge::class)
+            ->shouldReceive('__invoke')
+            ->once()
+            ->withArgs(fn (Embarque $b, ?array $ids, User $u) => $b->is($booking) && $ids === [$first->getKey(), $second->getKey()] && $u->is($user))
+            ->andReturn(1);
+
+        Livewire::test(ExpensesRelationManager::class, ['ownerRecord' => $booking, 'pageClass' => ViewEmbarque::class])
+            ->selectTableRecords([$first->getKey(), $second->getKey()])
+            ->callAction(TestAction::make('gerarCobrancaManual')->table()->bulk())
+            ->assertNotified('1 cobrança gerada com sucesso!');
+    }
+
+    public function test_manual_charge_without_marked_expenses_uses_all_pending_and_reports_when_none_is_created(): void
+    {
+        $booking = $this->booking();
+        $this->actingAs($this->user('manager,booking'));
+        $this->mock(GenerateManualCharge::class)
+            ->shouldReceive('__invoke')
+            ->once()
+            ->withArgs(fn (Embarque $b, ?array $ids) => $ids === null)
+            ->andReturn(0);
+
+        Livewire::test(ExpensesRelationManager::class, ['ownerRecord' => $booking, 'pageClass' => ViewEmbarque::class])
+            ->callAction(TestAction::make('gerarCobrancaTodas')->table())
+            ->assertNotified('Nenhuma cobrança gerada!');
+    }
+
+    public function test_manual_charge_is_hidden_from_users_without_manager_or_financial_credential(): void
+    {
+        $booking = $this->booking();
+        $this->actingAs($this->user('booking'));
+
+        Livewire::test(ExpensesRelationManager::class, ['ownerRecord' => $booking, 'pageClass' => ViewEmbarque::class])
+            ->assertActionHidden(TestAction::make('gerarCobrancaTodas')->table())
+            ->assertActionHidden(TestAction::make('gerarCobrancaManual')->table()->bulk());
+    }
+
+    public function test_review_button_marks_the_import_booking_and_is_hidden_on_exports(): void
+    {
+        $import = $this->booking(['impor_expor' => 'i', 'tipo_embarque' => 'm', 'revisao_despesas' => 'n']);
+        $export = $this->booking(['impor_expor' => 'e', 'tipo_embarque' => 'm']);
+        $this->actingAs($this->user('booking'));
+
+        Livewire::test(ExpensesRelationManager::class, ['ownerRecord' => $import, 'pageClass' => ViewEmbarque::class])
+            ->callAction(TestAction::make('revisao')->table())
+            ->assertNotified('Despesas revisadas.');
+        $this->assertSame('s', $import->fresh()->revisao_despesas);
+
+        Livewire::test(ExpensesRelationManager::class, ['ownerRecord' => $export, 'pageClass' => ViewEmbarque::class])
+            ->assertActionHidden(TestAction::make('revisao')->table());
+    }
+
+    public function test_review_button_shows_the_due_to_message_when_an_expense_lacks_it(): void
+    {
+        $import = $this->booking(['impor_expor' => 'i', 'tipo_embarque' => 'm', 'revisao_despesas' => 'n']);
+        $this->expense($import, ['ref_due_to' => null]);
+        $this->actingAs($this->user('booking'));
+
+        Livewire::test(ExpensesRelationManager::class, ['ownerRecord' => $import, 'pageClass' => ViewEmbarque::class])
+            ->callAction(TestAction::make('revisao')->table())
+            ->assertNotified('Todas as despesas necessitam estar com o campo "Due To" informado!');
+
+        $this->assertSame('n', $import->fresh()->revisao_despesas);
+    }
+
+    public function test_sell_cost_button_equalizes_the_selling_to_the_cost_after_confirmation(): void
+    {
+        $booking = $this->booking();
+        $expense = $this->expense($booking, ['buying_rate' => 40, 'ref_currency_br' => 2, 'selling_rate' => 90, 'ref_currency_sr' => 1]);
+        $this->actingAs($this->user('booking'));
+
+        Livewire::test(ExpensesRelationManager::class, ['ownerRecord' => $booking, 'pageClass' => ViewEmbarque::class])
+            ->callAction(TestAction::make('venderCusto')->table($expense))
+            ->assertNotified('Venda igualada ao custo.');
+
+        $this->assertSame([40.0, 2], [$expense->fresh()->selling_rate, $expense->fresh()->ref_currency_sr]);
+    }
+
+    public function test_row_shows_who_created_and_updated_and_warns_about_a_thin_margin(): void
+    {
+        $booking = $this->booking();
+        $creator = DB::table('usuario')->insertGetId(['nome' => 'Bia', 'login' => 'bia', 'senha' => 'x', 'status' => 1]);
+        $updater = DB::table('usuario')->insertGetId(['nome' => 'Caio', 'login' => 'caio', 'senha' => 'x', 'status' => 1]);
+        $thin = $this->expense($booking, ['buying_rate' => 100, 'selling_rate' => 150, 'ref_currency_br' => 2, 'ref_currency_sr' => 2, 'created_by' => $creator, 'created_at' => '2026-10-01', 'updated_by' => $updater, 'updated_at' => '2026-10-02']);
+        $wide = $this->expense($booking, ['buying_rate' => 100, 'selling_rate' => 300, 'ref_currency_br' => 2, 'ref_currency_sr' => 2]);
+        $otherCurrency = $this->expense($booking, ['buying_rate' => 100, 'selling_rate' => 101, 'ref_currency_br' => 2, 'ref_currency_sr' => 1]);
+        $this->actingAs($this->user('booking'));
+
+        Livewire::test(ExpensesRelationManager::class, ['ownerRecord' => $booking, 'pageClass' => ViewEmbarque::class])
+            ->assertTableColumnStateSet('low_margin', 'warning', $thin)
+            ->assertTableColumnStateSet('low_margin', null, $wide)
+            ->assertTableColumnStateSet('low_margin', null, $otherCurrency)
+            ->assertSee('Criado por Bia em 01/10/2026')
+            ->assertSee('Atualizado por Caio em 02/10/2026');
+    }
+
+    public function test_view_page_downloads_the_pdfs_and_reports_a_missing_quotation(): void
+    {
+        $this->actingAs($this->user('booking'));
+        DB::table('cmn_currencies')->insert(['id' => 2, 'name' => 'Dólar', 'symbol' => 'USD']);
+        DB::table('fin_expenses')->insert(['id' => 500, 'name' => 'Doc', 'ref_unity' => 1]);
+        $booking = $this->booking(['impor_expor' => 'e', 'tipo_embarque' => 'm', 'booking' => 'EXP1']);
+        DB::table('bl')->insert(['embarque_id' => $booking->getKey(), 'bl' => '1001']);
+        $this->expense($booking, ['ref_expense' => 500, 'buying_rate' => 10, 'selling_rate' => 10, 'ref_currency_br' => 2, 'ref_currency_sr' => 2, 'billing' => 'p']);
+
+        Livewire::test(ViewEmbarque::class, ['record' => $booking->getKey()])
+            ->callAction('instrucaoCobranca')
+            ->assertFileDownloaded('billing_EXP1.pdf')
+            ->callAction('valoresCompra')
+            ->assertFileDownloaded('EXP1.pdf')
+            ->callAction('valoresDespesa')
+            ->assertNotified('Não há cotação para a moeda USD');
     }
 
     /** @param  array<string, mixed>  $attributes */

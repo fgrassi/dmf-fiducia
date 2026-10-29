@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Embarques\Pages;
 
+use App\Actions\Booking\Documents\BillingInstructionPdf;
 use App\Actions\Booking\Documents\ExpenseStatement;
 use App\Actions\Booking\Documents\ExpenseStatementPdf;
 use App\Filament\Resources\Embarques\EmbarqueResource;
@@ -21,6 +22,10 @@ class ViewEmbarque extends ViewRecord
     {
         return [
             ActionGroup::make([
+                Action::make('instrucaoCobranca')
+                    ->label('Instrução de cobrança')
+                    ->icon(Heroicon::OutlinedArrowDownTray)
+                    ->action(fn (Embarque $record) => app(BillingInstructionPdf::class)($record)),
                 $this->statementAction('valoresCompra', 'Valores de compra', ExpenseStatement::PURCHASE),
                 $this->statementAction('valoresDespesa', 'Valores de despesa', ExpenseStatement::SALE),
                 $this->statementAction('valoresDocumentacao', 'Valores de despesa (documentação)', ExpenseStatement::DOCUMENTATION)
