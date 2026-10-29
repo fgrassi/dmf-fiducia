@@ -8,6 +8,7 @@ use App\Actions\Cobranca\Notices\OpenImportChargesNotice;
 use App\Actions\Cobranca\Notices\PendingTakersNotice;
 use App\Actions\Cobranca\Notices\ReleaseList;
 use App\Actions\Expenses\ExpenseDueNotice;
+use App\Actions\PaymentOrders\Generation\GeneratePaymentOrders;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -62,3 +63,25 @@ foreach ($notices as [$command, $action, $purpose, $time]) {
         ->when(fn () => (bool) config('services.cobranca.automatic_notices')
             && ($command !== 'cobranca:aviso-pendencia-tomador' || ! now()->isWeekend()));
 }
+
+// ordemPagamento/geraOrdemPagamento (legado): gera as ordens de pagamento ao armador das reservas com pagamento pendente.
+Artisan::command('ordens-pagamento:gerar', function () {
+    try {
+        $created = app(GeneratePaymentOrders::class)->all();
+    } catch (DomainException $e) {
+        $this->warn($e->getMessage());
+
+        return 1;
+    }
+
+    $this->info($created ? "{$created} ordem(ns) de pagamento gerada(s) com sucesso!" : 'Nenhuma ordem de pagamento gerada!');
+
+    return 0;
+})->purpose('Gera as ordens de pagamento ao armador das reservas com pagamento pendente');
+
+// ponytail: de hora em hora é um chute (o crontab do tracking não está no repo); confirmar com produção antes de ligar
+// desligado até o cron do tracking parar de chamar ordemPagamento/geraOrdemPagamento (ORDEM_PAGAMENTO_GERACAO_AUTOMATICA=true)
+Schedule::command('ordens-pagamento:gerar')
+    ->hourly()
+    ->withoutOverlapping()
+    ->when(fn () => (bool) config('services.ordem_pagamento.automatic_generation'));

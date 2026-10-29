@@ -65,3 +65,10 @@ html {
 .fi-simple-page-content {
     row-gap: calc(var(--spacing) * 2);
 }
+
+/*
+ * Totais do resumo da ordem de pagamento: o valor não estica, então o botão de editar fica colado a ele.
+ */
+.fi-order-totals .fi-in-entry-content {
+    width: auto;
+}

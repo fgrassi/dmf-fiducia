@@ -60,4 +60,10 @@ class Embarque extends Model
     {
         return $this->hasMany(FinExpensesValues::class, 'ref_embarque', 'embarque_id');
     }
+
+    /** Embarque::getRefArmadorParaPagamentoId (legado): o coloader, se informado, senão o armador da reserva. */
+    public function paymentCarrierId(): ?int
+    {
+        return (int) $this->coloader_id > 0 ? (int) $this->coloader_id : ($this->armador_id ? (int) $this->armador_id : null);
+    }
 }

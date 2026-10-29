@@ -3,6 +3,7 @@
 namespace Tests\Feature\Filament;
 
 use App\Actions\Cobranca\Generation\GenerateManualCharge;
+use App\Actions\PaymentOrders\Generation\GeneratePaymentOrders;
 use App\Filament\Resources\Embarques\EmbarqueResource;
 use App\Filament\Resources\Embarques\Pages\ListEmbarques;
 use App\Filament\Resources\Embarques\Pages\ViewEmbarque;
@@ -280,6 +281,42 @@ class EmbarqueResourceTest extends TestCase
             ->assertFileDownloaded('EXP1.pdf')
             ->callAction('valoresDespesa')
             ->assertNotified('Não há cotação para a moeda USD');
+    }
+
+    public function test_payment_order_is_generated_from_the_marked_expenses_and_reports_the_ignored_ones(): void
+    {
+        $booking = $this->booking();
+        $first = $this->expense($booking, ['buying_rate' => 1]);
+        $second = $this->expense($booking, ['buying_rate' => 2]);
+        $this->actingAs($this->user('financial,booking'));
+        $this->mock(GeneratePaymentOrders::class)
+            ->shouldReceive('fromSelection')
+            ->once()
+            ->withArgs(fn (Embarque $b, array $ids) => $b->is($booking) && $ids === [$first->getKey(), $second->getKey()])
+            ->andReturn(['success' => true, 'message' => '1 ordem(ns) de pagamento gerada(s) com sucesso!', 'orders' => [9], 'ignored' => [['id' => $second->getKey(), 'reason' => 'Despesa já lançada em ordem de pagamento.']]]);
+
+        Livewire::test(ExpensesRelationManager::class, ['ownerRecord' => $booking, 'pageClass' => ViewEmbarque::class])
+            ->selectTableRecords([$first->getKey(), $second->getKey()])
+            ->callAction(TestAction::make('gerarOrdemPagamento')->table()->bulk())
+            ->assertNotified('1 ordem(ns) de pagamento gerada(s) com sucesso!');
+    }
+
+    public function test_payment_order_generation_shows_the_error_and_is_hidden_without_the_financial_credential(): void
+    {
+        $booking = $this->booking();
+        $expense = $this->expense($booking, ['buying_rate' => 1]);
+        $this->actingAs($this->user('financial,booking'));
+        $this->mock(GeneratePaymentOrders::class)->shouldReceive('fromSelection')->once()->andThrow(new \DomainException('Cadastre o armador para pagamento da reserva.'));
+
+        Livewire::test(ExpensesRelationManager::class, ['ownerRecord' => $booking, 'pageClass' => ViewEmbarque::class])
+            ->selectTableRecords([$expense->getKey()])
+            ->callAction(TestAction::make('gerarOrdemPagamento')->table()->bulk())
+            ->assertNotified('Cadastre o armador para pagamento da reserva.');
+
+        $this->actingAs($this->user('booking'));
+
+        Livewire::test(ExpensesRelationManager::class, ['ownerRecord' => $booking, 'pageClass' => ViewEmbarque::class])
+            ->assertActionHidden(TestAction::make('gerarOrdemPagamento')->table()->bulk());
     }
 
     /** @param  array<string, mixed>  $attributes */

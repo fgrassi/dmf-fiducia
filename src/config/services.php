@@ -48,6 +48,11 @@ return [
         'recalculation_token' => env('COBRANCA_RECALCULO_TOKEN'),
     ],
 
+    // Geração automática das ordens de pagamento ao armador (ordens-pagamento:gerar). Ligar só quando o cron do tracking parar de chamar ordemPagamento/geraOrdemPagamento.
+    'ordem_pagamento' => [
+        'automatic_generation' => env('ORDEM_PAGAMENTO_GERACAO_AUTOMATICA', false),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

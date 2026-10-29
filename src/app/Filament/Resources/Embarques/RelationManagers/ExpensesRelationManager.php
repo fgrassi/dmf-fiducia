@@ -8,6 +8,7 @@ use App\Actions\Booking\SaveExpense;
 use App\Actions\Booking\SellCost;
 use App\Actions\Booking\ToggleExpenseReview;
 use App\Actions\Cobranca\Generation\GenerateManualCharge;
+use App\Actions\PaymentOrders\Generation\GeneratePaymentOrders;
 use App\Models\CmnCurrency;
 use App\Models\FinExpenses;
 use App\Models\FinExpensesValues;
@@ -304,6 +305,30 @@ class ExpensesRelationManager extends RelationManager
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    BulkAction::make('gerarOrdemPagamento')
+                        ->label('Ordem de Pagamento')
+                        ->icon('heroicon-o-credit-card')
+                        ->visible(fn () => (bool) auth()->user()?->hasLegacyCredential('financial'))
+                        ->requiresConfirmation()
+                        ->modalHeading('Tem certeza que deseja gerar a ordem de pagamento?')
+                        ->modalDescription('A ordem de pagamento do armador será gerada para as despesas selecionadas.')
+                        ->deselectRecordsAfterCompletion()
+                        ->action(function (Collection $records, BulkAction $action) {
+                            try {
+                                $result = app(GeneratePaymentOrders::class)->fromSelection($this->getOwnerRecord(), $records->modelKeys());
+                            } catch (DomainException $e) {
+                                Notification::make()->title($e->getMessage())->danger()->send();
+                                $action->halt();
+                            }
+
+                            $ignored = collect($result['ignored'])->map(fn (array $i) => "Despesa {$i['id']}: {$i['reason']}")->implode("\n");
+
+                            Notification::make()
+                                ->title($result['message'])
+                                ->body($ignored !== '' ? $ignored : null)
+                                ->status($result['success'] ? 'success' : 'warning')
+                                ->send();
+                        }),
                     BulkAction::make('gerarCobrancaManual')
                         ->label('Gerar cobrança manual')
                         ->icon('heroicon-o-document-plus')
