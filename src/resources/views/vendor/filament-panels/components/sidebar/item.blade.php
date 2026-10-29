@@ -114,6 +114,9 @@
                 icon="heroicon-m-chevron-down"
                 class="size-4"
                 x-bind:class="{ 'rotate-180': open }"
+                @if ($sidebarCollapsible && (! $subNavigation))
+                    x-show="$store.sidebar.isOpen"
+                @endif
             />
         @endif
 
