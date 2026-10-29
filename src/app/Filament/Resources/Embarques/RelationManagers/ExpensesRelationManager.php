@@ -5,11 +5,13 @@ namespace App\Filament\Resources\Embarques\RelationManagers;
 use App\Actions\Booking\DeleteExpense;
 use App\Actions\Booking\ExpenseTracking;
 use App\Actions\Booking\SaveExpense;
+use App\Actions\Booking\SellCost;
 use App\Actions\Booking\ToggleExpenseReview;
 use App\Models\CmnCurrency;
 use App\Models\FinExpenses;
 use App\Models\FinExpensesValues;
 use App\Models\FinExpensesValuesDueTo;
+use Carbon\Carbon;
 use DomainException;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
@@ -184,6 +186,24 @@ class ExpensesRelationManager extends RelationManager
             .($expense->min_value ? ' (S/R: '.number_format($expense->min_value, 2, ',', '.').')' : '');
     }
 
+    /** Detalhes (ícone de informação da linha): quem criou e quem atualizou, e quando. */
+    private function audit(FinExpensesValues $expense): string
+    {
+        $date = fn (?string $value) => $value ? Carbon::parse($value)->format('d/m/Y') : '';
+        $text = "Criado por {$expense->created_by_name} em {$date($expense->created_at)}";
+
+        return $expense->updated_by ? "{$text}\nAtualizado por {$expense->updated_by_name} em {$date($expense->updated_at)}" : $text;
+    }
+
+    /** Aviso da linha: mesma moeda e venda menos custo abaixo de 100. */
+    private function hasLowMargin(FinExpensesValues $expense): bool
+    {
+        return $expense->selling_rate - $expense->buying_rate < 100
+            && $expense->ref_currency_br == $expense->ref_currency_sr
+            && $expense->ref_currency_br
+            && $expense->selling_rate;
+    }
+
     /** O campo "Informar Agente" só existe quando o país do agente é o Chile. */
     private function agentIsChilean(): bool
     {
@@ -210,9 +230,11 @@ class ExpensesRelationManager extends RelationManager
         return $table
             ->modifyQueryUsing(fn (Builder $query) => $query
                 ->select('fin_expenses_values.*')
-                ->addSelect(['container_number' => DB::table('container')
-                    ->select('numero')
-                    ->whereColumn('container.container_id', 'fin_expenses_values.ref_container')])
+                ->addSelect([
+                    'container_number' => DB::table('container')->select('numero')->whereColumn('container.container_id', 'fin_expenses_values.ref_container'),
+                    'created_by_name' => DB::table('usuario')->select('nome')->whereColumn('usuario.usuario_id', 'fin_expenses_values.created_by'),
+                    'updated_by_name' => DB::table('usuario')->select('nome')->whereColumn('usuario.usuario_id', 'fin_expenses_values.updated_by'),
+                ])
                 ->with(['despesa.unity', 'dueTo', 'bl', 'equipment', 'buyingCurrency', 'sellingCurrency'])
                 ->orderBy('fin_expenses_values.id'))
             ->paginated(false)
@@ -247,6 +269,16 @@ class ExpensesRelationManager extends RelationManager
                         'profit' => $data['selling_rate'] && $data['buying_rate'] ? round($data['selling_rate'] - $data['buying_rate'], 2) : null,
                     ])
                     ->using(fn (FinExpensesValues $record, array $data, EditAction $action) => $this->save($record, $data, $action)),
+                Action::make('venderCusto')
+                    ->label('Vender custo')
+                    ->icon('heroicon-o-arrows-right-left')
+                    ->iconButton()
+                    ->requiresConfirmation()
+                    ->modalHeading('Tem certeza de que deseja igualar o custo da venda com o da compra?')
+                    ->action(function (FinExpensesValues $record) {
+                        app(SellCost::class)($record);
+                        Notification::make()->title('Venda igualada ao custo.')->success()->send();
+                    }),
                 DeleteAction::make()
                     ->using(function (FinExpensesValues $record, DeleteAction $action) {
                         try {
@@ -260,6 +292,18 @@ class ExpensesRelationManager extends RelationManager
                     }),
             ])
             ->columns([
+                IconColumn::make('info')
+                    ->label('')
+                    ->state('info')
+                    ->icon('heroicon-o-information-circle')
+                    ->color('danger')
+                    ->tooltip(fn (FinExpensesValues $record) => $this->audit($record)),
+                IconColumn::make('low_margin')
+                    ->label('')
+                    ->state(fn (FinExpensesValues $record) => $this->hasLowMargin($record) ? 'warning' : null)
+                    ->icon('heroicon-o-exclamation-triangle')
+                    ->color('danger')
+                    ->tooltip('A diferença entre o B/R e S/R é inferior a 100,00 na mesma moeda!'),
                 TextColumn::make('despesa.label')
                     ->label('Despesa'),
                 TextColumn::make('equipment.nome')

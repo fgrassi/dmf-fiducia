@@ -382,7 +382,7 @@ class ChargeDetails
     }
 
     /** FinExpensesValues::__toString: nome/unidade (equipamento) (BL) container. */
-    private function expenseLabel(stdClass $i): string
+    public function expenseLabel(stdClass $i): string
     {
         $label = $i->expense_name.'/'.$i->unity_name;
         $equipment = $i->ref_equipment ? DB::table('tipo_container')->where('tipo_container_id', $i->ref_equipment)->value('nome') : '';
