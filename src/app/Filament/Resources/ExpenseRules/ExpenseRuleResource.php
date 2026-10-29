@@ -36,7 +36,7 @@ class ExpenseRuleResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'Configurações';
 
-    protected static ?int $navigationSort = 21;
+    protected static ?int $navigationSort = 30;
 
     /** O legado não tinha security.yml (qualquer usuário logado); aqui exige financial, como os demais cadastros da cobrança. */
     public static function canAccess(): bool

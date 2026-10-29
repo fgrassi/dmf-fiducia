@@ -29,11 +29,9 @@ class ExpenseUnitResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-scale';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Financeiro';
+    protected static string|UnitEnum|null $navigationGroup = 'Configurações';
 
-    protected static ?string $navigationParentItem = 'Cadastros';
-
-    protected static ?int $navigationSort = 32;
+    protected static ?int $navigationSort = 50;
 
     /** security.yml do módulo (legado): credencial admin. */
     public static function canAccess(): bool

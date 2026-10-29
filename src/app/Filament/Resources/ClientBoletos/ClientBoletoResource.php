@@ -36,7 +36,7 @@ class ClientBoletoResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'Financeiro';
 
-    protected static ?int $navigationSort = 21;
+    protected static ?int $navigationSort = 30;
 
     /** security.yml do módulo (legado): credencial financial. */
     public static function canAccess(): bool

@@ -38,11 +38,17 @@ class AdminPanelProvider extends PanelProvider
             ->userMenu(position: UserMenuPosition::Sidebar)
             ->maxContentWidth(Width::Full)
             ->viteTheme('resources/css/filament/admin/theme.css')
+            ->navigationGroups([
+                'Cadastros',
+                'Config IT',
+                'Configurações',
+                'Financeiro',
+            ])
             ->navigationItems([
                 NavigationItem::make('Cadastros')
                     ->group('Financeiro')
                     ->icon('heroicon-o-folder')
-                    ->sort(30),
+                    ->sort(10),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')

@@ -31,7 +31,7 @@ class ChargeTypeResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'Configurações';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 40;
 
     /** security.yml do módulo (legado): credencial admin. */
     public static function canAccess(): bool

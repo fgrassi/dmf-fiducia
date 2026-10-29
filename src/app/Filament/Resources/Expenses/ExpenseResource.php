@@ -43,7 +43,7 @@ class ExpenseResource extends Resource
 
     protected static ?string $navigationParentItem = 'Cadastros';
 
-    protected static ?int $navigationSort = 33;
+    protected static ?int $navigationSort = 50;
 
     /** security.yml do módulo (legado): credencial booking (é ela, não financial, que o legado exige aqui). */
     public static function canAccess(): bool

@@ -39,7 +39,7 @@ class CarrierRateResource extends Resource
 
     protected static ?string $navigationParentItem = 'Cadastros';
 
-    protected static ?int $navigationSort = 35;
+    protected static ?int $navigationSort = 30;
 
     /** security.yml dos módulos (legado): credencial financial. */
     public static function canAccess(): bool

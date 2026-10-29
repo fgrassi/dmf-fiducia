@@ -31,7 +31,7 @@ class SettingResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'Configurações';
 
-    protected static ?int $navigationSort = 22;
+    protected static ?int $navigationSort = 20;
 
     /** security.yml do módulo (legado): credencial admin ou financial. */
     public static function canAccess(): bool

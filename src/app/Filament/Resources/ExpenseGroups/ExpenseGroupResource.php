@@ -40,7 +40,7 @@ class ExpenseGroupResource extends Resource
 
     protected static ?string $navigationParentItem = 'Cadastros';
 
-    protected static ?int $navigationSort = 39;
+    protected static ?int $navigationSort = 60;
 
     /** O legado não tem security.yml neste módulo (qualquer usuário logado); aqui exige admin ou financial (divergência V6). */
     public static function canAccess(): bool

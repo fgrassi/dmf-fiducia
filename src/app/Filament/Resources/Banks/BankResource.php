@@ -33,7 +33,7 @@ class BankResource extends Resource
 
     protected static ?string $navigationParentItem = 'Cadastros';
 
-    protected static ?int $navigationSort = 30;
+    protected static ?int $navigationSort = 10;
 
     /** security.yml do módulo (legado): credencial financial. */
     public static function canAccess(): bool

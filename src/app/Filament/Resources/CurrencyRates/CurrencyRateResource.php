@@ -40,7 +40,7 @@ class CurrencyRateResource extends Resource
 
     protected static ?string $navigationParentItem = 'Cadastros';
 
-    protected static ?int $navigationSort = 34;
+    protected static ?int $navigationSort = 20;
 
     /** security.yml dos módulos (legado): credencial financial. */
     public static function canAccess(): bool
