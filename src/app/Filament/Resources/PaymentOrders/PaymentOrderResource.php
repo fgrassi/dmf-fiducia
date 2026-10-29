@@ -29,11 +29,15 @@ class PaymentOrderResource extends Resource
 
     protected static ?string $slug = 'financeiro/ordens-de-pagamento';
 
+    protected static ?string $navigationLabel = 'Ordem de pagamento (armadores)';
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCreditCard;
 
     protected static string|UnitEnum|null $navigationGroup = 'Financeiro';
 
-    protected static ?int $navigationSort = 30;
+    protected static ?string $navigationParentItem = 'Ordem de Pagamento';
+
+    protected static ?int $navigationSort = 1;
 
     /** security.yml do módulo ordemPagamento (legado): credencial financial. */
     public static function canAccess(): bool

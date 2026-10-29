@@ -50,6 +50,11 @@ class AdminPanelProvider extends PanelProvider
                     ->group('Financeiro')
                     ->icon('heroicon-o-folder')
                     ->sort(10),
+                NavigationItem::make('Ordem de Pagamento')
+                    ->group('Financeiro')
+                    ->icon('heroicon-o-credit-card')
+                    ->sort(30)
+                    ->visible(fn () => (bool) auth()->user()?->hasLegacyCredential('financial')),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')

@@ -19,6 +19,7 @@ use App\Models\User;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\Testing\TestAction;
+use Filament\Facades\Filament;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -35,6 +36,17 @@ class PaymentOrderResourceTest extends TestCase
         $this->actingAs($this->user('booking'))
             ->get(PaymentOrderResource::getUrl())
             ->assertForbidden();
+    }
+
+    public function test_menu_groups_both_payment_orders_under_one_parent_item(): void
+    {
+        $this->actingAs($this->user('financial'));
+        Filament::setCurrentPanel('admin');
+
+        $parent = collect(Filament::getNavigation())->first(fn ($group) => $group->getLabel() === 'Financeiro')
+            ->getItems()->first(fn ($item) => $item->getLabel() === 'Ordem de Pagamento');
+
+        $this->assertSame(['Ordem de pagamento (armadores)', 'Ordem de pagamento (outros)'], collect($parent->getChildItems())->map->getLabel()->all());
     }
 
     public function test_lists_orders_newest_first_with_the_computed_total_and_filters_by_status(): void

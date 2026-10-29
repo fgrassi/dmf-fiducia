@@ -22,17 +22,29 @@ class PaymentInstructionPdf
 
     public function __invoke(InstrucaoPagamento $instruction): StreamedResponse
     {
-        $pdf = $this->render($instruction);
+        return $this->download($this->render($instruction), $instruction->code());
+    }
 
-        return response()->streamDownload(fn () => print ($pdf->Output('', 'S')), str_replace('/', '-', $instruction->code()).'.pdf', [
+    public function download(TCPDF $pdf, string $code): StreamedResponse
+    {
+        return response()->streamDownload(fn () => print ($pdf->Output('', 'S')), str_replace('/', '-', $code).'.pdf', [
             'Content-Type' => 'application/pdf',
         ]);
     }
 
     public function render(InstrucaoPagamento $instruction): TCPDF
     {
-        $d = ($this->instruction)($instruction);
+        return $this->draw(($this->instruction)($instruction));
+    }
 
+    /**
+     * Desenha os dados de PaymentInstruction ou de OtherPaymentInstruction (mesmo layout). Com 'carrier' fecha com o
+     * quadro do armador; com 'bank_text' (ordemPagamentoOutros), com os dados bancários em texto logo após o total.
+     *
+     * @param  array<string, mixed>  $d
+     */
+    public function draw(array $d): TCPDF
+    {
         $pdf = new TCPDF('P', 'mm', 'A4', true);
         $pdf->SetCreator('DMF Logistics');
         $pdf->SetAuthor('DMF Logistics');
@@ -81,7 +93,11 @@ class PaymentInstructionPdf
             $this->cells($pdf, [[$label, 130, 'L'], [$value, 60, 'R']]);
         }
 
-        $this->carrier($pdf, $d);
+        if (array_key_exists('carrier', $d)) {
+            $this->carrier($pdf, $d);
+        } elseif (filled($d['bank_text'] ?? null)) {
+            $this->bankText($pdf, $d['bank_text']);
+        }
 
         return $pdf;
     }
@@ -136,6 +152,17 @@ class PaymentInstructionPdf
         }
 
         $pdf->Ln();
+    }
+
+    private function bankText(TCPDF $pdf, string $text): void
+    {
+        $pdf->Ln();
+        $pdf->SetFont('Helvetica', 'B', 8);
+        $pdf->SetTextColor(...self::RED);
+        $pdf->MultiCell(190, self::LINE, 'Dados Bancários', 'B', 'L', false, 1, 10, '', true);
+        $pdf->SetFont('Helvetica', '', 7);
+        $pdf->SetTextColor(0);
+        $pdf->MultiCell(190, self::LINE, $text, 0, 'L', false, 1, 10, '', true);
     }
 
     /** @param  array<string, mixed>  $d */

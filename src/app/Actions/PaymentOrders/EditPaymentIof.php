@@ -4,6 +4,8 @@ namespace App\Actions\PaymentOrders;
 
 use App\Models\FinPaymentOrder;
 use App\Models\InstrucaoPagamento;
+use App\Models\InstrucaoPagamentoOutros;
+use App\Models\OrdemPagamento;
 use DomainException;
 
 /**
@@ -13,7 +15,7 @@ use DomainException;
 class EditPaymentIof
 {
     /** @throws DomainException */
-    public function order(FinPaymentOrder $order, float $iof): FinPaymentOrder
+    public function order(FinPaymentOrder|OrdemPagamento $order, float $iof): FinPaymentOrder|OrdemPagamento
     {
         $order->forceFill(['valor_iof' => $this->valid($iof)])->save();
 
@@ -21,7 +23,7 @@ class EditPaymentIof
     }
 
     /** @throws DomainException */
-    public function instruction(InstrucaoPagamento $instruction, float $iof): InstrucaoPagamento
+    public function instruction(InstrucaoPagamento|InstrucaoPagamentoOutros $instruction, float $iof): InstrucaoPagamento|InstrucaoPagamentoOutros
     {
         $instruction->forceFill(['valor_iof' => $this->valid($iof)])->save();
 

@@ -3,6 +3,7 @@
 namespace App\Actions\PaymentOrders;
 
 use App\Models\FinPaymentOrder;
+use App\Models\OrdemPagamento;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Throwable;
@@ -11,7 +12,7 @@ use Throwable;
 class EditPaymentDate
 {
     /** @throws DomainException */
-    public function __invoke(FinPaymentOrder $order, string $date): FinPaymentOrder
+    public function __invoke(FinPaymentOrder|OrdemPagamento $order, string $date): FinPaymentOrder|OrdemPagamento
     {
         try {
             $paid = CarbonImmutable::parse($date)->toDateString();
