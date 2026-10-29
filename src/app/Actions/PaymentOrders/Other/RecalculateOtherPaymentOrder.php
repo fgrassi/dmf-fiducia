@@ -25,7 +25,7 @@ class RecalculateOtherPaymentOrder
 
     /**
      * @param  array<int, float>  $rates  moeda => taxa digitada (obrigatória para cada moeda estrangeira dos itens)
-     * @param  array<int, array{id?: ?int, class?: ?string, name?: ?string, cnpj?: ?string, bank?: ?string}>  $parties  Due To => parte
+     * @param  array<int, array{id?: ?int, name?: ?string, cnpj?: ?string, bank?: ?string}>  $parties  Due To => parte
      * @return array{status: string, message: string} OK ou WARNING (sem item ligado)
      *
      * @throws DomainException
@@ -66,7 +66,7 @@ class RecalculateOtherPaymentOrder
         });
     }
 
-    /** @param  array<int, array{id?: ?int, class?: ?string, name?: ?string, cnpj?: ?string, bank?: ?string}>  $parties */
+    /** @param  array<int, array{id?: ?int, name?: ?string, cnpj?: ?string, bank?: ?string}>  $parties */
     private function instructions(OrdemPagamento $order, array $parties): array
     {
         $byDueTo = DB::table('ordem_pagamento_item as i')
@@ -81,10 +81,14 @@ class RecalculateOtherPaymentOrder
             return ['status' => 'WARNING', 'message' => 'Nenhum item habilitado para gerar a instrução de pagamento'];
         }
 
+        $known = $this->parties->forOrder($order);
+
         foreach ($byDueTo as $dueTo => $items) {
             $party = $parties[$dueTo] ?? [];
-            $class = filled($party['class'] ?? null) ? $party['class'] : 'Pessoa';
+            // A classe vem do servidor (Due To / instrução), nunca do formulário; o id precisa existir nela.
+            $class = $known[$dueTo]['class'] ?? 'Pessoa';
             $partyId = filled($party['id'] ?? null) ? (int) $party['id'] : null;
+            $partyId = $partyId && $this->parties->lookup($class, $partyId) ? $partyId : null;
 
             if ($partyId) {
                 $this->parties->updateRegistry($class, $partyId, $party['cnpj'] ?? null, $party['bank'] ?? null);

@@ -37,7 +37,7 @@ class ViewOtherPaymentOrder extends ViewRecord
                 ->modalDescription('Informe as taxas das moedas e os dados de quem recebe. A instrução de pagamento de cada parte é criada ou atualizada.')
                 ->modalSubmitActionLabel('Recalcular')
                 ->fillForm(fn (OrdemPagamento $record) => [
-                    'parties' => collect(app(OtherOrderParties::class)->forOrder($record))->map(fn (array $p) => ['id' => $p['id'], 'class' => $p['class'], 'name' => $p['name'], 'cnpj' => $p['cnpj'], 'bank' => $p['bank']])->all(),
+                    'parties' => collect(app(OtherOrderParties::class)->forOrder($record))->map(fn (array $p) => ['id' => $p['id'], 'name' => $p['name'], 'cnpj' => $p['cnpj'], 'bank' => $p['bank']])->all(),
                     'reset' => false,
                 ])
                 ->schema(fn (OrdemPagamento $record) => $this->recalculationSchema($record))

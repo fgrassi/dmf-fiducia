@@ -136,6 +136,25 @@ class OtherOrderItemsTest extends TestCase
         $this->assertSame(300.0, (float) DB::table('instrucao_pagamento_item_outros')->where('ordem_pagamento_item_id', $insurance->getKey())->value('valor'));
     }
 
+    public function test_recalculation_resolves_the_party_class_on_the_server_and_never_touches_another_table(): void
+    {
+        $this->booking();
+        DB::table('despachante')->insert(['despachante_id' => 3, 'nome' => 'Despachante Sul', 'cnpj' => null, 'dados_bancarios' => null]);
+        DB::table('pessoa')->insert(['pessoa_id' => 3, 'nome' => 'Pessoa Homônima', 'cnpj' => 'orig', 'dados_bancarios' => 'orig']);
+        $order = $this->order();
+        $this->item($order, 10, unit: 100, rate: 1, index: 1, value: 0, status: 1, dueTo: 5);
+
+        app(RecalculateOtherPaymentOrder::class)($order, [], false, [5 => ['id' => 3, 'class' => 'Pessoa', 'name' => 'X', 'cnpj' => '11', 'bank' => 'B']], 7);
+
+        $this->assertSame(['orig', 'orig'], [DB::table('pessoa')->value('cnpj'), DB::table('pessoa')->value('dados_bancarios')]);
+        $this->assertSame(['11', 'B'], [DB::table('despachante')->value('cnpj'), DB::table('despachante')->value('dados_bancarios')]);
+
+        app(RecalculateOtherPaymentOrder::class)($order->fresh(), [], false, [5 => ['id' => 99, 'name' => 'X', 'cnpj' => '22', 'bank' => 'B2']], 7);
+
+        $this->assertSame('11', DB::table('despachante')->value('cnpj'));
+        $this->assertSame([['Despachante', 3]], DB::table('instrucao_pagamento_parte')->get()->map(fn ($l) => [$l->parte_class, (int) $l->parte_id])->all());
+    }
+
     public function test_recalculating_with_reset_rebuilds_values_from_the_booking_expenses(): void
     {
         $booking = $this->booking(['qtd_bl' => 3]);
