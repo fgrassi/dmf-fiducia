@@ -9,6 +9,7 @@ use App\Actions\Cobranca\Notices\PendingTakersNotice;
 use App\Actions\Cobranca\Notices\ReleaseList;
 use App\Actions\Expenses\ExpenseDueNotice;
 use App\Actions\PaymentOrders\Generation\GeneratePaymentOrders;
+use App\Actions\PaymentOrders\Other\GenerateOtherPaymentOrders;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -85,3 +86,25 @@ Schedule::command('ordens-pagamento:gerar')
     ->hourly()
     ->withoutOverlapping()
     ->when(fn () => (bool) config('services.ordem_pagamento.automatic_generation'));
+
+// ordemPagamentoOutros/geraOrdemPagamento (legado): gera as ordens de pagamento a despachante, cia aérea e seguro.
+Artisan::command('ordens-pagamento-outros:gerar', function () {
+    try {
+        $created = app(GenerateOtherPaymentOrders::class)->all();
+    } catch (DomainException $e) {
+        $this->warn($e->getMessage());
+
+        return 1;
+    }
+
+    $this->info($created ? "{$created} ordem(ns) de pagamento gerada(s) com sucesso!" : 'Nenhuma ordem de pagamento gerada!');
+
+    return 0;
+})->purpose('Gera as ordens de pagamento de outros das reservas com pagamento pendente');
+
+// ponytail: de hora em hora é um chute (o crontab do tracking não está no repo); confirmar com produção antes de ligar
+// desligado até o cron do tracking parar de chamar ordemPagamentoOutros/geraOrdemPagamento (ORDEM_PAGAMENTO_OUTROS_GERACAO_AUTOMATICA=true)
+Schedule::command('ordens-pagamento-outros:gerar')
+    ->hourly()
+    ->withoutOverlapping()
+    ->when(fn () => (bool) config('services.ordem_pagamento_outros.automatic_generation'));

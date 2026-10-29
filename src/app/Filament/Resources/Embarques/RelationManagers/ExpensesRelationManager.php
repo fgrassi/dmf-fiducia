@@ -9,6 +9,7 @@ use App\Actions\Booking\SellCost;
 use App\Actions\Booking\ToggleExpenseReview;
 use App\Actions\Cobranca\Generation\GenerateManualCharge;
 use App\Actions\PaymentOrders\Generation\GeneratePaymentOrders;
+use App\Actions\PaymentOrders\Other\GenerateOtherPaymentOrders;
 use App\Models\CmnCurrency;
 use App\Models\FinExpenses;
 use App\Models\FinExpensesValues;
@@ -316,6 +317,30 @@ class ExpensesRelationManager extends RelationManager
                         ->action(function (Collection $records, BulkAction $action) {
                             try {
                                 $result = app(GeneratePaymentOrders::class)->fromSelection($this->getOwnerRecord(), $records->modelKeys());
+                            } catch (DomainException $e) {
+                                Notification::make()->title($e->getMessage())->danger()->send();
+                                $action->halt();
+                            }
+
+                            $ignored = collect($result['ignored'])->map(fn (array $i) => "Despesa {$i['id']}: {$i['reason']}")->implode("\n");
+
+                            Notification::make()
+                                ->title($result['message'])
+                                ->body($ignored !== '' ? $ignored : null)
+                                ->status($result['success'] ? 'success' : 'warning')
+                                ->send();
+                        }),
+                    BulkAction::make('gerarOrdemPagamentoOutros')
+                        ->label('Ordem de Pagamento Outros')
+                        ->icon('heroicon-o-banknotes')
+                        ->visible(fn () => (bool) auth()->user()?->hasLegacyCredential('financial'))
+                        ->requiresConfirmation()
+                        ->modalHeading('Tem certeza que deseja gerar a ordem de pagamento?')
+                        ->modalDescription('A ordem de pagamento de outros será gerada para as despesas selecionadas.')
+                        ->deselectRecordsAfterCompletion()
+                        ->action(function (Collection $records, BulkAction $action) {
+                            try {
+                                $result = app(GenerateOtherPaymentOrders::class)->fromSelection($this->getOwnerRecord(), $records->modelKeys());
                             } catch (DomainException $e) {
                                 Notification::make()->title($e->getMessage())->danger()->send();
                                 $action->halt();

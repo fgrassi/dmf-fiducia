@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Actions\PaymentOrders\Other\GenerateOtherPaymentOrders;
 use App\Actions\PaymentOrders\Other\RecalculateOtherPaymentOrder;
 use App\Filament\Resources\OtherPaymentOrders\OtherPaymentOrderResource;
 use App\Filament\Resources\OtherPaymentOrders\Pages\ListOtherPaymentOrders;
@@ -265,6 +266,23 @@ class OtherPaymentOrderResourceTest extends TestCase
 
         $this->assertSame([$two], $order->instructions()->pluck('instrucao_pagamento_outros_id')->map(fn ($id) => (int) $id)->all());
         $this->assertSame(1, DB::table('instrucao_pagamento_item_outros')->count());
+    }
+
+    public function test_list_generates_the_orders_manually_and_shows_the_error_message(): void
+    {
+        $this->actingAs($this->user('financial'));
+        $mock = $this->mock(GenerateOtherPaymentOrders::class);
+        $mock->shouldReceive('all')->once()->andReturn(3);
+        $mock->shouldReceive('all')->once()->andReturn(0);
+        $mock->shouldReceive('all')->once()->andThrow(new \DomainException('Outra geração de ordens está em andamento. Tente novamente.'));
+
+        Livewire::test(ListOtherPaymentOrders::class)
+            ->callAction('gerarManualmente')
+            ->assertNotified('3 ordem(ns) de pagamento gerada(s) com sucesso!')
+            ->callAction('gerarManualmente')
+            ->assertNotified('Nenhuma ordem de pagamento gerada!')
+            ->callAction('gerarManualmente')
+            ->assertNotified('Outra geração de ordens está em andamento. Tente novamente.');
     }
 
     /** @param  array<string, mixed>  $attributes */

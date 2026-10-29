@@ -53,6 +53,11 @@ return [
         'automatic_generation' => env('ORDEM_PAGAMENTO_GERACAO_AUTOMATICA', false),
     ],
 
+    // Geração automática das ordens de pagamento de outros (ordens-pagamento-outros:gerar). Ligar só quando o cron do tracking parar de chamar ordemPagamentoOutros/geraOrdemPagamento.
+    'ordem_pagamento_outros' => [
+        'automatic_generation' => env('ORDEM_PAGAMENTO_OUTROS_GERACAO_AUTOMATICA', false),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
