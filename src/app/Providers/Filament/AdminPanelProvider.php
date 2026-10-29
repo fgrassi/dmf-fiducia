@@ -40,6 +40,7 @@ class AdminPanelProvider extends PanelProvider
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->navigationGroups([
                 'Cadastros',
+                'Booking',
                 'Config IT',
                 'Configurações',
                 'Financeiro',
