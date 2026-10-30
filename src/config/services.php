@@ -58,6 +58,11 @@ return [
         'automatic_generation' => env('ORDEM_PAGAMENTO_OUTROS_GERACAO_AUTOMATICA', false),
     ],
 
+    // Geração do resumo de resultado das capas (capas:resumo-gerar). Ligar só quando o cron do tracking parar de chamar cron/manutencao.
+    'capas' => [
+        'automatic_routines' => env('CAPAS_ROTINAS_AUTOMATICAS', false),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

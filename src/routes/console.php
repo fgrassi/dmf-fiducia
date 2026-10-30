@@ -1,5 +1,7 @@
 <?php
 
+use App\Actions\AccountingCovers\GenerateCoverSummaries;
+use App\Actions\AccountingCovers\RefreshCoverSummaries;
 use App\Actions\Cobranca\Generation\GenerateAllCharges;
 use App\Actions\Cobranca\Notices\HapagPendingNotice;
 use App\Actions\Cobranca\Notices\OpenChargeReminders;
@@ -108,3 +110,25 @@ Schedule::command('ordens-pagamento-outros:gerar')
     ->hourly()
     ->withoutOverlapping()
     ->when(fn () => (bool) config('services.ordem_pagamento_outros.automatic_generation'));
+
+// cron/manutencao (legado), capas normais: gera o resumo_resultado das capas arquivadas e avisa quem favoritou a reserva.
+Artisan::command('capas:resumo-gerar', function () {
+    $this->info(app(GenerateCoverSummaries::class)().' resumo(s) gerado(s).');
+})->purpose('Gera o resumo de resultado das capas de contabilidade arquivadas');
+
+// ponytail: diário às 02:00 é um chute (o crontab do tracking não está no repo); confirmar com produção antes de ligar
+// desligado até o cron do tracking parar de chamar cron/manutencao (CAPAS_ROTINAS_AUTOMATICAS=true)
+Schedule::command('capas:resumo-gerar')
+    ->dailyAt('02:00')
+    ->withoutOverlapping()
+    ->when(fn () => (bool) config('services.capas.automatic_routines'));
+
+// capasContabilidade/atualizarResumoResultado (legado): recalcula rs e resultado dos resumos; só sob demanda.
+Artisan::command('capas:resumo-atualizar {--data-min= : criadas a partir de (AAAA-MM-DD)} {--data-max= : criadas até (AAAA-MM-DD)}', function () {
+    $count = app(RefreshCoverSummaries::class)(
+        $this->option('data-min') ? Carbon\Carbon::parse($this->option('data-min')) : null,
+        $this->option('data-max') ? Carbon\Carbon::parse($this->option('data-max')) : null,
+    );
+
+    $this->info("Atualizados {$count} registros de resumo.");
+})->purpose('Recalcula o resumo de resultado das capas de contabilidade');
