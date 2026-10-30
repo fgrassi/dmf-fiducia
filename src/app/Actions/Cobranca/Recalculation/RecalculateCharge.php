@@ -96,8 +96,10 @@ class RecalculateCharge
                         $negotiated->each(fn ($rate) => $rate->replicate()->forceFill(['ref_charge' => $c->id, 'created_at' => $rate->getRawOriginal('created_at')])->save());
                     }
 
-                    // legado: no "Todas" recalcula sempre, e IC com cotação desatualizada é pulada sem erro
-                    $done[] = $this->recalculate($c, $withoutIof, false, $user, true, false, failOnRates: false);
+                    // legado: no "Todas" recalcula sempre, e IC com cotação desatualizada é pulada sem erro (sem PDF, e-mail nem NFS-e)
+                    if ($recalculated = $this->recalculate($c, $withoutIof, false, $user, true, false, failOnRates: false)) {
+                        $done[] = $recalculated;
+                    }
                 }
 
                 return $charge;
@@ -151,8 +153,9 @@ class RecalculateCharge
     /**
      * @param  bool  $recalculateItems  FinCharges::recalcular() (armador permite) — sem ele só o IOF/total é refeito
      * @param  bool  $merging  no "unir" sem recálculo de itens o legado ainda refaz IOF e total
+     * @return ?FinCharges null quando a IC foi pulada por cotação desatualizada (só no "Todas")
      */
-    private function recalculate(FinCharges $charge, bool $withoutIof, bool $keepIof, User $user, bool $recalculateItems, bool $merging, bool $failOnRates = true): FinCharges
+    private function recalculate(FinCharges $charge, bool $withoutIof, bool $keepIof, User $user, bool $recalculateItems, bool $merging, bool $failOnRates = true): ?FinCharges
     {
         $charge->forceFill([
             'updated_at' => now()->toDateString(),
@@ -183,7 +186,7 @@ class RecalculateCharge
                 throw new DomainException('Não foi possível atualizar a cobrança. Taxas desatualizadas.');
             }
 
-            return $charge;
+            return null;
         }
 
         $this->recalculateItems($charge);
@@ -217,13 +220,13 @@ class RecalculateCharge
         $iof = match (true) {
             $withoutIof => 0.0,
             ! $this->iof->applies($charge) => 0.0,
-            $keepIof => (float) $charge->valor_iof,
+            $keepIof => $charge->valor_iof,
             default => $this->iof->calculated($charge),
         };
 
         $charge->forceFill([
             'valor_iof' => $iof,
-            'total_value' => (float) $charge->items()->sum('item_value') + $iof,
+            'total_value' => (float) $charge->items()->sum('item_value') + (float) $iof,
         ])->save();
     }
 

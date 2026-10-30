@@ -62,6 +62,20 @@ class ChargeDueDateTest extends TestCase
         $this->assertSame('2026-10-10', app(ChargeDueDate::class)->display($this->charge(term: ['prazo_exp' => 10]))->toDateString());
     }
 
+    public function test_pdf_shows_on_presentation_when_due_today_or_past(): void
+    {
+        $this->travelTo('2026-10-10');
+
+        $this->assertSame('Na apresentação', app(ChargeDueDate::class)->forPdf($this->charge(term: ['prazo_exp' => 10])));
+    }
+
+    public function test_pdf_shows_the_date_when_due_in_the_future(): void
+    {
+        $this->travelTo('2026-10-09');
+
+        $this->assertSame('10/10/2026', app(ChargeDueDate::class)->forPdf($this->charge(term: ['prazo_exp' => 10])));
+    }
+
     private function charge(?array $term, string $operation = 'e', string $due = '2026-10-01'): FinCharges
     {
         DB::table('pessoa')->insert(['pessoa_id' => 100, 'nome' => 'ACME']);

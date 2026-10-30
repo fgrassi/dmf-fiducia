@@ -98,9 +98,8 @@ class InsurancePdf
         $pdf->Ln(self::SPACE);
         $cell(100, 'Instrução de Cobrança ', 'L', false, 1, 60);
 
-        $due = $this->dueDate->display($charge);
         $pdf->SetFont('Helvetica', 'B', 8);
-        $pdf->MultiCell(0, 5, 'Data de Vencimento: '.($due instanceof CarbonImmutable ? $due->format('d/m/Y') : $due), 0, 'R', false, 1, 10, 15);
+        $pdf->MultiCell(0, 5, 'Data de Vencimento: '.$this->dueDate->forPdf($charge), 0, 'R', false, 1, 10, 15);
 
         $pdf->Ln(10);
         $header([[165, 'Informações Financeiras']]);
@@ -109,9 +108,11 @@ class InsurancePdf
         $field('Reserva:', (string) $e->booking);
         $field('Fatura:', (string) $e->invoice);
         $field('BLs (números):', (string) $e->house_bl, self::LABEL);
-        $field('Valor da fatura:', $insurance ? $symbol($insurance->ref_currency_fatura).' '.$insurance->valor_fatura : '', self::LABEL);
-        $field('Despesas (10%):', $insurance ? $symbol($insurance->ref_currency_despesa).' '.$insurance->despesas : '', self::LABEL);
-        $field('Valor do Frete:', $insurance ? $symbol($insurance->ref_currency_frete).' '.$insurance->valor_frete : '', self::LABEL);
+        // o legado imprime o decimal do banco como veio ("5496.70")
+        $amount = fn (mixed $currency, mixed $value) => $symbol($currency).' '.number_format((float) $value, 2, '.', '');
+        $field('Valor da fatura:', $insurance ? $amount($insurance->ref_currency_fatura, $insurance->valor_fatura) : '', self::LABEL);
+        $field('Despesas (10%):', $insurance ? $amount($insurance->ref_currency_despesa, $insurance->despesas) : '', self::LABEL);
+        $field('Valor do Frete:', $insurance ? $amount($insurance->ref_currency_frete, $insurance->valor_frete) : '', self::LABEL);
         $pdf->Ln(self::SPACE);
 
         $pdf->SetFont('Helvetica', 'B', self::FS);

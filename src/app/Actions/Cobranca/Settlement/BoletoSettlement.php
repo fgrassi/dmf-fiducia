@@ -73,7 +73,7 @@ class BoletoSettlement
             FinChargesLog::forceCreate([
                 'ref_charge' => $charge->id,
                 'acao' => 'baixa_boleto',
-                'historico' => "Baixa por boleto. Valor recebido: {$charge->received_value}; Banco: ".($bank ? "{$bank->name} ({$bank->bank_number})" : '—').FinCharges::recipientsLogSummary($emails),
+                'historico' => 'Baixa por boleto. Valor recebido: '.number_format((float) $charge->received_value, 2, '.', '').'; Banco: '.($bank ? "{$bank->name} ({$bank->bank_number})" : '—').FinCharges::recipientsLogSummary($emails),
                 'status_anterior' => ChargeStatus::Open->value,
                 'status_novo' => ChargeStatus::Boleto->value,
                 'created_at' => now(),
@@ -111,7 +111,9 @@ class BoletoSettlement
 
         $e = $charge->embarque;
         $type = (int) $charge->ref_type !== 1 ? ' - '.mb_strtoupper((string) $charge->type?->name) : '';
-        $client = (string) DB::table('pessoa')->where('pessoa_id', $e->cliente_id)->value('nome');
+        // FinCharges::getClientName: exportador (EXPO) ou importador (IMPO), com o CNPJ
+        $party = DB::table('pessoa')->where('pessoa_id', $e->impor_expor === 'e' ? $e->pessoa_id_cliente : $e->pessoa_id_importador)->first(['nome', 'cnpj']);
+        $client = $party ? "{$party->nome} ({$party->cnpj})" : '';
         $subject = "DMF Logistics: Demonstrativo de Baixa do Boleto Bancário{$type}: {$e->booking} - "
             .preg_replace("/\r?\n/m", ' ', (string) $e->invoice)." - {$client}";
 

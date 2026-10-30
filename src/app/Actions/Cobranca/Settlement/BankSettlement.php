@@ -61,7 +61,7 @@ class BankSettlement
             FinChargesLog::forceCreate([
                 'ref_charge' => $charge->id,
                 'acao' => 'baixa_bancaria',
-                'historico' => "Baixa bancária. Valor recebido: {$charge->received_value}; Banco: ".($bank ? "{$bank->name} ({$bank->bank_number})" : '—').FinCharges::recipientsLogSummary($emails),
+                'historico' => 'Baixa bancária. Valor recebido: '.number_format((float) $charge->received_value, 2, '.', '').'; Banco: '.($bank ? "{$bank->name} ({$bank->bank_number})" : '—').FinCharges::recipientsLogSummary($emails),
                 'status_anterior' => ChargeStatus::Open->value,
                 'status_novo' => ChargeStatus::Paid->value,
                 'created_at' => now(),

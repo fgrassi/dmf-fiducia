@@ -68,6 +68,16 @@ class SettlementTest extends TestCase
         $this->assertSame('Payment received', DB::table('transborda')->value('descr'));
     }
 
+    /** O legado grava o decimal do banco no histórico: 750.00, não 750. */
+    public function test_bank_settlement_log_shows_the_received_value_with_two_decimals(): void
+    {
+        $this->mockReceipts(null);
+
+        app(BankSettlement::class)($this->charge(), [...self::PAYMENT, 'received_value' => '750,00'], $this->user());
+
+        $this->assertStringStartsWith('Baixa bancária. Valor recebido: 750.00;', DB::table('fin_charges_log')->value('historico'));
+    }
+
     public function test_bank_settlement_does_not_re_release_a_shipment_already_sent(): void
     {
         $this->mockReceipts();
@@ -117,7 +127,8 @@ class SettlementTest extends TestCase
         $pdf->shouldReceive('Output')->andReturn('%PDF-fake');
         $this->mock(DeclarationPdf::class)->shouldReceive('render')->once()->andReturn($pdf);
         $this->mock(ChargeRecipients::class)->shouldReceive('__invoke')->andReturn(['cliente@x.com' => 'Cliente']);
-        $charge = $this->charge();
+        DB::table('pessoa')->insert(['pessoa_id' => 7, 'nome' => 'ACME', 'cnpj' => '11.222.333/0001-81']);
+        $charge = $this->charge(booking: ['pessoa_id_cliente' => 7]);
 
         app(BoletoSettlement::class)($charge, self::PAYMENT, $this->user());
 
@@ -128,6 +139,7 @@ class SettlementTest extends TestCase
         Storage::disk('tracking_uploads')->assertExists("declaracao/{$name}.pdf");
         $this->assertSame('baixa_boleto', DB::table('fin_charges_log')->value('acao'));
         $this->assertStringContainsString('Demonstrativo de Baixa do Boleto Bancário', $this->sentSubjects()->first());
+        $this->assertStringEndsWith(' - ACME (11.222.333/0001-81)', $this->sentSubjects()->first());
     }
 
     private function assertRefused(callable $call, string $message): void

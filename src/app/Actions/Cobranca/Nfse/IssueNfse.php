@@ -333,7 +333,7 @@ class IssueNfse
         // não incidência / imunidade / exportação: sem alíquota nem valor do ISS
         if ($issqn === '1' && is_numeric($operation->aliquota_iss)) {
             $values['aliquota_iss'] = (float) $operation->aliquota_iss;
-            $values['valor_iss'] = round($amount * $operation->aliquota_iss / 100, 2);
+            $values['valor_iss'] = round($amount * ((float) $operation->aliquota_iss / 100), 2); // como o legado: alíquota/100 antes de multiplicar (o ponto flutuante muda 1 centavo)
         }
 
         $values += array_filter(['pis_cofins' => self::pisCofins($operation, $amount), 'tot_trib' => self::approximateTaxes($operation)]);
@@ -547,7 +547,7 @@ class IssueNfse
         foreach (['pis', 'cofins'] as $tax) {
             if (is_numeric($operation->{"aliquota_{$tax}"})) {
                 $block["aliquota_{$tax}"] = (float) $operation->{"aliquota_{$tax}"};
-                $block["valor_{$tax}"] = round($amount * $operation->{"aliquota_{$tax}"} / 100, 2);
+                $block["valor_{$tax}"] = round($amount * ((float) $operation->{"aliquota_{$tax}"} / 100), 2);
             }
         }
 

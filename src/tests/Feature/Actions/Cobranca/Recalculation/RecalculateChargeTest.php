@@ -145,6 +145,24 @@ class RecalculateChargeTest extends TestCase
         $this->assertSame([1.0], $this->itemValues($paid));
     }
 
+    public function test_all_mode_skips_pdf_email_and_nfse_for_a_charge_with_outdated_rates(): void
+    {
+        $outdated = $this->charge();
+        $this->item($outdated, 100, currency: 2);
+        $brl = $this->charge();
+        $this->item($brl, 200, currency: 1, expense: 501);
+        DB::table('fin_currencies_rates_values')->delete();
+
+        $notified = [];
+        $this->after->shouldReceive('__invoke')->andReturnUsing(function (FinCharges $c) use (&$notified) {
+            $notified[] = $c->id;
+        });
+        $this->recalculate($outdated, RecalculateCharge::ALL);
+
+        $this->assertSame([1.0], $this->itemValues($outdated));
+        $this->assertSame([$brl->id], $notified);
+    }
+
     public function test_after_recalculation_runs_for_each_recalculated_charge_with_the_nfse_reason(): void
     {
         $charge = $this->chargeWithItems();

@@ -43,12 +43,7 @@ class DebitNote
         $bl = $charge->ref_bl ? DB::table('bl')->where('bl_id', $charge->ref_bl)->first() : null;
         $date = fn ($d) => $d ? Carbon::parse($d)->format('d/m/Y') : '';
         $name = fn (string $table, string $key, $id) => $id ? (string) DB::table($table)->where($key, $id)->value('nome') : '';
-        $port = function ($id) {
-            $p = $id ? DB::table('porto as p')->leftJoin('paises as c', 'c.paises_id', '=', 'p.ref_pais')
-                ->where('p.porto_id', $id)->first(['p.nome', 'p.uncode', 'c.uncode as pais']) : null;
-
-            return $p ? "{$p->nome} ({$p->pais})({$p->uncode})" : '';
-        };
+        $port = fn ($id) => $this->details->port($id);
         $h1 = ['font' => ['bold' => true, 'size' => 12], 'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER]];
         $left = ['alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER]];
 

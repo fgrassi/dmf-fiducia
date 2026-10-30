@@ -96,8 +96,8 @@ class InstructionPdf
             $pdf->Image(resource_path('images/logo_head_1.png'), 40, 15, 30);
             $pdf->SetFont('Helvetica', 'B', 16);
             $pdf->SetTextColor(...self::RED);
-            $pdf->MultiCell(0, 5, 'INSTRUÇÃO DE ', 0, 'L', false, 1, 75, 20);
-            $pdf->MultiCell(0, 5, 'COBRANÇA', 0, 'L', false, 1, 105, 20);
+            // uma linha só: em Helvetica "INSTRUÇÃO DE" é mais larga que em BebasNeue e invadiria "COBRANÇA"
+            $pdf->MultiCell(0, 5, 'INSTRUÇÃO DE COBRANÇA', 0, 'L', false, 1, 75, 20);
             $pdf->SetFont('Helvetica', 'B', 8);
             $pdf->MultiCell(190, 5, 'IC'.str_pad((string) $charge->id, 4, '0', STR_PAD_LEFT).'/'.$charge->created_at->format('Y'), 0, 'R', false, 1, 10, 10);
         };
@@ -108,8 +108,7 @@ class InstructionPdf
         };
 
         $page();
-        $due = $this->dueDate->display($charge);
-        $pdf->MultiCell(190, 5, 'Data de Vencimento: '.(is_string($due) ? $due : $due->format('d/m/Y')), 0, 'R', false, 1, 10, 15);
+        $pdf->MultiCell(190, 5, 'Data de Vencimento: '.$this->dueDate->forPdf($charge), 0, 'R', false, 1, 10, 15);
 
         // cabeçalhos dos campos (em vermelho) e, depois, os valores por cima
         $pdf->SetDrawColor(...self::RED);

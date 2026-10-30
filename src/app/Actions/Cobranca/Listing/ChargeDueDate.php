@@ -11,6 +11,8 @@ class ChargeDueDate
 {
     public const EMPTY = 'N/D';
 
+    public const ON_PRESENTATION = 'Na apresentação';
+
     /** Vencimento efetivo considerando o prazo negociado do cliente. */
     public function final(FinCharges $charge): ?CarbonImmutable
     {
@@ -34,6 +36,14 @@ class ChargeDueDate
     public function display(FinCharges $charge): CarbonImmutable|string
     {
         return $this->final($charge) ?? self::EMPTY;
+    }
+
+    /** getDataVencimento do legado, nos PDFs da IC e do seguro: "Na apresentação" quando sem data ou já vencida/hoje. */
+    public function forPdf(FinCharges $charge): string
+    {
+        $due = $this->final($charge);
+
+        return $due && $due->greaterThan(CarbonImmutable::today()) ? $due->format('d/m/Y') : self::ON_PRESENTATION;
     }
 
     private function clientTermDays(FinCharges $charge): ?int

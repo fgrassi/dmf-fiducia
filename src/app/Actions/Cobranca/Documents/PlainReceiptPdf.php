@@ -44,12 +44,7 @@ class PlainReceiptPdf
         $bl = $charge->ref_bl ? DB::table('bl')->where('bl_id', $charge->ref_bl)->first() : null;
         $name = fn (string $table, string $key, $id) => $id ? (string) DB::table($table)->where($key, $id)->value('nome') : '';
         $date = fn ($d) => $d ? Carbon::parse($d)->format('d/m/Y') : '';
-        $port = function ($id) {
-            $p = $id ? DB::table('porto as p')->leftJoin('paises as c', 'c.paises_id', '=', 'p.ref_pais')
-                ->where('p.porto_id', $id)->first(['p.nome', 'p.uncode', 'c.uncode as pais']) : null;
-
-            return $p ? "{$p->nome} ({$p->pais})({$p->uncode})" : '';
-        };
+        $port = fn ($id) => $this->details->port($id);
 
         $pdf = new TCPDF('P', 'mm', 'A4', true);
         $pdf->SetCreator('DMF Logistics');

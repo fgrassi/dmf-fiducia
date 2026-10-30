@@ -45,12 +45,7 @@ class DeclarationPdf
         $bl = $charge->ref_bl ? DB::table('bl')->where('bl_id', $charge->ref_bl)->first() : null;
         $name = fn (string $table, string $key, $id) => $id ? (string) DB::table($table)->where($key, $id)->value('nome') : '';
         $date = fn ($d) => $d ? Carbon::parse($d)->format('d/m/Y') : '';
-        $port = function ($id) {
-            $p = $id ? DB::table('porto as p')->leftJoin('paises as c', 'c.paises_id', '=', 'p.ref_pais')
-                ->where('p.porto_id', $id)->first(['p.nome', 'p.uncode', 'c.uncode as pais']) : null;
-
-            return $p ? "{$p->nome} ({$p->pais})({$p->uncode})" : '';
-        };
+        $port = fn ($id) => $this->details->port($id);
 
         $pdf = new TCPDF('P', 'mm', 'A4', true);
         $pdf->SetCreator('DMF Logistics');
@@ -275,7 +270,7 @@ class DeclarationPdf
         $cell(165, (string) $charge->discount_obs);
         $space(2);
         $pdf->SetFont('Helvetica', 'B', 10);
-        $cell(165, ($plain ? 'Valores pagos via Boleto Bancário' : 'Boleto Bancário').', com vencimento em '.$date($charge->payment_confirmation).'.');
+        $cell(165, ($plain ? 'Valores pagos via Boleto Bancário, com' : 'Boleto Bancário com').' vencimento em '.$date($charge->payment_confirmation).'.');
         $space(3);
         $pdf->SetFont('Helvetica', '', 10);
         $cell(165, 'Santa Cruz do Sul, '.now()->format('d').' de '.self::MONTHS[now()->month].' de '.now()->format('Y'));
