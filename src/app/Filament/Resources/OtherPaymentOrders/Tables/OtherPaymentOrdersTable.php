@@ -37,7 +37,8 @@ class OtherPaymentOrdersTable
                 TextColumn::make('embarque.house_bl')
                     ->label('HBL'),
                 TextColumn::make('client_name')
-                    ->label('Cliente'),
+                    ->label('Cliente')
+                    ->wrap(),
                 TextColumn::make('items_total')
                     ->label('Valor Total')
                     ->formatStateUsing(fn ($state) => 'R$'.number_format((float) $state, 2, ',', '.')),

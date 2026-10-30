@@ -53,9 +53,11 @@ class ManualAccountingCoversTable
                 TextColumn::make('numero')
                     ->label('Número'),
                 TextColumn::make('client.nome')
-                    ->label('Cliente'),
+                    ->label('Cliente')
+                    ->wrap(),
                 TextColumn::make('nome_cliente')
-                    ->label('Nome Cliente'),
+                    ->label('Nome Cliente')
+                    ->wrap(),
                 TextColumn::make('currency.symbol')
                     ->label('Moeda'),
                 TextColumn::make('valor_cotacao')

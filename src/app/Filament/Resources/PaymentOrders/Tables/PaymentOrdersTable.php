@@ -51,7 +51,8 @@ class PaymentOrdersTable
                 TextColumn::make('mbl')
                     ->label('MBL'),
                 TextColumn::make('armador.nome')
-                    ->label('Armador'),
+                    ->label('Armador')
+                    ->wrap(),
                 TextColumn::make('items_total')
                     ->label('Valor Total')
                     ->formatStateUsing(fn ($state) => 'R$'.number_format((float) $state, 2, ',', '.')),
