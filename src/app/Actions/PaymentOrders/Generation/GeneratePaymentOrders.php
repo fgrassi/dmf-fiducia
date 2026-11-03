@@ -16,7 +16,8 @@ use stdClass;
  * (ctr_pgto = 0). Ordem sem valor é apagada. Uma geração por vez (PaymentGenerationLock).
  *
  * Preserva o legado: no modo automático o item recebe como BL o último BL da reserva (a variável do laço vaza no PHP) e as
- * despesas de reservas consolidadas do mesmo MBL entram na mesma ordem.
+ * despesas de reservas consolidadas do mesmo MBL entram na mesma ordem, e a consolidada sem despesas pendentes repete a lista
+ * da anterior ($despesas não é zerada no laço).
  * Diferença: o legado, ao falhar numa reserva do lote (cotação do dia que não existe para uma despesa de cobrança PA, por
  * exemplo), derrubava o cron inteiro; aqui a reserva é desfeita e as outras seguem.
  */
@@ -188,12 +189,16 @@ class GeneratePaymentOrders
             if ($selectedIds !== null || $this->checks->quotesUpToDate($booking, null)) {
                 $this->addItems($order, $booking, $this->checks->expenses($booking, $ids), $selectedIds, $bls, $mbl);
 
+                $previous = collect();
+
                 foreach ($others as $other) {
                     $otherIds = $this->checks->pendingIds($other);
 
                     if ($otherIds !== []) {
-                        $this->addItems($order, $booking, $this->checks->expenses($other, $otherIds, nonZeroOnly: true), null, $bls, $mbl, extra: true);
+                        $previous = $this->checks->expenses($other, $otherIds, nonZeroOnly: true);
                     }
+
+                    $this->addItems($order, $booking, $previous, null, $bls, $mbl, extra: true);
                 }
             }
 

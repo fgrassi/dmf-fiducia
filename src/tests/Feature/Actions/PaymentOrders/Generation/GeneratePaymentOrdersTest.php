@@ -149,6 +149,24 @@ class GeneratePaymentOrdersTest extends TestCase
         $this->assertSame([0, 0], [(int) $main->fresh()->ctr_pgto, (int) $other->fresh()->ctr_pgto]);
     }
 
+    public function test_a_consolidated_booking_without_expenses_repeats_the_previous_one_like_the_legacy(): void
+    {
+        $this->todayRate(5);
+        $main = $this->booking(['booking' => 'MAIN', 'consolidado' => 's']);
+        $withExpenses = $this->booking(['booking' => 'WITH', 'consolidado' => 's']);
+        $empty = $this->booking(['booking' => 'EMPTY', 'consolidado' => 's']);
+        foreach ([$main, $withExpenses, $empty] as $booking) {
+            $this->bl($booking, 'MBL1');
+        }
+        $this->expense($main, ['ref_expense' => 10, 'buying_rate' => 100]);
+        $this->expense($withExpenses, ['ref_expense' => 11, 'buying_rate' => 40]);
+
+        app(GeneratePaymentOrders::class)->forBooking($main);
+
+        $order = FinPaymentOrder::sole();
+        $this->assertSame([900.0, 3], [(float) $order->total_value, $order->items()->count()]);
+    }
+
     public function test_selection_creates_the_order_ignores_incompatible_and_used_expenses_and_updates_the_pending_flag(): void
     {
         $booking = $this->booking();

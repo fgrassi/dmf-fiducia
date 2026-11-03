@@ -8,8 +8,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * atualizaValorUnitario, editTaxa, atualizaIndice e habilitaDesabilita (legado): edições do item da ordem. Sem histórico.
  *
- * Preserva o legado: com moeda real, mudar o índice multiplica o valor atual do item pelo novo índice (e não o valor
- * unitário), então mudar o índice duas vezes acumula.
+ * Diverge do legado de propósito: com moeda real, o legado multiplicava o valor atual do item pelo novo índice (mudar
+ * duas vezes acumulava); aqui o índice sempre multiplica o valor unitário.
  */
 class EditOtherOrderItem
 {
@@ -45,9 +45,7 @@ class EditOtherOrderItem
     public function index(OrdemPagamentoItem $item, float $index): OrdemPagamentoItem
     {
         $item->indice = $index;
-        $item->item_value = (int) $item->ref_currency === self::REAL
-            ? $index * (float) $item->item_value
-            : $index * (float) $item->unitary_value * (float) $item->current_rate_value;
+        $item->item_value = $index * (float) $item->unitary_value * ((int) $item->ref_currency === self::REAL ? 1 : (float) $item->current_rate_value);
         $item->save();
 
         return $item;

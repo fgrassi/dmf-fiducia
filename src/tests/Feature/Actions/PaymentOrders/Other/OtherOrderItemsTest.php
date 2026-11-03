@@ -95,9 +95,9 @@ class OtherOrderItemsTest extends TestCase
         $this->assertSame(2160.0, $foreign->fresh()->item_value);
 
         $edit->index($real->fresh(), 2);
-        $this->assertSame(600.0, $real->fresh()->item_value);
+        $this->assertSame(300.0, $real->fresh()->item_value);
         $edit->index($real->fresh(), 2);
-        $this->assertSame(1200.0, $real->fresh()->item_value);
+        $this->assertSame(300.0, $real->fresh()->item_value);
 
         $this->assertFalse($edit->toggle($foreign->fresh()));
         $this->assertNull($foreign->fresh()->status);
