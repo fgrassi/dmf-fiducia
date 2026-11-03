@@ -2,13 +2,19 @@
 
 namespace App\Filament\Resources\Boxes\Tables;
 
+use App\Actions\BoxControl\DeleteBox;
 use App\Filament\Resources\Boxes\BoxResource;
 use App\Models\ControleCaixa;
 use App\Models\ControleCaixaEmbarque;
 use App\Models\Embarque;
+use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
+use Filament\Notifications\Notification;
+use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\SelectColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\TextInputColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -28,12 +34,14 @@ class BoxesTable
                 TextColumn::make('controle_caixa_id')
                     ->label('Número')
                     ->searchable(),
-                TextColumn::make('tipo_caixa')
+                SelectColumn::make('tipo_caixa')
                     ->label('Tipo')
-                    ->formatStateUsing(fn (?string $state) => ControleCaixa::TYPES[$state] ?? $state),
-                TextColumn::make('nome_caixa')
+                    ->options(ControleCaixa::TYPES)
+                    ->selectablePlaceholder(false),
+                TextInputColumn::make('nome_caixa')
                     ->label('Nome')
                     ->placeholder('Não determinado.')
+                    ->rules(['max:255'])
                     ->searchable(),
                 TextColumn::make('bookings_count')
                     ->label('Nº Processos'),
@@ -69,6 +77,17 @@ class BoxesTable
             ->recordActions([
                 ViewAction::make()
                     ->label('Exibir'),
+                Action::make('excluir')
+                    ->label('Excluir')
+                    ->icon(Heroicon::OutlinedTrash)
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Confirmar exclusão?')
+                    ->modalDescription('Os vínculos com as reservas também são apagados.')
+                    ->action(function (ControleCaixa $record, DeleteBox $delete) {
+                        $delete($record);
+                        Notification::make()->title('Registro Removido com Sucesso')->success()->send();
+                    }),
             ]);
     }
 }

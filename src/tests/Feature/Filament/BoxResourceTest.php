@@ -111,6 +111,53 @@ class BoxResourceTest extends TestCase
         $this->assertSame(0, $box->bookings()->count());
     }
 
+    public function test_creates_an_open_box(): void
+    {
+        $this->actingAs($this->user('financial'));
+
+        Livewire::test(ListBoxes::class)
+            ->callAction('nova', ['tipo_caixa' => 'e', 'nome_caixa' => 'EXPO 2026'])
+            ->assertHasNoActionErrors();
+
+        $this->assertDatabaseHas('controle_caixa', ['tipo_caixa' => 'e', 'nome_caixa' => 'EXPO 2026', 'status' => 'a']);
+    }
+
+    public function test_new_box_requires_type_and_name(): void
+    {
+        $this->actingAs($this->user('financial'));
+
+        Livewire::test(ListBoxes::class)
+            ->callAction('nova', ['tipo_caixa' => null, 'nome_caixa' => ''])
+            ->assertHasActionErrors(['tipo_caixa' => 'required', 'nome_caixa' => 'required']);
+    }
+
+    public function test_edits_name_and_type_in_the_row(): void
+    {
+        $this->actingAs($this->user('financial'));
+        $box = $this->box();
+
+        Livewire::test(ListBoxes::class)
+            ->call('updateTableColumnState', 'nome_caixa', (string) $box->getKey(), 'RENOMEADA')
+            ->call('updateTableColumnState', 'tipo_caixa', (string) $box->getKey(), 'd');
+
+        $this->assertSame(['RENOMEADA', 'd'], [$box->fresh()->nome_caixa, $box->fresh()->tipo_caixa]);
+    }
+
+    public function test_deletes_the_box_and_its_bookings(): void
+    {
+        $this->actingAs($this->user('financial'));
+        $box = $this->box();
+        $other = $this->box();
+        $box->bookings()->create(['embarque_id' => 1]);
+        $other->bookings()->create(['embarque_id' => 2]);
+
+        Livewire::test(ListBoxes::class)
+            ->callAction(TestAction::make('excluir')->table($box));
+
+        $this->assertDatabaseMissing('controle_caixa', ['controle_caixa_id' => $box->getKey()]);
+        $this->assertSame([2], DB::table('controle_caixa_embarque')->pluck('embarque_id')->all());
+    }
+
     /** @param array<string, mixed> $attributes */
     private function box(array $attributes = []): ControleCaixa
     {
