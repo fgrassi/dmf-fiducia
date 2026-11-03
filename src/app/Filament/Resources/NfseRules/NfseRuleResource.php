@@ -37,7 +37,7 @@ class NfseRuleResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'Financeiro';
 
-    protected static ?int $navigationSort = 70;
+    protected static ?int $navigationSort = 100;
 
     /** security.yml do módulo (legado): credencial financial. */
     public static function canAccess(): bool

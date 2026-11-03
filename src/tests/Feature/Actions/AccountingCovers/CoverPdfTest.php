@@ -67,10 +67,10 @@ class CoverPdfTest extends TestCase
     private function cover(array $booking, array $cover): CapaProcesso
     {
         DB::table('cmn_currencies')->insert(['id' => 2, 'name' => 'Dólar', 'symbol' => 'US$']);
-        DB::table('pessoa')->insert([['pessoa_id' => 1, 'nome' => 'Cliente SA'], ['pessoa_id' => 2, 'nome' => 'Importadora SA']]);
+        DB::table('pessoa')->insert([['pessoa_id' => 1, 'nome' => 'Cliente SA'], ['pessoa_id' => 2, 'nome' => 'Importadora SA'], ['pessoa_id' => 3, 'nome' => 'Outra SA']]);
         DB::table('sedes')->insert(['id' => 1, 'nome' => 'Porto Alegre']);
         DB::table('vendedor')->insert(['vendedor_id' => 1, 'nome' => 'Ana', 'sede_id' => 1]);
-        DB::table('embarque')->insert(['embarque_id' => 1, 'booking' => 'B1', 'tipo_embarque' => 'm', 'cliente_id' => 1, 'pessoa_id_importador' => 2, 'vendedor_id' => 1] + $booking);
+        DB::table('embarque')->insert(['embarque_id' => 1, 'booking' => 'B1', 'tipo_embarque' => 'm', 'cliente_id' => 3, 'pessoa_id_cliente' => 1, 'pessoa_id_importador' => 2, 'vendedor_id' => 1] + $booking);
 
         return CapaProcesso::create($cover + ['embarque_id' => 1, 'numero' => 7, 'moeda_id' => 1]);
     }

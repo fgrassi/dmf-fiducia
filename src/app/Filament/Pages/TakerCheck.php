@@ -39,7 +39,7 @@ class TakerCheck extends Page
 
     protected static string|UnitEnum|null $navigationGroup = 'Config IT';
 
-    protected static ?int $navigationSort = 26;
+    protected static ?int $navigationSort = 27;
 
     public ?array $data = [];
 

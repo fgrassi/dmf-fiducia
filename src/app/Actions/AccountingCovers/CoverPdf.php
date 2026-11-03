@@ -27,7 +27,9 @@ class CoverPdf
         $pdf->SetAuthor('DMF Logistics');
         $pdf->SetTitle('DMF Logistics - Capa Contabilidade');
         $pdf->setPrintHeader(false);
-        $pdf->setPrintFooter(false);
+        $pdf->SetHeaderMargin(15);
+        $pdf->SetFooterMargin(23);
+        $pdf->setFooterFont(['helvetica', '', 8]);
         $pdf->setImageScale(4);
         $pdf->AddPage();
         $pdf->SetMargins(10, 10);

@@ -18,7 +18,9 @@ class DeleteCover
             $expenseItems = DB::table('capa_processo_despesa_item')->where('capa_processo_id', $cover->getKey());
 
             $chargeIds = DB::table('fin_charges_items')
-                ->whereIn('ref_expense', (clone $receiptItems)->select('fin_expenses_values_id')->union((clone $expenseItems)->select('fin_expenses_values_id')))
+                ->where(fn ($q) => $q
+                    ->whereIn('ref_expense', (clone $receiptItems)->select('fin_expenses_values_id'))
+                    ->orWhereIn('ref_expense', (clone $expenseItems)->select('fin_expenses_values_id')))
                 ->pluck('ref_charge');
 
             DB::table('fin_charges')->whereIn('id', $chargeIds)->update([

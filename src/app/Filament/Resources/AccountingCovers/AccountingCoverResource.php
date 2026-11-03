@@ -28,9 +28,7 @@ class AccountingCoverResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'Financeiro';
 
-    protected static ?string $navigationParentItem = 'Capas';
-
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 20;
 
     /** security.yml do módulo (legado): credencial financial ou director. */
     public static function canAccess(): bool

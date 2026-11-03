@@ -51,7 +51,7 @@ class CoverSheet
         return [
             'reminder' => $booking->house_bl === 'BL DIRETO' ? 'BL DIRETO' : mb_strtoupper(self::TYPES[$booking->tipo_embarque] ?? ''),
             'party_label' => $export ? 'Exportador:' : 'Importador',
-            'party' => (string) DB::table('pessoa')->where('pessoa_id', $export ? $booking->cliente_id : $booking->pessoa_id_importador)->value('nome'),
+            'party' => (string) DB::table('pessoa')->where('pessoa_id', $export ? $booking->pessoa_id_cliente : $booking->pessoa_id_importador)->value('nome'),
             'bl' => (string) $booking->house_bl,
             'office' => (string) DB::table('vendedor as v')->leftJoin('sedes as s', 's.id', '=', 'v.sede_id')->where('v.vendedor_id', $booking->vendedor_id)->value('s.nome'),
             'seller' => (string) DB::table('vendedor')->where('vendedor_id', $booking->vendedor_id)->value('nome'),

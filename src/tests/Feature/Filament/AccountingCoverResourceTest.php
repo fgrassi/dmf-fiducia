@@ -22,7 +22,12 @@ class AccountingCoverResourceTest extends TestCase
     public function test_forbids_user_without_financial_or_director_credential(): void
     {
         $this->actingAs($this->user('booking'))->get(AccountingCoverResource::getUrl())->assertForbidden();
-        $this->actingAs($this->user('booking', 'outro'))->get(CoverFolderResource::getUrl())->assertForbidden();
+    }
+
+    public function test_folders_page_is_for_it_only(): void
+    {
+        $this->actingAs($this->user('financial', 'director'))->get(CoverFolderResource::getUrl())->assertForbidden();
+        $this->actingAs($this->user('it'))->get(CoverFolderResource::getUrl())->assertOk();
     }
 
     public function test_allows_director(): void
@@ -143,7 +148,7 @@ class AccountingCoverResourceTest extends TestCase
 
     public function test_folders_page_lists_newest_first_and_edits_month_year_and_status_keeping_the_name(): void
     {
-        $this->actingAs($this->user('financial'));
+        $this->actingAs($this->user('it'));
         $old = CapaProcessoArquivo::create(['nome' => 'JULHO/2026', 'mes' => 7, 'ano' => 2026, 'status' => 0]);
         $new = CapaProcessoArquivo::create(['nome' => 'AGOSTO/2026', 'mes' => 8, 'ano' => 2026, 'status' => 1]);
 

@@ -14,31 +14,32 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use UnitEnum;
 
-/** listPasta (legado): pastas mensais das capas de contabilidade. */
+/**
+ * listPasta (legado): pastas mensais das capas de contabilidade. No legado não há menu para ela (só a URL
+ * `/capasContabilidade/listPasta`); fica em Config IT até a chefia decidir se mantém.
+ */
 class CoverFolderResource extends Resource
 {
     protected static ?string $model = CapaProcessoArquivo::class;
 
-    protected static ?string $modelLabel = 'Caixa';
+    protected static ?string $modelLabel = 'Pasta';
 
-    protected static ?string $pluralModelLabel = 'Controle de Caixas';
+    protected static ?string $pluralModelLabel = 'Pastas de Capas';
 
-    protected static ?string $navigationLabel = 'Controle de Caixas';
+    protected static ?string $navigationLabel = 'Pastas de Capas';
 
-    protected static ?string $slug = 'financeiro/controle-de-caixas';
+    protected static ?string $slug = 'financeiro/pastas-de-capas';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedFolder;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Financeiro';
+    protected static string|UnitEnum|null $navigationGroup = 'Config IT';
 
-    protected static ?string $navigationParentItem = 'Capas';
+    protected static ?int $navigationSort = 26;
 
-    protected static ?int $navigationSort = 2;
-
-    /** security.yml do módulo capasContabilidade (legado): credencial financial ou director. */
+    /** O legado usava `financial` ou `director` (só pela URL); agora é do TI (credencial `it`; o admin sempre passa). */
     public static function canAccess(): bool
     {
-        return (bool) auth()->user()?->hasLegacyCredential(['financial', 'director']);
+        return (bool) auth()->user()?->hasLegacyCredential('it');
     }
 
     /** O legado edita mês, ano e status direto (common/editCampo) e não muda o nome da pasta. */
@@ -67,7 +68,7 @@ class CoverFolderResource extends Resource
             ->defaultSort(fn ($query) => $query->orderByDesc('ano')->orderByDesc('mes'))
             ->columns([
                 TextColumn::make('nome')
-                    ->label('Caixa'),
+                    ->label('Pasta'),
                 TextColumn::make('mes')
                     ->label('Mês'),
                 TextColumn::make('ano')

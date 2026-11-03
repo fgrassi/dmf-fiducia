@@ -26,7 +26,7 @@ class ChargeResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'Financeiro';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 30;
 
     /** security.yml do módulo cobranca (legado): credencial financial. */
     public static function canAccess(): bool
