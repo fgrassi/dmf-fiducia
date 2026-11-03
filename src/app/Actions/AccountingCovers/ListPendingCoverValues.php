@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\DB;
  * loadValoresReserva (legado): o que da reserva (e das "outras" com o mesmo MBL ou booking) ainda não entrou em nenhuma capa.
  *
  * Diferenças do legado: despesas por unidade (ref_unity = 5) repetidas contam por diferença de multiconjunto (o `$acum` do legado
- * nunca zera e esconde itens de outras despesas); IOF de cobrança só aparece se positivo, também com "outras" reservas.
+ * nunca zera e esconde itens de outras despesas); valores arredondados a 2 casas (as colunas são FLOAT e o legado mostra com number_format,
+ * o campo numérico do Filament mostraria 11686,3896484375); IOF de cobrança só aparece se positivo, também com "outras" reservas.
  *
  * @phpstan-type Row array{id: int, name: string, value: float}
  */
@@ -75,7 +76,7 @@ class ListPendingCoverValues
     private function unflagged(Collection $charges, string $flag, string $value): array
     {
         return $charges->filter(fn ($c) => ! $c->{$flag} && $c->{$value} > 0)
-            ->map(fn ($c) => ['id' => (int) $c->id, 'value' => (float) $c->{$value}])->values()->all();
+            ->map(fn ($c) => ['id' => (int) $c->id, 'value' => round((float) $c->{$value}, 2)])->values()->all();
     }
 
     /** @param  list<int>  $ids */
@@ -190,7 +191,7 @@ class ListPendingCoverValues
     private function purchaseIof(array $ids): array
     {
         return collect(['fin_payment_orders', 'ordem_pagamento'])
-            ->map(fn (string $table) => (float) DB::table($table)->whereIn('ref_embarque', $ids)->where('valor_iof', '>', 0)->sum('valor_iof'))
+            ->map(fn (string $table) => round((float) DB::table($table)->whereIn('ref_embarque', $ids)->where('valor_iof', '>', 0)->sum('valor_iof'), 2))
             ->filter(fn (float $total) => $total > 0)->values()->all();
     }
 
@@ -233,7 +234,7 @@ class ListPendingCoverValues
         return array_values(array_map(fn ($row) => [
             'id' => (int) $row->id,
             'name' => $this->details->expenseLabel($this->labelSource((int) $row->id)),
-            'value' => (float) $row->value,
+            'value' => round((float) $row->value, 2),
         ], $rows));
     }
 

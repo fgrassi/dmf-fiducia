@@ -9,13 +9,15 @@ use App\Models\Embarque;
 use DomainException;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Checkbox;
-use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Icons\Heroicon;
@@ -66,17 +68,23 @@ class NewCoverAction
                     ->live()
                     ->dehydrated(false)
                     ->afterStateUpdated(fn (Set $set, Get $get, $state) => self::markAll($set, $get, (bool) $state)),
-                self::rows('expenses', 'Despesas efetivadas'),
-                self::rows('revenues', 'Receitas efetivadas no Brasil'),
+                Grid::make(2)->schema([
+                    Group::make([
+                        self::rows('expenses', 'Despesas efetivadas'),
+                        self::rows('purchase_iof', null, editable: false),
+                        Placeholder::make('total_expenses')
+                            ->label('Total Despesas')
+                            ->content(fn (Get $get) => self::money([self::total($get, ['expenses', 'purchase_iof'])])[0]),
+                    ]),
+                    Group::make([
+                        self::rows('revenues', 'Receitas efetivadas no Brasil'),
+                        ...array_map(fn (string $kind) => self::rows($kind, null, editable: false), array_keys(self::EXTRAS)),
+                        Placeholder::make('total_revenues')
+                            ->label('Total Receitas')
+                            ->content(fn (Get $get) => self::money([self::total($get, ['revenues', ...array_keys(self::EXTRAS)], ['discount'])])[0]),
+                    ]),
+                ]),
                 self::rows('covered_expenses', 'Despesas já em capa (somente não vinculadas ao armador)'),
-                CheckboxList::make('purchase_iof')
-                    ->label('IOF da compra')
-                    ->options(fn (Get $get) => self::money(self::pending($get('booking_id'))['purchase_iof'] ?? []))
-                    ->visible(fn (Get $get) => filled(self::pending($get('booking_id'))['purchase_iof'] ?? [])),
-                ...array_map(fn (string $kind, string $label) => CheckboxList::make($kind)
-                    ->label($label)
-                    ->options(fn (Get $get) => self::money(array_column(self::pending($get('booking_id'))[$kind] ?? [], 'value', 'id')))
-                    ->visible(fn (Get $get) => filled(self::pending($get('booking_id'))[$kind] ?? [])), array_keys(self::EXTRAS), self::EXTRAS),
             ])
             ->action(function (array $data, CreateCover $create, Action $action) {
                 try {
@@ -90,13 +98,15 @@ class NewCoverAction
             });
     }
 
-    private static function rows(string $name, string $label): Repeater
+    private static function rows(string $name, ?string $label, bool $editable = true): Repeater
     {
         return Repeater::make($name)
             ->label($label)
+            ->hiddenLabel($label === null)
             ->schema([
                 Checkbox::make('selected')
-                    ->label('Na capa'),
+                    ->label('Na capa')
+                    ->disabled(fn (Get $get) => blank($get('id'))),
                 Hidden::make('id'),
                 Hidden::make('ta_payment_id'),
                 TextInput::make('name')
@@ -106,7 +116,9 @@ class NewCoverAction
                 TextInput::make('value')
                     ->label('Valor')
                     ->numeric()
-                    ->required(),
+                    ->live(onBlur: true)
+                    ->disabled(! $editable)
+                    ->required($editable),
             ])
             ->columns(3)
             ->addable(false)
@@ -124,24 +136,46 @@ class NewCoverAction
             $set($name, array_map($row, $pending[$name] ?? []));
         }
 
-        foreach (['purchase_iof', ...array_keys(self::EXTRAS)] as $kind) {
-            $set($kind, []);
+        $iof = array_map(fn (float $value, int $id) => ['id' => $id, 'value' => $value], $pending['purchase_iof'] ?? [], array_keys($pending['purchase_iof'] ?? []));
+        $set('purchase_iof', $bookingId ? self::extraRows('IOF', $iof, zeroed: true) : []);
+
+        foreach (self::EXTRAS as $kind => $title) {
+            $set($kind, self::extraRows($title, $pending[$kind] ?? []));
         }
 
         $set('select_all', false);
     }
 
+    /**
+     * Total de cada coluna como no legado: tudo o que está listado, marcado ou não (o legado não desconta o desconto; aqui ele sai).
+     *
+     * @param  list<string>  $sum
+     * @param  list<string>  $subtract
+     */
+    private static function total(Get $get, array $sum, array $subtract = []): float
+    {
+        $total = fn (array $names) => collect($names)->sum(fn (string $name) => collect($get($name) ?? [])->sum(fn (array $row) => (float) ($row['value'] ?? 0)));
+
+        return $total(array_diff($sum, $subtract)) - $total($subtract);
+    }
+
+    /**
+     * Linhas de leitura (valor da listagem, sem edição); com `zeroed`, sem itens fica uma linha zerada, sem id e sem marcação.
+     *
+     * @param  list<array{id: int, value: float}>  $items
+     * @return list<array<string, mixed>>
+     */
+    private static function extraRows(string $name, array $items, bool $zeroed = false): array
+    {
+        $rows = array_map(fn (array $item) => $item + ['name' => $name, 'selected' => false, 'ta_payment_id' => null], $items);
+
+        return $rows ?: ($zeroed ? [['id' => null, 'name' => $name, 'value' => 0, 'selected' => false, 'ta_payment_id' => null]] : []);
+    }
+
     private static function markAll(Set $set, Get $get, bool $selected): void
     {
-        foreach (['revenues', 'expenses', 'covered_expenses'] as $name) {
-            $set($name, array_map(fn (array $row) => ['selected' => $selected] + $row, $get($name) ?? []));
-        }
-
-        $pending = self::pending($get('booking_id'));
-        $set('purchase_iof', $selected ? array_keys($pending['purchase_iof'] ?? []) : []);
-
-        foreach (array_keys(self::EXTRAS) as $kind) {
-            $set($kind, $selected ? array_column($pending[$kind] ?? [], 'id') : []);
+        foreach (['revenues', 'expenses', 'covered_expenses', 'purchase_iof', ...array_keys(self::EXTRAS)] as $name) {
+            $set($name, array_map(fn (array $row) => ['selected' => $selected && filled($row['id'])] + $row, $get($name) ?? []));
         }
     }
 
@@ -183,6 +217,11 @@ class NewCoverAction
             ->map(fn (array $row) => array_filter(['id' => $row['id'], 'value' => $row['value'], 'ta_payment_id' => $row['ta_payment_id'] ?? null], fn ($v) => $v !== null))
             ->values()->all();
 
+        $ids = fn (string $name) => collect($data[$name] ?? [])
+            ->filter(fn (array $row) => ($row['selected'] ?? false) && filled($row['id']))
+            ->map(fn (array $row) => (int) $row['id'])
+            ->values()->all();
+
         return [
             'currency_id' => (int) $data['currency_id'],
             'commission' => $data['commission'] ?? 0,
@@ -190,8 +229,7 @@ class NewCoverAction
             'revenues' => $marked('revenues'),
             'expenses' => $marked('expenses'),
             'covered_expenses' => $marked('covered_expenses'),
-            'purchase_iof' => $data['purchase_iof'] ?? [],
-            ...collect(array_keys(self::EXTRAS))->mapWithKeys(fn (string $kind) => [$kind => $data[$kind] ?? []])->all(),
+            ...collect(['purchase_iof', ...array_keys(self::EXTRAS)])->mapWithKeys(fn (string $name) => [$name => $ids($name)])->all(),
         ];
     }
 }

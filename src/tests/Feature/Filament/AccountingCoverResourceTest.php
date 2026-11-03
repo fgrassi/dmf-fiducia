@@ -196,7 +196,7 @@ class AccountingCoverResourceTest extends TestCase
                 'commission' => 0,
                 'rate' => 5,
                 'revenues' => [['selected' => true, 'id' => 20, 'ta_payment_id' => null, 'name' => 'THC/UN', 'value' => 280]],
-                'fine' => [1],
+                'fine' => [['selected' => true, 'id' => 1, 'ta_payment_id' => null, 'name' => 'Multa', 'value' => 3]],
             ])
             ->assertHasNoFormErrors()
             ->assertNotified('Capa 1 criada.');
@@ -213,13 +213,17 @@ class AccountingCoverResourceTest extends TestCase
         DB::table('fin_expenses_unities')->insert(['id' => 1, 'name' => 'Unidade', 'acronym' => 'UN']);
         DB::table('fin_expenses')->insert(['id' => 20, 'name' => 'THC', 'ref_unity' => 1]);
         DB::table('fin_expenses_values')->insert(['id' => 20, 'ref_expense' => 20, 'ref_embarque' => 10]);
-        DB::table('fin_charges')->insert(['id' => 1, 'ref_type' => 1, 'ref_booking' => 10, 'created_at' => '2026-10-01']);
+        DB::table('fin_charges')->insert(['id' => 1, 'ref_type' => 1, 'ref_booking' => 10, 'created_at' => '2026-10-01', 'fine' => 3]);
         DB::table('fin_charges_items')->insert(['ref_charge' => 1, 'ref_expense' => 20, 'item_value' => 300, 'ref_currency' => 1, 'created_at' => '2026-10-01']);
 
         Livewire::test(ListAccountingCovers::class)
             ->mountAction('newCover')
             ->fillForm(['booking_id' => 10])
-            ->assertSchemaStateSet(['revenues' => [['id' => 20, 'name' => 'THC/UN', 'value' => 300.0, 'selected' => false, 'ta_payment_id' => null]]]);
+            ->assertSchemaStateSet([
+                'revenues' => [['id' => 20, 'name' => 'THC/UN', 'value' => 300.0, 'selected' => false, 'ta_payment_id' => null]],
+                'fine' => [['id' => 1, 'name' => 'Multa', 'value' => 3.0, 'selected' => false, 'ta_payment_id' => null]],
+                'purchase_iof' => [['id' => null, 'name' => 'IOF', 'value' => 0, 'selected' => false, 'ta_payment_id' => null]],
+            ]);
     }
 
     public function test_downloads_the_cover_pdf_from_the_list(): void
