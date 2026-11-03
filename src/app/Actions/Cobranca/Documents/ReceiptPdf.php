@@ -225,7 +225,8 @@ class ReceiptPdf
             }
         }
 
-        if ($includeExtras && (float) $charge->valor_iof) {
+        // C23: o legado imprime a linha mesmo com IOF "0.00" (string não vazia é verdadeira no PHP 5.6)
+        if ($includeExtras && $charge->valor_iof !== null) {
             $cell(144, 'Despesas Financeiras/IOF');
             $cell(21, 'R$ '.$brl((float) $charge->valor_iof), 'R');
             $pdf->Ln();
