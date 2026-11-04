@@ -275,7 +275,7 @@ class VariedExpenseResource extends Resource
     }
 
     /** Pessoas do tipo 1 (agentes), como o agente/ajax2 do legado. */
-    private static function agents(): Builder
+    public static function agents(): Builder
     {
         return Pessoa::query()
             ->whereIn('pessoa.pessoa_id', DB::table('pessoa_tipo_pessoa')->where('tipo_pessoa_id', 1)->select('pessoa_id'))
