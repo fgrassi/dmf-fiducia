@@ -35,7 +35,7 @@ class DefaultRateResource extends Resource
 
     protected static ?string $navigationParentItem = 'Cadastros';
 
-    protected static ?int $navigationSort = 90;
+    protected static ?int $navigationSort = 70;
 
     /** security.yml do módulo (legado): credencial admin ou financial. */
     public static function canAccess(): bool

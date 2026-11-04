@@ -38,9 +38,9 @@ class CurrencyRateResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'Financeiro';
 
-    protected static ?string $navigationParentItem = 'Cadastros';
+    protected static ?string $navigationParentItem = 'Lançamentos';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 10;
 
     /** security.yml dos módulos (legado): credencial financial. */
     public static function canAccess(): bool

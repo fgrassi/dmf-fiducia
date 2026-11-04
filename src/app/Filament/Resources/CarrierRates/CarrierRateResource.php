@@ -25,11 +25,11 @@ class CarrierRateResource extends Resource
 {
     protected static ?string $model = FinCurrenciesRatesArmador::class;
 
-    protected static ?string $modelLabel = 'Cotação de Armador';
+    protected static ?string $modelLabel = 'Taxa Armador';
 
-    protected static ?string $pluralModelLabel = 'Cotações de Armador';
+    protected static ?string $pluralModelLabel = 'Taxas Armador';
 
-    protected static ?string $navigationLabel = 'Cotações de Armador';
+    protected static ?string $navigationLabel = 'Taxa Armador';
 
     protected static ?string $slug = 'financeiro/cotacoes-armador';
 
@@ -37,9 +37,9 @@ class CarrierRateResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'Financeiro';
 
-    protected static ?string $navigationParentItem = 'Cadastros';
+    protected static ?string $navigationParentItem = 'Lançamentos';
 
-    protected static ?int $navigationSort = 30;
+    protected static ?int $navigationSort = 20;
 
     /** security.yml dos módulos (legado): credencial financial. */
     public static function canAccess(): bool

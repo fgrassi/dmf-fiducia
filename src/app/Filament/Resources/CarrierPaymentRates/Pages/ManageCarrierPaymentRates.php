@@ -18,7 +18,7 @@ class ManageCarrierPaymentRates extends ManageRecords
         return [
             RateValueAction::forAny(SaveRateValue::CARRIER_PAYMENT, FinCurrenciesRatesArmadorPayment::with(['armador', 'currency'])->get()->pluck('label', 'id')->all()),
             CreateAction::make()
-                ->label('Incluir Nova Cotação de Pagamento'),
+                ->label('Incluir Nova Taxa Pgto Armador'),
         ];
     }
 }
