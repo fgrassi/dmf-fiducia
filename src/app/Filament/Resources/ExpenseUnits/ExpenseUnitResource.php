@@ -31,7 +31,7 @@ class ExpenseUnitResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'Configurações';
 
-    protected static ?int $navigationSort = 50;
+    protected static ?int $navigationSort = 60;
 
     /** security.yml do módulo (legado): credencial admin. */
     public static function canAccess(): bool

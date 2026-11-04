@@ -50,6 +50,11 @@ class AdminPanelProvider extends PanelProvider
                     ->group('Financeiro')
                     ->icon('heroicon-o-folder')
                     ->sort(10),
+                NavigationItem::make('Configurações Usuários')
+                    ->group('Configurações')
+                    ->icon('heroicon-o-cog-6-tooth')
+                    ->sort(30)
+                    ->visible(fn () => (bool) auth()->user()?->hasLegacyCredential(['usuario', 'auxiliares'])),
                 NavigationItem::make('Ordem de Pagamento')
                     ->group('Financeiro')
                     ->icon('heroicon-o-credit-card')
