@@ -54,7 +54,7 @@ class AdminPanelProvider extends PanelProvider
                     ->group('Financeiro')
                     ->icon('heroicon-o-banknotes')
                     ->sort(51)
-                    ->visible(fn () => (bool) auth()->user()?->canManageCompanyExpenses()),
+                    ->visible(fn () => (bool) (auth()->user()?->canManageCompanyExpenses() || auth()->user()?->hasLegacyCredential('financial'))),
                 NavigationItem::make('Configurações Usuários')
                     ->group('Configurações')
                     ->icon('heroicon-o-cog-6-tooth')
