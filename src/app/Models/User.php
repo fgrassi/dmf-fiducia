@@ -71,4 +71,12 @@ class User extends Authenticatable implements FilamentUser, HasName
         return in_array('admin', $owned, true)
             || array_intersect((array) $credentials, $owned) !== [];
     }
+
+    /** Entrada do módulo despesa (legado): diretor, financeiro com gerente, ou o usuário 2972 (da Sâmila). */
+    public function canManageCompanyExpenses(): bool
+    {
+        return $this->hasLegacyCredential('director')
+            || ($this->hasLegacyCredential('financial') && $this->hasLegacyCredential('manager'))
+            || (int) $this->getKey() === 2972;
+    }
 }

@@ -50,6 +50,11 @@ class AdminPanelProvider extends PanelProvider
                     ->group('Financeiro')
                     ->icon('heroicon-o-folder')
                     ->sort(10),
+                NavigationItem::make('Despesas')
+                    ->group('Financeiro')
+                    ->icon('heroicon-o-banknotes')
+                    ->sort(51)
+                    ->visible(fn () => (bool) auth()->user()?->canManageCompanyExpenses()),
                 NavigationItem::make('Configurações Usuários')
                     ->group('Configurações')
                     ->icon('heroicon-o-cog-6-tooth')
@@ -62,6 +67,7 @@ class AdminPanelProvider extends PanelProvider
                     ->visible(fn () => (bool) auth()->user()?->hasLegacyCredential('financial')),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
+            ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\Filament\Clusters')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
                 Dashboard::class,
