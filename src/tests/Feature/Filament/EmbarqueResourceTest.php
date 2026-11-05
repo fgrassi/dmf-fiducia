@@ -59,6 +59,22 @@ class EmbarqueResourceTest extends TestCase
             ->assertCanNotSeeTableRecords([$import]);
     }
 
+    public function test_list_tabs_split_by_import_and_export(): void
+    {
+        $this->actingAs($this->user('booking'));
+        $import = $this->booking(['booking' => 'IMP1', 'impor_expor' => 'i']);
+        $export = $this->booking(['booking' => 'EXP1', 'impor_expor' => 'e']);
+
+        Livewire::test(ListEmbarques::class)
+            ->assertCanSeeTableRecords([$import, $export])
+            ->set('activeTab', 'impo')
+            ->assertCanSeeTableRecords([$import])
+            ->assertCanNotSeeTableRecords([$export])
+            ->set('activeTab', 'expo')
+            ->assertCanSeeTableRecords([$export])
+            ->assertCanNotSeeTableRecords([$import]);
+    }
+
     public function test_view_page_renders_the_booking_details(): void
     {
         $this->actingAs($this->user('booking'));
