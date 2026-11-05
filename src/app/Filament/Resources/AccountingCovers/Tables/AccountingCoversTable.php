@@ -81,6 +81,7 @@ class AccountingCoversTable
                     ->state(fn (CapaProcesso $record) => self::money($record->processResult(), 'R$')),
                 TextColumn::make('folder.nome')
                     ->label('Caixa')
+                    ->wrap()
                     ->default('Não Arquivado'),
             ])
             ->filters([

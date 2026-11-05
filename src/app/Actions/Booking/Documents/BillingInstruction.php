@@ -2,6 +2,7 @@
 
 namespace App\Actions\Booking\Documents;
 
+use App\Actions\Booking\ExportQuotationReferences;
 use App\Models\Embarque;
 use Illuminate\Support\Facades\DB;
 use stdClass;
@@ -138,19 +139,7 @@ class BillingInstruction
             return (string) DB::table('cotacao_impo')->where('cotacao_impo_id', $booking->cotacao_impo_id)->value('referencia');
         }
 
-        $quotation = DB::table('cotacao_expo')->where('cotacao_expo_id', $booking->cotacao_expo_id)->first();
-
-        if (! $quotation) {
-            return '';
-        }
-
-        $initials = collect(explode(' ', (string) DB::table('usuario')->where('usuario_id', $quotation->created_by)->value('nome')))
-            ->reject(fn (string $word) => ctype_lower(substr($word, 0, 1)))
-            ->map(fn (string $word) => substr($word, 0, 1))
-            ->implode('');
-        $code = fn (?int $port) => substr((string) DB::table('porto')->where('porto_id', $port)->value('uncode'), 2);
-
-        return $initials.str_pad((string) $quotation->cotacao_expo_id, 4, '0', STR_PAD_LEFT).$code($quotation->porto_origem_id).$code($quotation->porto_destino_id).'/'.date('Y', strtotime((string) $quotation->created_at));
+        return app(ExportQuotationReferences::class)([$booking->cotacao_expo_id])[$booking->cotacao_expo_id] ?? '';
     }
 
     /** Embarque::getContatosDocs: contatos ativos que recebem documentos, "nome (e-mail) - Phone: fone". */

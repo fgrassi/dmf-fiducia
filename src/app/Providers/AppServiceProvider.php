@@ -8,6 +8,7 @@ use App\Filament\Resources\AccountingCovers\Pages\ListAccountingCovers;
 use App\Filament\Resources\ManualAccountingCovers\ManualAccountingCoverResource;
 use App\Filament\Resources\ManualAccountingCovers\Pages\ListManualAccountingCovers;
 use Filament\Support\Facades\FilamentView;
+use Filament\Tables\Columns\Column;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
@@ -28,6 +29,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Auth::provider('legacy-usuario', fn ($app, array $config) => new LegacyUsuarioProvider($app['hash'], $config['model']));
+
+        // cabeçalhos de todas as tabelas quebram em várias linhas em vez de esticar a coluna
+        Column::configureUsing(fn (Column $column) => $column->wrapHeader());
 
         // abas "Capas normais" / "Capas manuais" no topo das duas listas (são dois resources, em tabelas diferentes)
         foreach (['normal' => ListAccountingCovers::class, 'manual' => ListManualAccountingCovers::class] as $active => $page) {
