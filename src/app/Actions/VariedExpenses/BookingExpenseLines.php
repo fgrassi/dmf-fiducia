@@ -81,7 +81,7 @@ class BookingExpenseLines
     }
 
     /** FinExpensesValues::getFator (legado). */
-    private function factor(stdClass $expense, stdClass $bl): float
+    public function factor(stdClass $expense, stdClass $bl): float
     {
         return match ((int) $expense->ref_unity) {
             self::UNIT_CONTAINER => match (true) {
