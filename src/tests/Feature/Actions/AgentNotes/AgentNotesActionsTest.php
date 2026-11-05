@@ -77,7 +77,7 @@ class AgentNotesActionsTest extends TestCase
         $this->assertCount(2, app(AgentNoteLists::class)->open(5, '2026-10-01', null));
     }
 
-    public function test_paid_list_needs_both_dates_and_filters_by_payment_date_using_the_export_credit_value_for_every_credit(): void
+    public function test_paid_list_filters_by_payment_date_with_one_side_optional_using_the_export_credit_value_for_every_credit(): void
     {
         $this->credit(10, ['status_pagamento' => 1, 'data_pagamento' => '2026-10-05', 'due_to_dmf' => 999, 'due_to_dmf_agent' => 30, 'due_to_cnee_agent' => 3]);
         $this->credit(10, ['status_pagamento' => 1, 'data_pagamento' => '2026-09-05']);
@@ -85,7 +85,8 @@ class AgentNotesActionsTest extends TestCase
         $this->varied(['status_pagamento' => 1, 'data_pagamento' => '2026-10-10', 'valor' => 9]);
         $this->varied(['status_pagamento' => 0, 'data_pagamento' => '2026-10-10']);
 
-        $this->assertCount(0, app(AgentNoteLists::class)->paid(5, '2026-10-01', null));
+        $this->assertCount(4, app(AgentNoteLists::class)->paid(5, null, null));
+        $this->assertCount(3, app(AgentNoteLists::class)->paid(5, '2026-10-01', null));
 
         $rows = app(AgentNoteLists::class)->paid(5, '2026-10-01', '2026-10-31');
 
