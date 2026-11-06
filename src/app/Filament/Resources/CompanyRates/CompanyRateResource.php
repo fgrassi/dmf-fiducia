@@ -22,11 +22,11 @@ class CompanyRateResource extends Resource
 {
     protected static ?string $model = FinCompaniesRates::class;
 
-    protected static ?string $modelLabel = 'Taxa Negociada';
+    protected static ?string $modelLabel = 'Taxa por Empresa';
 
-    protected static ?string $pluralModelLabel = 'Taxas Negociadas';
+    protected static ?string $pluralModelLabel = 'Taxas por Empresas';
 
-    protected static ?string $navigationLabel = 'Taxas Negociadas';
+    protected static ?string $navigationLabel = 'Taxas por Empresas';
 
     protected static ?string $slug = 'financeiro/taxas-negociadas';
 

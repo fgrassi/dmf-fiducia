@@ -31,9 +31,7 @@ class DefaultRateResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-receipt-percent';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Financeiro';
-
-    protected static ?string $navigationParentItem = 'Cadastros';
+    protected static string|UnitEnum|null $navigationGroup = 'Configurações';
 
     protected static ?int $navigationSort = 70;
 
