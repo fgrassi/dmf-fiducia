@@ -5,6 +5,7 @@ namespace App\Actions\Booking;
 use App\Models\Embarque;
 use App\Models\FinExpensesValues;
 use DomainException;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -18,12 +19,20 @@ use Illuminate\Support\Facades\DB;
  * cobrança/pagamento.
  *
  * Diferença do legado, por decisão: reserva sem cotação (ou de modal sem cotação, como o seguro) é recusada antes de apagar
- * qualquer coisa; o legado apagava as despesas e depois falhava. A importação apaga documentos já emitidos, então a tela
- * pergunta antes (warning()).
+ * qualquer coisa; o legado apagava as despesas e depois falhava. O banco recusa apagar despesa que cobrança, ordem de
+ * pagamento, baixa de TA ou capa já usam (RESTRICT): o legado quebrava no meio do laço, deixando a reserva pela metade;
+ * aqui é tudo ou nada, com mensagem. A tela avisa antes (warning()).
  */
 class ImportQuotationCosts
 {
     private const SYSTEM_USER = 1;
+
+    /** Tabelas que, além das de DeleteExpense::USED_IN, apontam para a despesa com chave estrangeira RESTRICT: tabela => [coluna, documento]. */
+    private const ALSO_USED_IN = [
+        'ordem_pagamento_item' => ['ref_expense', 'uma Ordem de Pagamento'],
+        'ta_baixa' => ['fin_expenses_values_id', 'uma baixa de TA'],
+        'capa_processo_despesa_item' => ['fin_expenses_values_id', 'uma Capa de Contabilidade'],
+    ];
 
     /** Aviso para a confirmação: documentos que já usam as despesas que a importação vai apagar. */
     public function warning(Embarque $booking): ?string
@@ -35,7 +44,11 @@ class ImportQuotationCosts
         $ids = $booking->expenses()->pluck('id');
 
         $documents = collect(DeleteExpense::USED_IN)
-            ->filter(fn (string $document, string $table) => DB::table($table)->whereIn('ref_expense', $ids)->exists())
+            ->map(fn (string $document, string $table) => [$table, 'ref_expense', $document])
+            ->merge(collect(self::ALSO_USED_IN)->map(fn (array $use, string $table) => [$table, ...$use]))
+            ->filter(fn (array $use) => DB::table($use[0])->whereIn($use[1], $ids)->exists())
+            ->map(fn (array $use) => $use[2])
+            ->unique()
             ->values();
 
         if (DB::table('capa_processo')->where('embarque_id', $booking->getKey())->exists()) {
@@ -56,9 +69,16 @@ class ImportQuotationCosts
     {
         $items = $this->items($booking);
 
-        return DB::transaction(fn () => $booking->impor_expor === 'i'
-            ? $this->replaceAll($booking, $items, $userId)
-            : $this->merge($booking, $items, $userId));
+        try {
+            return DB::transaction(fn () => $booking->impor_expor === 'i'
+                ? $this->replaceAll($booking, $items, $userId)
+                : $this->merge($booking, $items, $userId));
+        } catch (QueryException $e) {
+            // O banco recusa apagar despesa com cobrança, ordem, baixa de TA ou capa (RESTRICT); o legado quebrava no meio do laço.
+            throw_unless($e->getCode() === '23000', $e);
+
+            throw new DomainException('Não foi possível importar: há cobrança, ordem de pagamento, baixa de TA ou capa usando as despesas desta reserva. Nada foi alterado.');
+        }
     }
 
     /** @return Collection<int, object> */
