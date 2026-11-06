@@ -77,7 +77,7 @@ class ExpenseStatement
     /** Aéreo: fator da cotação; só W/M multiplica pelo fator. */
     private function purchaseWithoutBl(Embarque $booking): array
     {
-        $factor = round((float) $this->importFactor($booking), 2);
+        $factor = round((float) $booking->importFactor(), 2);
 
         if ($factor <= 0) {
             return ['message' => 'É necessário que o fator seja maior que 0'];
@@ -123,7 +123,7 @@ class ExpenseStatement
 
             foreach ($this->expenses($booking)->filter(fn ($d) => ! $d->ref_bl && ! $d->ref_container && $d->ref_due_to !== self::MAIL_DUE_TO && (string) $d->all_in !== '1') as $d) {
                 if ((int) $d->ref_unity === self::UNIT_WEIGHT_MEASURE && $booking->impor_expor === 'i') {
-                    $factor = (float) $this->importFactor($booking);
+                    $factor = (float) $booking->importFactor();
                 } elseif ((int) $d->ref_unity === self::UNIT_PROCESS) {
                     $factor = 1.0;
                 }
@@ -239,7 +239,7 @@ class ExpenseStatement
         };
 
         if ((int) $d->ref_unity === self::UNIT_WEIGHT_MEASURE && $booking->impor_expor === 'i') {
-            return $own && $own !== 1.0 ? $own : (float) $this->importFactor($booking);
+            return $own && $own !== 1.0 ? $own : (float) $booking->importFactor();
         }
 
         return $own;
@@ -250,19 +250,6 @@ class ExpenseStatement
         $container = DB::table('container')->where('container_id', $d->ref_container)->first();
 
         return $container && (int) $container->bl_id === (int) $bl->bl_id ? $this->factors->containerFactor($container) : 0.0;
-    }
-
-    /** Embarque::getFatorLclImpo: o maior entre peso e volume da cotação (aéreo: volume ÷ 0,006). */
-    private function importFactor(Embarque $booking): ?float
-    {
-        $weight = (float) $booking->peso_cotacao;
-        $volume = (float) $booking->volume_cotacao;
-
-        if ($booking->impor_expor !== 'i' || (! $weight && ! $volume)) {
-            return null;
-        }
-
-        return max($booking->tipo_embarque === 'm' ? $volume : $volume / 0.006, $weight);
     }
 
     /**

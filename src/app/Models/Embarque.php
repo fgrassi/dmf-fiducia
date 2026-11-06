@@ -71,4 +71,17 @@ class Embarque extends Model
     {
         return (int) $this->coloader_id > 0 ? (int) $this->coloader_id : ($this->armador_id ? (int) $this->armador_id : null);
     }
+
+    /** Embarque::getFatorLclImpo (legado): o maior entre peso e volume da cotação (aéreo: volume ÷ 0,006). */
+    public function importFactor(): ?float
+    {
+        $weight = (float) $this->peso_cotacao;
+        $volume = (float) $this->volume_cotacao;
+
+        if ($this->impor_expor !== 'i' || (! $weight && ! $volume)) {
+            return null;
+        }
+
+        return max($this->tipo_embarque === 'm' ? $volume : $volume / 0.006, $weight);
+    }
 }

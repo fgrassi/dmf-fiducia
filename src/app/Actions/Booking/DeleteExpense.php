@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 class DeleteExpense
 {
     /** tabela de itens => documento, na ordem em que o legado checa */
-    private const USED_IN = [
+    public const USED_IN = [
         'fin_charges_items' => 'uma Cobrança',
         'fin_payment_order_items' => 'uma Ordem de Pagamento',
         'fin_credit_note_items' => 'uma Nota de Crédito',

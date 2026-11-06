@@ -2,8 +2,10 @@
 
 namespace App\Filament\Resources\Embarques\RelationManagers;
 
+use App\Actions\Booking\CalculateAgreedFreight;
 use App\Actions\Booking\DeleteExpense;
 use App\Actions\Booking\ExpenseTracking;
+use App\Actions\Booking\ImportQuotationCosts;
 use App\Actions\Booking\SaveExpense;
 use App\Actions\Booking\SellCost;
 use App\Actions\Booking\ToggleExpenseReview;
@@ -23,6 +25,7 @@ use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
@@ -299,6 +302,35 @@ class ExpensesRelationManager extends RelationManager
 
                         Notification::make()->title($reviewed ? 'Despesas revisadas.' : 'Revisão desfeita.')->success()->send();
                     }),
+                Action::make('importarCustosCotacao')
+                    ->label('Importar custos da cotação')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('gray')
+                    ->visible(fn () => (bool) ($this->getOwnerRecord()->cotacao_expo_id ?: $this->getOwnerRecord()->cotacao_impo_id ?: $this->getOwnerRecord()->cotacao_impo_aereo_id))
+                    ->requiresConfirmation()
+                    ->modalHeading('Deseja importar os custos da cotação?')
+                    ->modalDescription(fn () => app(ImportQuotationCosts::class)->warning($this->getOwnerRecord()))
+                    ->action(function (Action $action) {
+                        try {
+                            $count = app(ImportQuotationCosts::class)($this->getOwnerRecord(), auth()->id());
+                        } catch (DomainException $e) {
+                            Notification::make()->title($e->getMessage())->danger()->send();
+                            $action->halt();
+                        }
+
+                        Notification::make()->title("{$count} despesa(s) importada(s) da cotação.")->success()->send();
+                    }),
+                Action::make('valorHouseBl')
+                    ->label('Valor do House BL')
+                    ->icon('heroicon-o-clipboard-document')
+                    ->color('gray')
+                    ->visible(fn () => $this->agreedFreight() !== null)
+                    ->modalHeading('Valor do House BL')
+                    ->modalDescription(fn () => 'Gerado em '.Carbon::parse($this->agreedFreight()->created_at)->format('d/m/Y').' por '.DB::table('usuario')->where('usuario_id', $this->agreedFreight()->created_by)->value('nome').'.')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Fechar')
+                    ->fillForm(fn () => ['valor' => trim($this->agreedFreight()->valor)])
+                    ->schema([Textarea::make('valor')->label('Valor')->readOnly()->rows(8)]),
                 CreateAction::make()
                     ->label('Adicionar despesa')
                     ->modalWidth('5xl')
@@ -353,6 +385,24 @@ class ExpensesRelationManager extends RelationManager
                                 ->body($ignored !== '' ? $ignored : null)
                                 ->status($result['success'] ? 'success' : 'warning')
                                 ->send();
+                        }),
+                    BulkAction::make('calcularFrete')
+                        ->label('Calcular Frete')
+                        ->icon('heroicon-o-calculator')
+                        ->visible(fn () => $this->getOwnerRecord()->impor_expor === 'i')
+                        ->modalHeading('Calcular o valor do House BL')
+                        ->modalDescription('O valor é calculado com as despesas marcadas.')
+                        ->schema(fn () => $this->agreedFreight() ? [Textarea::make('justificativa')->label('Justificativa')->required()] : [])
+                        ->deselectRecordsAfterCompletion()
+                        ->action(function (Collection $records, array $data, BulkAction $action) {
+                            try {
+                                app(CalculateAgreedFreight::class)($this->getOwnerRecord(), $records->modelKeys(), $data['justificativa'] ?? null, auth()->id());
+                            } catch (DomainException $e) {
+                                Notification::make()->title($e->getMessage())->danger()->send();
+                                $action->halt();
+                            }
+
+                            Notification::make()->title('Valor do House BL calculado.')->success()->send();
                         }),
                     BulkAction::make('gerarCobrancaManual')
                         ->label('Gerar cobrança manual')
@@ -458,5 +508,11 @@ class ExpensesRelationManager extends RelationManager
                     ->boolean()
                     ->visible(fn () => $this->getOwnerRecord()->impor_expor === 'e'),
             ]);
+    }
+
+    /** valor_frete_embarque: o valor do House BL calculado para a reserva, se houver. */
+    private function agreedFreight(): ?object
+    {
+        return DB::table('valor_frete_embarque')->where('embarque_id', $this->getOwnerRecord()->getKey())->first();
     }
 }

@@ -124,7 +124,7 @@ class SaveExpense
     }
 
     /** applyRequiredHiddenDocumentFlags: a despesa 1916 não vai ao cliente (tipo PP, Due To DMF, sem venda). */
-    private function withHiddenDocumentFlags(array $values): array
+    public function withHiddenDocumentFlags(array $values): array
     {
         return [
             ...$values,
