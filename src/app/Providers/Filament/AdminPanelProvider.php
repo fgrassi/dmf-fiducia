@@ -55,6 +55,11 @@ class AdminPanelProvider extends PanelProvider
                     ->icon('heroicon-o-pencil-square')
                     ->sort(15)
                     ->visible(fn () => (bool) auth()->user()?->hasLegacyCredential('financial')),
+                NavigationItem::make('Consultas')
+                    ->group('Financeiro')
+                    ->icon('heroicon-o-magnifying-glass')
+                    ->sort(16)
+                    ->visible(fn () => (bool) auth()->user()?->hasLegacyCredential(['financial', 'manager'])),
                 NavigationItem::make('Despesas')
                     ->group('Financeiro')
                     ->icon('heroicon-o-banknotes')

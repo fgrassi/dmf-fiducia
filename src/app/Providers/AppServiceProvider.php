@@ -33,6 +33,9 @@ class AppServiceProvider extends ServiceProvider
         // cabeçalhos de todas as tabelas quebram em várias linhas em vez de esticar a coluna
         Column::configureUsing(fn (Column $column) => $column->wrapHeader());
 
+        // campo "Pesquisar no menu" no topo da sidebar
+        FilamentView::registerRenderHook(PanelsRenderHook::SIDEBAR_NAV_START, fn () => view('filament.sidebar-search'));
+
         // abas "Capas normais" / "Capas manuais" no topo das duas listas (são dois resources, em tabelas diferentes)
         foreach (['normal' => ListAccountingCovers::class, 'manual' => ListManualAccountingCovers::class] as $active => $page) {
             FilamentView::registerRenderHook(

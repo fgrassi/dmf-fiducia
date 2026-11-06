@@ -44,7 +44,9 @@ class AgentNoteSearch extends Page implements HasTable
 
     protected static string|UnitEnum|null $navigationGroup = 'Financeiro';
 
-    protected static ?int $navigationSort = 114;
+    protected static ?string $navigationParentItem = 'Consultas';
+
+    protected static ?int $navigationSort = 20;
 
     /** security.yml do módulo (legado): só a credencial financial. */
     public static function canAccess(): bool
