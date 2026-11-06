@@ -56,6 +56,11 @@ class Embarque extends Model
         return $this->hasMany(Bl::class, 'embarque_id', 'embarque_id');
     }
 
+    public function commissions(): HasMany
+    {
+        return $this->hasMany(ComissaoEmbarque::class, 'embarque_id', 'embarque_id');
+    }
+
     public function expenses(): HasMany
     {
         return $this->hasMany(FinExpensesValues::class, 'ref_embarque', 'embarque_id');

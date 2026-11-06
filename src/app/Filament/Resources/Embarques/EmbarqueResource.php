@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Embarques;
 
 use App\Filament\Resources\Embarques\Pages\ListEmbarques;
 use App\Filament\Resources\Embarques\Pages\ViewEmbarque;
+use App\Filament\Resources\Embarques\RelationManagers\CommissionsRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\ExpensesRelationManager;
 use App\Filament\Resources\Embarques\Schemas\EmbarqueInfolist;
 use App\Filament\Resources\Embarques\Tables\EmbarquesTable;
@@ -54,6 +55,7 @@ class EmbarqueResource extends Resource
     {
         return [
             ExpensesRelationManager::class,
+            CommissionsRelationManager::class,
         ];
     }
 
