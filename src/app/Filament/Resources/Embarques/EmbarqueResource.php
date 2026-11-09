@@ -6,6 +6,7 @@ use App\Filament\Resources\Embarques\Pages\ListEmbarques;
 use App\Filament\Resources\Embarques\Pages\ViewEmbarque;
 use App\Filament\Resources\Embarques\RelationManagers\CommissionsRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\ExpensesRelationManager;
+use App\Filament\Resources\Embarques\RelationManagers\FreightInvoicesRelationManager;
 use App\Filament\Resources\Embarques\Schemas\EmbarqueInfolist;
 use App\Filament\Resources\Embarques\Tables\EmbarquesTable;
 use App\Models\Embarque;
@@ -56,6 +57,7 @@ class EmbarqueResource extends Resource
         return [
             ExpensesRelationManager::class,
             CommissionsRelationManager::class,
+            FreightInvoicesRelationManager::class,
         ];
     }
 

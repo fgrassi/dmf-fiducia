@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Embarque extends Model
 {
@@ -49,6 +50,19 @@ class Embarque extends Model
     public function armador(): BelongsTo
     {
         return $this->belongsTo(Armador::class, 'armador_id', 'armador_id');
+    }
+
+    public function controlePa(): HasOne
+    {
+        return $this->hasOne(ControlePa::class, 'embarque_id', 'embarque_id');
+    }
+
+    /** Freight Invoices da DMF geradas para a reserva (arquivos de tipo 24), a mais nova primeiro. */
+    public function freightInvoices(): HasMany
+    {
+        return $this->hasMany(EmbEmbarqueFile::class, 'ref_embarque', 'embarque_id')
+            ->where('ref_file_type', EmbEmbarqueFile::DMF_INVOICE)
+            ->orderByDesc('id');
     }
 
     public function bls(): HasMany
