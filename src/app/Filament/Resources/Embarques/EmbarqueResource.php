@@ -5,6 +5,8 @@ namespace App\Filament\Resources\Embarques;
 use App\Filament\Resources\Embarques\Pages\ListEmbarques;
 use App\Filament\Resources\Embarques\Pages\ViewEmbarque;
 use App\Filament\Resources\Embarques\RelationManagers\CommissionsRelationManager;
+use App\Filament\Resources\Embarques\RelationManagers\CreditNotesRelationManager;
+use App\Filament\Resources\Embarques\RelationManagers\DebitNotesRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\ExpensesRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\FreightInvoicesRelationManager;
 use App\Filament\Resources\Embarques\Schemas\EmbarqueInfolist;
@@ -58,6 +60,8 @@ class EmbarqueResource extends Resource
             ExpensesRelationManager::class,
             CommissionsRelationManager::class,
             FreightInvoicesRelationManager::class,
+            CreditNotesRelationManager::class,
+            DebitNotesRelationManager::class,
         ];
     }
 

@@ -6,12 +6,14 @@ use App\Actions\Booking\CalculateAgreedFreight;
 use App\Actions\Booking\DeleteExpense;
 use App\Actions\Booking\ExpenseTracking;
 use App\Actions\Booking\ImportQuotationCosts;
+use App\Actions\Booking\Notes\CreateNote;
 use App\Actions\Booking\SaveExpense;
 use App\Actions\Booking\SellCost;
 use App\Actions\Booking\ToggleExpenseReview;
 use App\Actions\Cobranca\Generation\GenerateManualCharge;
 use App\Actions\PaymentOrders\Generation\GeneratePaymentOrders;
 use App\Actions\PaymentOrders\Other\GenerateOtherPaymentOrders;
+use App\Enums\NoteType;
 use App\Models\CmnCurrency;
 use App\Models\FinExpenses;
 use App\Models\FinExpensesValues;
@@ -186,6 +188,37 @@ class ExpensesRelationManager extends RelationManager
                             ->visible($this->agentIsChilean()),
                     ]),
             ]);
+    }
+
+    /** executeGeraDebitNote / executeGeraCreditNote (legado): "com marcados gerar", só nas exportações. */
+    private function noteBulkAction(NoteType $type): BulkAction
+    {
+        return BulkAction::make($type === NoteType::Debit ? 'gerarNotaDebito' : 'gerarNotaCredito')
+            ->label($type->label())
+            ->icon('heroicon-o-document-text')
+            ->visible(fn () => $this->getOwnerRecord()->impor_expor === 'e')
+            ->requiresConfirmation()
+            ->modalHeading('Gerar '.$type->label())
+            ->modalDescription(fn () => $this->hasNotes()
+                ? 'Já existem Notas lançadas neste processo. Tem certeza que deseja criar uma nova?'
+                : 'A nota será gerada com as despesas selecionadas.')
+            ->deselectRecordsAfterCompletion()
+            ->action(function (Collection $records) use ($type) {
+                try {
+                    $id = app(CreateNote::class)($this->getOwnerRecord(), $type, $records->modelKeys(), auth()->id());
+                } catch (DomainException $e) {
+                    Notification::make()->title($e->getMessage())->danger()->send();
+
+                    return;
+                }
+
+                Notification::make()->title(DB::table($type->table())->where('id', $id)->value('name').' gerada.')->success()->send();
+            });
+    }
+
+    private function hasNotes(): bool
+    {
+        return $this->getOwnerRecord()->debitNotes()->exists() || $this->getOwnerRecord()->creditNotes()->exists();
     }
 
     private function expenseLabel(FinExpenses $expense): string
@@ -413,6 +446,8 @@ class ExpensesRelationManager extends RelationManager
                         ->modalDescription('A IC é gerada só com as despesas marcadas e o documento é enviado ao cliente.')
                         ->deselectRecordsAfterCompletion()
                         ->action(fn (Collection $records, BulkAction $action) => $this->generateCharge($records->modelKeys(), $action)),
+                    $this->noteBulkAction(NoteType::Debit),
+                    $this->noteBulkAction(NoteType::Credit),
                 ]),
             ])
             ->recordActions([
