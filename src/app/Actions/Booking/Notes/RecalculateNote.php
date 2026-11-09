@@ -22,7 +22,11 @@ class RecalculateNote
 
     private const CONTAINER_UNIT = 2;
 
-    public function __invoke(NoteType $type, int $noteId): void
+    /**
+     * @param  bool  $regenerateExw  só a geração pelas despesas separa as despesas EXW do lucro e refaz `exw_expenses` e a observação;
+     *                               incluir/remover item soma todos os itens no lucro e preserva o EXW digitado (como o legado)
+     */
+    public function __invoke(NoteType $type, int $noteId, bool $regenerateExw = false): void
     {
         $note = DB::table($type->table())->find($noteId);
 
@@ -33,7 +37,7 @@ class RecalculateNote
             ->select('v.*', 'e.ref_unity as unity')
             ->get();
 
-        $isExw = fn (object $v) => $type === NoteType::Debit && (int) $v->flag_exw === 1;
+        $isExw = fn (object $v) => $regenerateExw && $type === NoteType::Debit && (int) $v->flag_exw === 1;
         $profit = $items->reject($isExw)->sum(fn (object $v) => ($v->selling_rate - $v->buying_rate) * $this->factor($v));
         $commission = $type === NoteType::Debit ? $this->commissionPurchase((int) $note->ref_embarque) : 0.0;
         $remainder = $profit - $commission;
@@ -47,7 +51,7 @@ class RecalculateNote
             'due_to_shipper_agent' => 0,
         ];
 
-        if ($type === NoteType::Debit) {
+        if ($type === NoteType::Debit && $regenerateExw) {
             $exw = $items->filter($isExw);
             $values['exw_expenses'] = $exw->sum(fn (object $v) => $v->selling_rate * $this->factor($v));
 

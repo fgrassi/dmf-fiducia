@@ -121,6 +121,45 @@ class BookingNotesTest extends TestCase
         }
     }
 
+    public function test_adding_and_removing_items_keep_the_typed_exw_expenses_and_observations(): void
+    {
+        $booking = $this->booking();
+        $first = $this->expense($booking, 10, 100, 160);
+        $second = $this->expense($booking, 11, 50, 70);
+        $id = app(CreateNote::class)($booking, NoteType::Debit, [$first], 7);
+        DB::table('fin_debit_notes')->where('id', $id)->update(['exw_expenses' => 3470, 'obs' => 'EXW digitado']);
+
+        app(ChangeNoteItems::class)->add(NoteType::Debit, $id, $second);
+        app(ChangeNoteItems::class)->remove(NoteType::Debit, $id, $first);
+
+        $note = DB::table('fin_debit_notes')->find($id);
+        $this->assertEquals(3470.0, $note->exw_expenses);
+        $this->assertSame('EXW digitado', $note->obs);
+    }
+
+    public function test_an_exw_item_added_later_counts_in_the_profit_like_the_legacy(): void
+    {
+        $booking = $this->booking();
+        $freight = $this->expense($booking, 10, 100, 160);
+        $exw = $this->expense($booking, 20, 0, 90, ['flag_exw' => 1]);
+        $id = app(CreateNote::class)($booking, NoteType::Debit, [$freight], 7);
+
+        app(ChangeNoteItems::class)->add(NoteType::Debit, $id, $exw);
+
+        $note = DB::table('fin_debit_notes')->find($id);
+        $this->assertEquals([150.0, 0.0], [$note->gross_profit, $note->exw_expenses]);
+    }
+
+    public function test_items_are_stored_in_the_order_the_expenses_were_marked(): void
+    {
+        $booking = $this->booking();
+        [$first, $second, $third] = [$this->expense($booking, 10, 1, 2), $this->expense($booking, 11, 1, 2), $this->expense($booking, 12, 1, 2)];
+
+        $id = app(CreateNote::class)($booking, NoteType::Debit, [$third, $first, $second], 7);
+
+        $this->assertEquals([$third, $first, $second], DB::table('fin_debit_note_items')->where('ref_debit_note', $id)->orderBy('id')->pluck('ref_expense')->all());
+    }
+
     public function test_refuses_a_note_when_the_booking_has_no_agent(): void
     {
         $this->expectExceptionMessage('Não há agente cadastrado para esse embarque.');

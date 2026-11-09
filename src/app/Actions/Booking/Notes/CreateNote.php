@@ -44,7 +44,8 @@ class CreateNote
         }
 
         $fromExpenses = $expenseIds !== [];
-        $valid = DB::table('fin_expenses_values')->where('ref_embarque', $booking->getKey())->whereIn('id', $expenseIds)->pluck('id');
+        $belonging = DB::table('fin_expenses_values')->where('ref_embarque', $booking->getKey())->whereIn('id', $expenseIds)->pluck('id');
+        $valid = collect($expenseIds)->intersect($belonging)->values();
 
         return DB::transaction(function () use ($booking, $type, $userId, $fromExpenses, $valid) {
             $noteId = DB::table($type->table())->insertGetId([
@@ -66,7 +67,7 @@ class CreateNote
 
             if ($fromExpenses) {
                 DB::table($type->itemsTable())->insert($valid->map(fn ($id) => [$type->itemColumn() => $noteId, 'ref_expense' => $id])->all());
-                ($this->recalculate)($type, $noteId);
+                ($this->recalculate)($type, $noteId, regenerateExw: true);
             }
 
             return $noteId;
