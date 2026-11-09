@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
  * aprovação e o aprovador recebe uma mensagem. Editar um contato existente nunca muda o status por si só (um pendente
  * ou reprovado não vira OK fora do fluxo de aprovação).
  *
- * ponytail: sem o "Criar acesso à Customer" (API de provisionamento da Intranet) nem o e-mail da aprovação; aprovar segue no legado.
+ *  sem o "Criar acesso à Customer" (API de provisionamento da Intranet) nem o e-mail da aprovação; aprovar segue no legado.
  */
 class SaveCompanyContact
 {

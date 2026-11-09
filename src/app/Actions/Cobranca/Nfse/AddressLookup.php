@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
  * Endereço do tomador (BrasilApiCepClient / IbgeClient / OpenCnpjClient do legado): CEP pelo ViaCEP (já traz o código IBGE),
  * município IBGE pelo nome + UF e o endereço do CNPJ do BL pela OpenCNPJ.
  *
- * ponytail: só ViaCEP (sem o fallback BrasilAPI) e sem a busca de CEP por logradouro (buscarCepEndereco); somar se o ViaCEP falhar com frequência.
+ *  só ViaCEP (sem o fallback BrasilAPI) e sem a busca de CEP por logradouro (buscarCepEndereco); somar se o ViaCEP falhar com frequência.
  */
 class AddressLookup
 {

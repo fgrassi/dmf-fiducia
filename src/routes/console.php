@@ -57,7 +57,7 @@ foreach ($notices as [$command, $action, $purpose, $time]) {
         $this->info(app($action)().' registro(s) processado(s).');
     })->purpose($purpose);
 
-    // ponytail: horários chutados (o crontab do tracking não está no repo); confirmar com produção antes de ligar
+    //  horários chutados (o crontab do tracking não está no repo); confirmar com produção antes de ligar
     // desligado até o cron do tracking parar de chamar cron/<rotina> (COBRANCA_ROTINAS_AUTOMATICAS=true)
     // avisoPendenciaTomador rodava só em dias úteis (0 8 * * 1-5)
     Schedule::command($command)
@@ -82,7 +82,7 @@ Artisan::command('ordens-pagamento:gerar', function () {
     return 0;
 })->purpose('Gera as ordens de pagamento ao armador das reservas com pagamento pendente');
 
-// ponytail: de hora em hora é um chute (o crontab do tracking não está no repo); confirmar com produção antes de ligar
+//  de hora em hora é um chute (o crontab do tracking não está no repo); confirmar com produção antes de ligar
 // desligado até o cron do tracking parar de chamar ordemPagamento/geraOrdemPagamento (ORDEM_PAGAMENTO_GERACAO_AUTOMATICA=true)
 Schedule::command('ordens-pagamento:gerar')
     ->hourly()
@@ -104,7 +104,7 @@ Artisan::command('ordens-pagamento-outros:gerar', function () {
     return 0;
 })->purpose('Gera as ordens de pagamento de outros das reservas com pagamento pendente');
 
-// ponytail: de hora em hora é um chute (o crontab do tracking não está no repo); confirmar com produção antes de ligar
+//  de hora em hora é um chute (o crontab do tracking não está no repo); confirmar com produção antes de ligar
 // desligado até o cron do tracking parar de chamar ordemPagamentoOutros/geraOrdemPagamento (ORDEM_PAGAMENTO_OUTROS_GERACAO_AUTOMATICA=true)
 Schedule::command('ordens-pagamento-outros:gerar')
     ->hourly()
@@ -116,7 +116,7 @@ Artisan::command('capas:resumo-gerar', function () {
     $this->info(app(GenerateCoverSummaries::class)().' resumo(s) gerado(s).');
 })->purpose('Gera o resumo de resultado das capas de contabilidade arquivadas');
 
-// ponytail: diário às 02:00 é um chute (o crontab do tracking não está no repo); confirmar com produção antes de ligar
+//  diário às 02:00 é um chute (o crontab do tracking não está no repo); confirmar com produção antes de ligar
 // desligado até o cron do tracking parar de chamar cron/manutencao (CAPAS_ROTINAS_AUTOMATICAS=true)
 Schedule::command('capas:resumo-gerar')
     ->dailyAt('02:00')

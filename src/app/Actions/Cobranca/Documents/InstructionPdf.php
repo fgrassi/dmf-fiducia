@@ -20,7 +20,7 @@ use TCPDF;
  * dados bancários e contatos), gravado em uploads/cobranca como ic{modal}{id}{ddmmyyGi} e anexado à IC;
  * com $sendEmail, vai ao cliente no e-mail "Instrução de Cobrança" (cliente em exceção: só o financeiro).
  *
- * A IC de seguro (geraPdfSeguro) é o InsurancePdf. ponytail: título em Helvetica (o legado usa BebasNeue).
+ * A IC de seguro (geraPdfSeguro) é o InsurancePdf.  título em Helvetica (o legado usa BebasNeue).
  */
 class InstructionPdf
 {

@@ -27,7 +27,7 @@ use UnitEnum;
 /**
  * usuario (legado): cadastro de usuários, credenciais e vínculos com empresas.
  *
- * ponytail: sem exclusão (o legado apaga a linha, que quase sempre está referenciada: use o status "Deletado"),
+ *  sem exclusão (o legado apaga a linha, que quase sempre está referenciada: use o status "Deletado"),
  * sem foto (o formulário do legado também não edita) e sem as telas show/listDmf.
  */
 class UserResource extends Resource

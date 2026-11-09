@@ -42,7 +42,7 @@ use UnitEnum;
  *   Agentes"): período da data de pagamento, um lado pode ficar aberto; "Remover baixa" reabre as marcadas e "Gerar PDF"
  *   baixa o extrato do agente com a conta bancária escolhida.
  * Um item só no menu ("Notas de Crédito/Débito Agente", nome pedido pelo financeiro no lugar dos três do legado).
- * ponytail: a lista "Com baixa" usa os valores do Remover Baixa (toda nota baixada pode ser reaberta); o extrato em PDF
+ *  a lista "Com baixa" usa os valores do Remover Baixa (toda nota baixada pode ser reaberta); o extrato em PDF
  * segue as regras da D13 (AgentNoteLists::statement) e deixa de fora courier de exportação e variada sem shipper.
  */
 class AgentNoteControl extends Page implements HasTable

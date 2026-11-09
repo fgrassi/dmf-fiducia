@@ -10,7 +10,7 @@ use Throwable;
  * financeiro/atualizaTomador (legado): grava na pessoa o endereço corrigido na tela de tomadores (tudo em maiúsculas), cria a pessoa
  * dos CNPJs sem cadastro e resolve cidade (criando a que faltar, pelo nome oficial do IBGE), sigla do estado e país.
  *
- * ponytail: sem a busca de município "parecido" nem a criação de estado do legado (as 27 UFs já existem); somar se aparecer aviso de cidade/UF não encontrada.
+ *  sem a busca de município "parecido" nem a criação de estado do legado (as 27 UFs já existem); somar se aparecer aviso de cidade/UF não encontrada.
  *
  * @phpstan-import-type Row from PendingTakers
  */

@@ -264,7 +264,7 @@ class GenerateCharges
 
     /**
      * geraFrete: cliente com separa_taxas tem antes uma IC só do frete (regra 4) por BL, sem NFS-e.
-     * ponytail: como no legado, só EXPO gera (em IMPO a lista de despesas ficava vazia e a IC era descartada).
+     *  como no legado, só EXPO gera (em IMPO a lista de despesas ficava vazia e a IC era descartada).
      */
     private function freight(Embarque $b): void
     {

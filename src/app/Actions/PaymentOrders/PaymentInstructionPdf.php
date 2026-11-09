@@ -8,7 +8,7 @@ use TCPDF;
 
 /**
  * pdfInstrucaoPagamento (legado): PDF A4 da instrução de pagamento ao armador, com a reserva, os equipamentos, as
- * despesas, o IOF e os dados bancários (ou "VIA BOLETO"). ponytail: título em Helvetica (o legado usa BebasNeue).
+ * despesas, o IOF e os dados bancários (ou "VIA BOLETO").  título em Helvetica (o legado usa BebasNeue).
  */
 class PaymentInstructionPdf
 {

@@ -53,7 +53,7 @@ class GenerateAllCharges
 
     /**
      * Uma origem por confirmação, como no legado (marcar a confirmação com control = 1 quando a IC sai).
-     * ponytail: o legado chamava a geração uma vez por modal (um resumo/digest por modal); aqui é uma rodada só.
+     *  o legado chamava a geração uma vez por modal (um resumo/digest por modal); aqui é uma rodada só.
      *
      * @return list<array{0:int, 1:\Closure}>
      */

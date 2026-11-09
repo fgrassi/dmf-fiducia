@@ -22,7 +22,7 @@ use UnitEnum;
 /**
  * vendedor (legado): cadastro de vendedores e dos usuários vinculados. Excluir é lógico (deleted_at).
  *
- * ponytail: sem a ficha do vendedor (carteira de clientes, prospecção e restrições), só o cadastro.
+ *  sem a ficha do vendedor (carteira de clientes, prospecção e restrições), só o cadastro.
  */
 class SellerResource extends Resource
 {

@@ -8,7 +8,7 @@ use TCPDF;
 
 /**
  * billingInstruction (legado, DmfUtil::geraPdfBilling): PDF A4 da instrução de cobrança da reserva, em inglês.
- * Os dados vêm de BillingInstruction. ponytail: título em Helvetica (o legado usa BebasNeue) e altura de linha
+ * Os dados vêm de BillingInstruction.  título em Helvetica (o legado usa BebasNeue) e altura de linha
  * calculada pelo texto, em vez do 4 fixo que cortava observações longas.
  */
 class BillingInstructionPdf

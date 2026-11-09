@@ -163,7 +163,7 @@ class BookingChecks
 
     /**
      * Comissão (Arbitrary Fee etc.) precisa do frete correspondente no mesmo equipamento.
-     * ponytail: como no legado, só a última despesa da reserva é conferida (o flag era sobrescrito no loop); conferir todas se o financeiro pedir.
+     *  como no legado, só a última despesa da reserva é conferida (o flag era sobrescrito no loop); conferir todas se o financeiro pedir.
      *
      * @param  Collection<int, FinExpensesValues>  $expenses
      */
