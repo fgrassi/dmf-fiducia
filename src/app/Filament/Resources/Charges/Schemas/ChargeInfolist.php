@@ -497,6 +497,14 @@ class ChargeInfolist
                                 ]),
                             Section::make('NFSe')
                                 ->visible(fn (FinCharges $r) => $r->nfses()->exists() || $r->status->isSettled() || app(IssueNfse::class)->canGenerate($r))
+                                ->headerActions([
+                                    Action::make('abrirGerarNfse')
+                                        ->label('Gerar NFSe')
+                                        ->icon(Heroicon::DocumentPlus)
+                                        ->color('gray')
+                                        ->visible(fn (FinCharges $record) => app(IssueNfse::class)->canGenerate($record))
+                                        ->alpineClickHandler("\$wire.mountAction('gerarNfse')"),
+                                ])
                                 ->schema([
                                     ViewEntry::make('nfse_rows')
                                         ->hiddenLabel()

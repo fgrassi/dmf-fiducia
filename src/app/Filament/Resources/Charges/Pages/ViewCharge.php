@@ -95,49 +95,6 @@ class ViewCharge extends ViewRecord
                 ->visible($open)
                 ->modalDescription('Recalcular a cobrança com IOF zerado?')
                 ->schema(fn () => $this->recalculationNfseFields()),
-            // reemitirNfse do legado: emissão antes da baixa (prazo/boleto, armador que não recalcula ou exceção) ou depois dela
-            Action::make('gerarNfse')
-                ->label('Gerar NFSe')
-                ->icon('heroicon-o-document-plus')
-                ->color('gray')
-                ->visible(fn () => app(IssueNfse::class)->canGenerate($this->getRecord()))
-                ->modalHeading('Gerar NFSe')
-                ->modalWidth('3xl')
-                ->modalSubmitActionLabel('Emitir NFSe')
-                ->fillForm(fn () => ['nfse' => NfseEmissionForm::defaults(
-                    $this->getRecord(),
-                    NfseEmissionForm::GENERATE,
-                    FinChargesNfse::where('ref_charge', $this->getRecord()->getKey())->orderByDesc('fin_charges_nfse_id')->first(),
-                )])
-                ->steps(fn () => [
-                    Step::make('NFS-e')
-                        ->schema(NfseEmissionForm::fields($this->getRecord(), NfseEmissionForm::GENERATE)),
-                    Step::make('Confirmação')
-                        ->schema($this->confirmation('nfse')),
-                ])
-                ->action(function (array $data) {
-                    $record = $this->getRecord();
-                    $emails = $this->chosenRecipients($data);
-                    $record->selectRecipients($emails);
-                    $record->save();
-
-                    $outcome = app(IssueNfse::class)->forCharge($record, ['emitir_nfse' => true, ...$data['nfse']], IssueNfse::REISSUE, auth()->id());
-
-                    if ($outcome && $outcome['records'] !== []) {
-                        FinChargesLog::forceCreate([
-                            'ref_charge' => $record->id,
-                            'acao' => 'alteracao',
-                            'historico' => 'Reemissão NFSe'.FinCharges::recipientsLogSummary($emails),
-                            'status_anterior' => 0,
-                            'status_novo' => 1,
-                            'created_at' => now(),
-                            'created_by' => auth()->id(),
-                        ]);
-                    }
-
-                    $this->notifyNfse($outcome ?? ['status' => 'danger', 'message' => 'Não foi possível reenviar a NFSe.']);
-                    $this->redirect(ChargeResource::getUrl('view', ['record' => $record]));
-                }),
             Action::make('baixaBancaria')
                 ->label('Baixa Bancária')
                 ->icon('heroicon-o-building-library')
@@ -265,6 +222,53 @@ class ViewCharge extends ViewRecord
                     $this->redirect(ChargeResource::getUrl('index'));
                 }),
         ];
+    }
+
+    /** reemitirNfse do legado: emissão antes da baixa (prazo/boleto, armador que não recalcula ou exceção) ou depois dela; disparada pelo botão do cabeçalho da seção NFSe. */
+    public function gerarNfseAction(): Action
+    {
+        return Action::make('gerarNfse')
+            ->label('Gerar NFSe')
+            ->icon('heroicon-o-document-plus')
+            ->color('gray')
+            ->visible(fn () => app(IssueNfse::class)->canGenerate($this->getRecord()))
+            ->modalHeading('Gerar NFSe')
+            ->modalWidth('3xl')
+            ->modalSubmitActionLabel('Emitir NFSe')
+            ->fillForm(fn () => ['nfse' => NfseEmissionForm::defaults(
+                $this->getRecord(),
+                NfseEmissionForm::GENERATE,
+                FinChargesNfse::where('ref_charge', $this->getRecord()->getKey())->orderByDesc('fin_charges_nfse_id')->first(),
+            )])
+            ->steps(fn () => [
+                Step::make('NFS-e')
+                    ->schema(NfseEmissionForm::fields($this->getRecord(), NfseEmissionForm::GENERATE)),
+                Step::make('Confirmação')
+                    ->schema($this->confirmation('nfse')),
+            ])
+            ->action(function (array $data) {
+                $record = $this->getRecord();
+                $emails = $this->chosenRecipients($data);
+                $record->selectRecipients($emails);
+                $record->save();
+
+                $outcome = app(IssueNfse::class)->forCharge($record, ['emitir_nfse' => true, ...$data['nfse']], IssueNfse::REISSUE, auth()->id());
+
+                if ($outcome && $outcome['records'] !== []) {
+                    FinChargesLog::forceCreate([
+                        'ref_charge' => $record->id,
+                        'acao' => 'alteracao',
+                        'historico' => 'Reemissão NFSe'.FinCharges::recipientsLogSummary($emails),
+                        'status_anterior' => 0,
+                        'status_novo' => 1,
+                        'created_at' => now(),
+                        'created_by' => auth()->id(),
+                    ]);
+                }
+
+                $this->notifyNfse($outcome ?? ['status' => 'danger', 'message' => 'Não foi possível reenviar a NFSe.']);
+                $this->redirect(ChargeResource::getUrl('view', ['record' => $record]));
+            });
     }
 
     /** FinChargesForm do legado: valor recebido sugerido é o total da IC. */
