@@ -135,6 +135,18 @@ class PaymentInstructionTest extends TestCase
         $this->assertSame('OVERRIDE', app(PaymentInstruction::class)($instruction->fresh())['bank']['code']);
     }
 
+    public function test_prints_the_ports_with_the_country_name_like_the_legacy_booking(): void
+    {
+        [, $instruction] = $this->instruction();
+        DB::table('paises')->insert(['paises_id' => 3, 'nome' => 'BRASIL', 'uncode' => 'BR']);
+        DB::table('porto')->insert(['porto_id' => 4, 'nome' => 'RIO GRANDE', 'uncode' => 'BRRIG', 'ref_pais' => 3]);
+        DB::table('embarque')->where('embarque_id', 10)->update(['porto_origem_id' => 4]);
+
+        $data = app(PaymentInstruction::class)($instruction->fresh());
+
+        $this->assertSame(['RIO GRANDE (BRASIL)', ''], [$data['origin'], $data['destination']]);
+    }
+
     public function test_renders_the_pdf(): void
     {
         [, $instruction] = $this->instruction();

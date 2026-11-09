@@ -36,6 +36,13 @@ class PaymentOrderItemsTest extends TestCase
         $this->assertSame(551.23, app(OrderItemValue::class)->debit($expense, 5.5123, 100, 'MBL1'));
     }
 
+    public function test_debit_rounds_half_cents_up_like_the_legacy_php(): void
+    {
+        $expense = $this->expense(unity: self::BL_UNIT);
+
+        $this->assertSame(1311.26, app(OrderItemValue::class)->debit($expense, 5.8278, 225, 'MBL1'));
+    }
+
     public function test_debit_for_container_unit_multiplies_by_the_bl_container_factor(): void
     {
         $booking = DB::table('embarque')->insertGetId(['booking' => 'B', 'impor_expor' => 'e']);

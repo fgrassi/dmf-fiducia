@@ -3,6 +3,7 @@
 namespace App\Actions\Cobranca\Items;
 
 use App\Models\FinCharges;
+use App\Services\LegacyMath;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -30,7 +31,7 @@ class ChargeIof
     /** IOF calculado (base × alíquota) ignorando o valor manual: é o que o recálculo grava. */
     public function calculated(FinCharges $charge): float
     {
-        return $this->applies($charge) ? round($this->base($charge) * self::RATE, 2) : 0.0;
+        return $this->applies($charge) ? LegacyMath::round($this->base($charge) * self::RATE, 2) : 0.0;
     }
 
     /** deveCalcularIof: cliente isento ou exportação da VIPAL não pagam IOF. */

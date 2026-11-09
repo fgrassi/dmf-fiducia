@@ -4,6 +4,7 @@ namespace App\Actions\Cobranca\Recalculation;
 
 use App\Models\Embarque;
 use App\Models\FinCharges;
+use App\Services\LegacyMath;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 
@@ -52,7 +53,7 @@ class ChargeRates
         [$rateId, $tax] = $this->table($clientId, (int) $currencyId);
         $value = (float) $this->value($rateId);
 
-        return round($value + $value * ((float) $tax / 100), 4);
+        return LegacyMath::round($value + $value * ((float) $tax / 100), 4);
     }
 
     /**

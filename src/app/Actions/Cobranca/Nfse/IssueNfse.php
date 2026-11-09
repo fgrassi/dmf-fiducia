@@ -6,6 +6,7 @@ use App\Actions\Cobranca\Recalculation\ChargeRates;
 use App\Enums\Cobranca\ChargeStatus;
 use App\Models\FinCharges;
 use App\Models\FinChargesNfse;
+use App\Services\LegacyMath;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use stdClass;
@@ -333,7 +334,7 @@ class IssueNfse
         // não incidência / imunidade / exportação: sem alíquota nem valor do ISS
         if ($issqn === '1' && is_numeric($operation->aliquota_iss)) {
             $values['aliquota_iss'] = (float) $operation->aliquota_iss;
-            $values['valor_iss'] = round($amount * ((float) $operation->aliquota_iss / 100), 2); // como o legado: alíquota/100 antes de multiplicar (o ponto flutuante muda 1 centavo)
+            $values['valor_iss'] = LegacyMath::round($amount * ((float) $operation->aliquota_iss / 100), 2); // como o legado: alíquota/100 antes de multiplicar, com o round() do PHP 5.6
         }
 
         $values += array_filter(['pis_cofins' => self::pisCofins($operation, $amount), 'tot_trib' => self::approximateTaxes($operation)]);
@@ -380,14 +381,14 @@ class IssueNfse
 
         $value = (float) $charge->total_value - (float) $charge->discount;
 
-        return round($value > 0 ? $value : (float) $charge->total_value, 2);
+        return LegacyMath::round($value > 0 ? $value : (float) $charge->total_value, 2);
     }
 
     /** getValoresGruposPorOperacao: total atual de cada operação fatiada. @return array<int, float> */
     public function groupValues(FinCharges $charge): array
     {
         try {
-            return collect(($this->groups)($charge))->mapWithKeys(fn ($g) => [$g['operation_id'] => round($g['total'], 2)])->all();
+            return collect(($this->groups)($charge))->mapWithKeys(fn ($g) => [$g['operation_id'] => LegacyMath::round($g['total'], 2)])->all();
         } catch (DomainException) {
             return [];
         }
@@ -542,12 +543,12 @@ class IssueNfse
             return ['cst' => $cst];
         }
 
-        $block = ['cst' => $cst, 'tipo_retencao' => (string) $operation->pis_cofins_tipo_retencao ?: '0', 'base_calculo' => round($amount, 2)];
+        $block = ['cst' => $cst, 'tipo_retencao' => (string) $operation->pis_cofins_tipo_retencao ?: '0', 'base_calculo' => LegacyMath::round($amount, 2)];
 
         foreach (['pis', 'cofins'] as $tax) {
             if (is_numeric($operation->{"aliquota_{$tax}"})) {
                 $block["aliquota_{$tax}"] = (float) $operation->{"aliquota_{$tax}"};
-                $block["valor_{$tax}"] = round($amount * ((float) $operation->{"aliquota_{$tax}"} / 100), 2);
+                $block["valor_{$tax}"] = LegacyMath::round($amount * ((float) $operation->{"aliquota_{$tax}"} / 100), 2);
             }
         }
 

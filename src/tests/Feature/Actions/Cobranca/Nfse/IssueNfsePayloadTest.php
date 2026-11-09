@@ -30,7 +30,7 @@ class IssueNfsePayloadTest extends TestCase
         $this->assertSame('Reserva: BKG - 10 ('.$charge->id.') | BLs (numeros): HBL 1', $payload['informacoes_complementares']);
     }
 
-    /** Paridade com buildPayload: o legado multiplica pela alíquota/100, e o ponto flutuante dá 7,48 (não 7,49) em 299,40 × 2,5%. */
+    /** Paridade com buildPayload: o legado multiplica pela alíquota/100 e o round() do PHP 5.6 pré-arredonda, então 299,40 × 2,5% dá 7,49 (o PHP 8.4 puro daria 7,48). */
     public function test_tax_values_use_the_legacy_float_order_of_operations(): void
     {
         DB::table('config_nfse')->insert(['config_nfse_id' => 1, 'emissor_cnpj' => '11222333000181', 'emissor_codigo_municipio' => '4314902']);
@@ -42,6 +42,6 @@ class IssueNfsePayloadTest extends TestCase
 
         $payload = app(IssueNfse::class)->payload($charge, IssueNfse::operationById($operationId), ['tipo' => 'pj', 'cpf_cnpj' => '11444777000161', 'nome' => 'ACME'], 'Serviço', 'BKG10-1', null, null);
 
-        $this->assertSame([7.48, 7.48, 7.48], [$payload['valores']['valor_iss'], $payload['valores']['pis_cofins']['valor_pis'], $payload['valores']['pis_cofins']['valor_cofins']]);
+        $this->assertSame([7.49, 7.49, 7.49], [$payload['valores']['valor_iss'], $payload['valores']['pis_cofins']['valor_pis'], $payload['valores']['pis_cofins']['valor_cofins']]);
     }
 }

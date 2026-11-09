@@ -6,6 +6,7 @@ use App\Actions\Booking\SaveExpense;
 use App\Models\FinExpensesValues;
 use App\Models\OrdemPagamento;
 use App\Models\TaBaixa;
+use App\Services\LegacyMath;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
@@ -39,7 +40,7 @@ class EditTaPayment
 
         $expense = FinExpensesValues::find($payment->fin_expenses_values_id) ?? throw new DomainException('Despesa TA não encontrada.');
         $balance = round($this->total($expense) - (float) TaBaixa::where('fin_expenses_values_id', $expense->getKey())->whereKeyNot($payment->getKey())->sum('valor_ta'), 2);
-        $taValue = round($paid / $rate, 2);
+        $taValue = LegacyMath::round($paid / $rate, 2);
 
         if ($taValue - $balance > 0.02) {
             throw new DomainException('O valor pago excede o saldo disponível.');
@@ -88,7 +89,7 @@ class EditTaPayment
     /** Valor total da TA: custo unitário × quantidade de mercadorias da reserva. */
     private function total(FinExpensesValues $expense): float
     {
-        return round((float) $expense->buying_rate * (int) DB::table('mercadoria')->where('embarque_id', $expense->ref_embarque)->sum('quantidade'), 2);
+        return LegacyMath::round((float) $expense->buying_rate * (int) DB::table('mercadoria')->where('embarque_id', $expense->ref_embarque)->sum('quantidade'), 2);
     }
 
     /**

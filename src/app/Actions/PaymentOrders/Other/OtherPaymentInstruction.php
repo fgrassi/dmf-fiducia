@@ -4,7 +4,6 @@ namespace App\Actions\PaymentOrders\Other;
 
 use App\Actions\PaymentOrders\PaymentInstruction;
 use App\Models\InstrucaoPagamentoOutros;
-use App\Models\Porto;
 use App\Services\Cobranca\ChargeDetails;
 use Illuminate\Support\Facades\DB;
 use stdClass;
@@ -48,8 +47,8 @@ class OtherPaymentInstruction
             'free_time_label' => $import ? 'Free Time Demurrage (dias)' : 'Free Time Detention (dias)',
             'free_time' => (string) ($import ? $booking->free_time : $booking->free_time_detention),
             'ship' => $name('navio', 'navio_id', $import ? $booking->navio_id_destino : $booking->navio_id),
-            'origin' => Porto::find($booking->porto_origem_id)?->label ?? '',
-            'destination' => Porto::find($booking->porto_destino_id)?->label ?? '',
+            'origin' => $this->details->port($booking->porto_origem_id),
+            'destination' => $this->details->port($booking->porto_destino_id),
             'etd' => $date($booking->saida_prevista),
             'eta' => $date($booking->chegada_prevista),
             'equipment' => DB::table('mercadoria as m')->leftJoin('tipo_container as t', 't.tipo_container_id', '=', 'm.tipo_container_id')

@@ -3,6 +3,7 @@
 namespace App\Actions\PaymentOrders;
 
 use App\Services\Cobranca\ChargeDetails;
+use App\Services\LegacyMath;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use stdClass;
@@ -41,7 +42,7 @@ class OrderItemValue
         $unity = (int) DB::table('fin_expenses')->where('id', $expense->ref_expense)->value('ref_unity');
 
         if (in_array($unity, [self::UNIT_BL, self::UNIT_PROCESS], true)) {
-            return round($unit * $rate, 2);
+            return LegacyMath::round($unit * $rate);
         }
 
         $bls = DB::table('bl')->where('embarque_id', $expense->ref_embarque)->orderBy('bl_id')->get();
@@ -57,9 +58,9 @@ class OrderItemValue
             }
 
             $total += match ($unity) {
-                self::UNIT_CONTAINER => round($unit * $rate * $this->containerQuantity($expense, $bl), 2),
+                self::UNIT_CONTAINER => LegacyMath::round($unit * $rate * $this->containerQuantity($expense, $bl)),
                 self::UNIT_WEIGHT_MEASURE => $this->weightMeasure($expense, $bl, $unit, $rate, $bls->count()),
-                default => round($unit * $rate, 2),
+                default => LegacyMath::round($unit * $rate),
             };
         }
 
@@ -100,7 +101,7 @@ class OrderItemValue
             ->orderByDesc('v.id')
             ->value('v.rate');
 
-        return $value !== null ? round((float) $value, 4) : throw new DomainException('Não há cotação do armador para hoje.');
+        return $value !== null ? LegacyMath::round((float) $value, 4) : throw new DomainException('Não há cotação do armador para hoje.');
     }
 
     private function containerQuantity(object $expense, stdClass $bl): float

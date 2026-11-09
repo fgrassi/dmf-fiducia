@@ -8,6 +8,7 @@ use App\Actions\Financeiro\TaReport as TaReportQuery;
 use App\Filament\Resources\OtherPaymentOrders\OtherPaymentOrderResource;
 use App\Models\Pessoa;
 use App\Services\Cobranca\ChargeDetails;
+use App\Services\LegacyMath;
 use BackedEnum;
 use DomainException;
 use Filament\Actions\Action;
@@ -229,7 +230,7 @@ class TaReport extends Page implements HasTable
                                     return;
                                 }
 
-                                collect($get('pagamentos'))->each(fn (array $item, string $key) => $set("pagamentos.{$key}.valor_pago", round((float) $item['saldo'] * (float) $state, 2)));
+                                collect($get('pagamentos'))->each(fn (array $item, string $key) => $set("pagamentos.{$key}.valor_pago", LegacyMath::round((float) $item['saldo'] * (float) $state, 2)));
                             }),
                         Repeater::make('pagamentos')
                             ->label('Reservas')

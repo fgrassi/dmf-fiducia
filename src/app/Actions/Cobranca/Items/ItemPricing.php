@@ -3,6 +3,7 @@
 namespace App\Actions\Cobranca\Items;
 
 use App\Services\Cobranca\ChargeDetails;
+use App\Services\LegacyMath;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use stdClass;
@@ -53,9 +54,9 @@ class ItemPricing
         $container = fn () => DB::table('container')->where('container_id', $expense->ref_container)->first();
 
         return match ((int) $expense->despesa->ref_unity) {
-            1 => round($unit * $rate * ($bl ? 1 : (float) DB::table('embarque')->where('embarque_id', $embarqueId)->value('qtd_bl')), 2),
-            5 => round($unit * $rate / max(1, DB::table('bl')->where('embarque_id', $embarqueId)->whereNotNull('bl')->where('bl', '<>', '')->count()), 2),
-            2 => round($unit * $rate * match (true) {
+            1 => LegacyMath::round($unit * $rate * ($bl ? 1 : (float) DB::table('embarque')->where('embarque_id', $embarqueId)->value('qtd_bl')), 2),
+            5 => LegacyMath::round($unit * $rate / max(1, DB::table('bl')->where('embarque_id', $embarqueId)->whereNotNull('bl')->where('bl', '<>', '')->count()), 2),
+            2 => LegacyMath::round($unit * $rate * match (true) {
                 ! $bl => (float) DB::table('mercadoria')->where('embarque_id', $embarqueId)
                     ->when(filled($expense->ref_equipment), fn ($q) => $q->where('tipo_container_id', $expense->ref_equipment))
                     ->sum('quantidade'),
@@ -64,7 +65,7 @@ class ItemPricing
                 default => $this->factors->blFactor($bl),
             }, 2),
             3 => $this->weightMeasure($expense, $rate, $unit, $bl, $container),
-            default => round($unit * $rate, 2),
+            default => LegacyMath::round($unit * $rate, 2),
         };
     }
 

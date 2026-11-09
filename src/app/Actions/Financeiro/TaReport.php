@@ -3,6 +3,7 @@
 namespace App\Actions\Financeiro;
 
 use App\Actions\Booking\SaveExpense;
+use App\Services\LegacyMath;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -155,7 +156,7 @@ class TaReport
             'has_op' => $open->isNotEmpty(),
             'prefill_valor_pago' => match (true) {
                 $payments->isEmpty() && $open->isNotEmpty() && $orderValue > 0 => $orderValue,
-                (bool) $suggested => round($balance * $suggested, 2),
+                (bool) $suggested => LegacyMath::round($balance * $suggested, 2),
                 default => 0,
             },
             'qtd_baixas' => $payments->count(),

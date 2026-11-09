@@ -7,6 +7,7 @@ use App\Models\FinExpensesValues;
 use App\Models\OrdemPagamento;
 use App\Models\OrdemPagamentoItem;
 use App\Models\TaBaixa;
+use App\Services\LegacyMath;
 use DomainException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -76,7 +77,7 @@ class GiveTaPayment
         $quantity = (int) DB::table('mercadoria')->where('embarque_id', $bookingId)->sum('quantidade');
         $total = (float) $expense->buying_rate * $quantity;
         $balance = round($total - (float) TaBaixa::where('fin_expenses_values_id', $expense->getKey())->sum('valor_ta'), 2);
-        $taValue = round($paid / $rate, 2);
+        $taValue = LegacyMath::round($paid / $rate, 2);
 
         if ($taValue - $balance > 0.02) {
             throw new DomainException("{$label}: o valor pago excede o saldo.");

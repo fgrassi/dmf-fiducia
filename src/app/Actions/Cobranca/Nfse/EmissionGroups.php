@@ -4,6 +4,7 @@ namespace App\Actions\Cobranca\Nfse;
 
 use App\Models\Embarque;
 use App\Models\FinCharges;
+use App\Services\LegacyMath;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
@@ -43,7 +44,7 @@ class EmissionGroups
 
         $itemsTotal = $items->sum('value');
         $discount = (float) $charge->discount;
-        $share = fn (float $sum) => max(0.0, round($sum - ($discount > 0 && $itemsTotal > 0 ? round($discount * ($sum / $itemsTotal), 2) : 0.0), 2));
+        $share = fn (float $sum) => max(0.0, LegacyMath::round($sum - ($discount > 0 && $itemsTotal > 0 ? LegacyMath::round($discount * ($sum / $itemsTotal), 2) : 0.0), 2));
         $used = [];
         $groups = [];
 
@@ -75,9 +76,9 @@ class EmissionGroups
             }
 
             $groups[] = ['operation_id' => (int) $default, 'item_ids' => $rest->keys()->all(),
-                'total' => round($share($rest->sum('value')) + max(0.0, $iof), 2), 'residual' => true];
+                'total' => LegacyMath::round($share($rest->sum('value')) + max(0.0, $iof), 2), 'residual' => true];
         } elseif ($iof > 0) {
-            $groups[array_key_last($groups)]['total'] = round($groups[array_key_last($groups)]['total'] + $iof, 2);
+            $groups[array_key_last($groups)]['total'] = LegacyMath::round($groups[array_key_last($groups)]['total'] + $iof, 2);
         }
 
         return $groups;
