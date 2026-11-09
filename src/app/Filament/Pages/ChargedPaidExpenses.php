@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Actions\Expenses\ChargedPaidReport;
 use App\Actions\Expenses\ExportChargedPaidReport;
+use App\Filament\Livewire\ReportResult;
 use App\Models\CapaProcessoArquivo;
 use App\Models\FinExpenses;
 use App\Models\Pessoa;
@@ -19,7 +20,7 @@ use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Grid;
-use Filament\Schemas\Components\View;
+use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -48,8 +49,11 @@ class ChargedPaidExpenses extends Page
     /** @var array<string, mixed>|null */
     public ?array $data = [];
 
-    /** @var array<string, mixed>|null */
-    public ?array $report = null;
+    /** Filtros do último "Enviar": o resultado fica no componente filho, fora do estado da página. */
+    public ?array $applied = null;
+
+    /** Muda a cada "Enviar", para o resultado ser refeito mesmo com os mesmos filtros. */
+    public int $runs = 0;
 
     /** security.yml do módulo (legado): credencial financial. */
     public static function canAccess(): bool
@@ -129,14 +133,20 @@ class ChargedPaidExpenses extends Page
                                 ->action(fn () => $this->clear()),
                         ]),
                     ]),
-                View::make('filament.pages.charged-paid-expenses')
-                    ->viewData(fn () => ['report' => $this->report]),
+                Livewire::make(ReportResult::class, fn () => [
+                    'action' => ChargedPaidReport::class,
+                    'view' => 'filament.pages.charged-paid-expenses',
+                    'arguments' => [$this->applied],
+                ])
+                    ->key('result'.$this->runs)
+                    ->visible(fn () => $this->applied !== null),
             ]);
     }
 
     public function send(): void
     {
-        $this->report = $this->build();
+        $this->applied = $this->filters();
+        $this->runs++;
     }
 
     public function excel(): ?StreamedResponse
@@ -149,28 +159,37 @@ class ChargedPaidExpenses extends Page
     public function clear(): void
     {
         $this->form->fill(['tipo_data' => 'cobranca']);
-        $this->report = null;
+        $this->applied = null;
     }
 
     /** @return array<string, mixed>|null null quando o filtro é inválido (a mensagem sai como aviso) */
     private function build(): ?array
     {
-        $state = $this->form->getState();
-
         try {
-            return app(ChargedPaidReport::class)([
-                'data_ini' => $state['data_ini'] ?? null,
-                'data_fim' => $state['data_fim'] ?? null,
-                'tipo_data' => $state['tipo_data'] ?? null,
-                'despesa_ids' => $state['despesa_ids'] ?? [],
-                'regra_ids' => $state['regra_ids'] ?? [],
-                'cliente_id' => $state['cliente_id'] ?? null,
-                'arquivo_id' => $state['arquivo_id'] ?? null,
-            ]);
+            return app(ChargedPaidReport::class)($this->filters());
         } catch (DomainException $e) {
-            Notification::make()->title($e->getMessage())->warning()->send();
+            Notification::make()
+                ->title($e->getMessage())
+                ->warning()
+                ->send();
 
             return null;
         }
+    }
+
+    /** @return array<string, mixed> */
+    private function filters(): array
+    {
+        $state = $this->form->getState();
+
+        return [
+            'data_ini' => $state['data_ini'] ?? null,
+            'data_fim' => $state['data_fim'] ?? null,
+            'tipo_data' => $state['tipo_data'] ?? null,
+            'despesa_ids' => $state['despesa_ids'] ?? [],
+            'regra_ids' => $state['regra_ids'] ?? [],
+            'cliente_id' => $state['cliente_id'] ?? null,
+            'arquivo_id' => $state['arquivo_id'] ?? null,
+        ];
     }
 }

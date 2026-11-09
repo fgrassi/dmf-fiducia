@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Actions\Financeiro\DailyRatesReport;
+use App\Filament\Livewire\ReportResult;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
@@ -11,7 +12,7 @@ use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Grid;
-use Filament\Schemas\Components\View;
+use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use UnitEnum;
@@ -38,8 +39,11 @@ class DailyRates extends Page
     /** @var array<string, mixed>|null */
     public ?array $data = [];
 
-    /** @var array<string, mixed>|null */
-    public ?array $report = null;
+    /** Filtros do último "Enviar": o resultado fica no componente filho, fora do estado da página. */
+    public ?array $applied = null;
+
+    /** Muda a cada "Enviar", para o resultado ser refeito mesmo com os mesmos filtros. */
+    public int $runs = 0;
 
     /** security.yml do módulo (legado): credencial financial. */
     public static function canAccess(): bool
@@ -89,14 +93,20 @@ class DailyRates extends Page
                                 ->action(fn () => $this->clear()),
                         ]),
                     ]),
-                View::make('filament.pages.daily-rates')
-                    ->viewData(fn () => ['report' => $this->report]),
+                Livewire::make(ReportResult::class, fn () => [
+                    'action' => DailyRatesReport::class,
+                    'view' => 'filament.pages.daily-rates',
+                    'arguments' => [$this->applied],
+                ])
+                    ->key('result'.$this->runs)
+                    ->visible(fn () => $this->applied !== null),
             ]);
     }
 
     public function send(): void
     {
-        $this->report = app(DailyRatesReport::class)($this->form->getState());
+        $this->applied = $this->form->getState();
+        $this->runs++;
     }
 
     public function clear(): void

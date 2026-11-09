@@ -3,6 +3,7 @@
 namespace Tests\Feature\Filament;
 
 use App\Actions\Financeiro\ArrivalForecastReport;
+use App\Filament\Livewire\ReportResult;
 use App\Filament\Pages\ArrivalForecast;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -98,6 +99,14 @@ class ArrivalForecastTest extends TestCase
             ->assertSee('Informe o período')
             ->fillForm(['tipo' => 'i', 'data_ini' => '2026-11-01', 'data_fim' => '2026-11-30'])
             ->call('send')
+            ->assertSeeLivewire(ReportResult::class);
+
+        Livewire::test(ReportResult::class, [
+            'action' => ArrivalForecastReport::class,
+            'view' => 'filament.pages.arrival-forecast',
+            'arguments' => ['i', '2026-11-01', '2026-11-30'],
+            'viewData' => ['type' => 'i'],
+        ])
             ->assertSee(['IMP1(1)', 'BL-1', 'THC/CTN', '1.020,00']);
     }
 

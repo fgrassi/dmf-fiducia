@@ -42,9 +42,9 @@ class ArrecadacaoReportsTest extends TestCase
         DB::table('ordem_pagamento_item')->insert(['ordem_pagamento_id' => 1, 'ref_expense' => 50, 'ref_currency' => 1, 'item_value' => 30, 'created_at' => '2026-10-11']);
 
         Livewire::test(CertificateCorrections::class)
-            ->fillForm(['data_ini' => '2026-10-01', 'data_fim' => '2026-10-31'])
-            ->call('send')
-            ->assertSee(['BKG-1', 'US$ 80,00', 'R$ 300,00', 'R$ 150,00', 'R$ 150,00'])
+            ->set('tableDeferredFilters.periodo', ['data_ini' => '2026-10-01', 'data_fim' => '2026-10-31'])
+            ->call('applyTableFilters')
+            ->assertSee(['BKG-1', 'US$ 80,00', 'R$ 300,00', 'R$ 150,00', 'Resultado: R$ 150,00'])
             ->assertDontSee('BKG-OLD')
             ->assertDontSee('999');
     }
@@ -64,13 +64,14 @@ class ArrecadacaoReportsTest extends TestCase
         ]);
 
         Livewire::test(IofRevenue::class)
-            ->fillForm(['data_ini' => '2026-10-01', 'data_fim' => '2026-10-31'])
-            ->call('send')
-            ->assertSee(['BKG-1', 'HBL-77', '10,50', '15/10/2026', '15,00'])
+            ->set('tableDeferredFilters.periodo', ['data_ini' => '2026-10-01', 'data_fim' => '2026-10-31'])
+            ->call('applyTableFilters')
+            ->assertSee(['BKG-1', 'HBL-77', '10,50', '15/10/2026', '4,50', 'Total de IOF: R$ 15,00'])
             ->assertDontSee(['99,00', '77,00'])
-            ->fillForm(['data_ini' => '2026-10-31', 'data_fim' => '2026-10-01'])
-            ->call('send')
-            ->assertHasFormErrors(['data_fim']);
+            ->sortTable('valor_iof', 'asc')
+            ->assertSeeInOrder(['4,50', '10,50'])
+            ->sortTable('valor_iof', 'desc')
+            ->assertSeeInOrder(['10,50', '4,50']);
     }
 
     private function user(string ...$credentials): User

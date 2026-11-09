@@ -70,8 +70,9 @@ class SiscoservPaymentsTest extends TestCase
         $this->actingAs($this->user());
 
         Livewire::test(SiscoservPayments::class)
-            ->fillForm(['cliente_id' => 7])
-            ->call('send')
+            ->assertSee('Nenhum pagamento encontrado')
+            ->set('tableDeferredFilters.busca.cliente_id', 7)
+            ->call('applyTableFilters')
             ->assertSee(['CLIENTE X', 'AGENTE Y', 'IN', 'ESCRITORIO Z']);
     }
 }

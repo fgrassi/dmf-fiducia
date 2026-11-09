@@ -5,14 +5,12 @@
     $date = fn ($value) => $value ? date('d/m/Y', strtotime($value)) : '';
 @endphp
 
-@if ($report === null)
-    <p style="font-size: .875rem;">Informe o período para gerar o fluxo de caixa.</p>
-@elseif ($report['sea'] === [] && $report['other'] === [])
+@if ($report['sea'] === [] && $report['other'] === [])
     <p style="font-size: .875rem;">Nenhum embarque encontrado para o filtro informado.</p>
 @endif
 
 @foreach ([['sea', 'Armador'], ['other', 'Cia Aérea/Cia Seguro']] as [$key, $carrier])
-    @foreach ($report[$key] ?? [] as $row)
+    @foreach ($report[$key] as $row)
         <div style="overflow-x: auto; font-size: .875rem; margin-bottom: 1.5rem;">
             <table style="width: 100%; border-collapse: collapse; margin-bottom: .5rem;">
                 <tr>

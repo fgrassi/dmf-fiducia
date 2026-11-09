@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Actions\Financeiro\ClientAccountStatement as ClientAccountStatementReport;
 use App\Actions\Financeiro\ExportClientAccountStatement;
+use App\Filament\Livewire\ReportResult;
 use App\Models\Pessoa;
 use BackedEnum;
 use DomainException;
@@ -16,7 +17,7 @@ use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Grid;
-use Filament\Schemas\Components\View;
+use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -45,8 +46,11 @@ class ClientAccountStatement extends Page
     /** @var array<string, mixed>|null */
     public ?array $data = [];
 
-    /** @var array<string, mixed>|null */
-    public ?array $report = null;
+    /** Filtros do último "Enviar": o resultado fica no componente filho, fora do estado da página. */
+    public ?array $applied = null;
+
+    /** Muda a cada "Enviar", para o resultado ser refeito mesmo com os mesmos filtros. */
+    public int $runs = 0;
 
     /** security.yml do módulo (legado): financial, director, manager ou supervisor (admin entra em qualquer módulo). */
     public static function canAccess(): bool
@@ -108,14 +112,20 @@ class ClientAccountStatement extends Page
                                 ->action(fn () => $this->clear()),
                         ]),
                     ]),
-                View::make('filament.pages.client-account-statement')
-                    ->viewData(fn () => ['report' => $this->report]),
+                Livewire::make(ReportResult::class, fn () => [
+                    'action' => ClientAccountStatementReport::class,
+                    'view' => 'filament.pages.client-account-statement',
+                    'arguments' => [$this->applied],
+                ])
+                    ->key('result'.$this->runs)
+                    ->visible(fn () => $this->applied !== null),
             ]);
     }
 
     public function send(): void
     {
-        $this->report = $this->build();
+        $this->applied = $this->form->getState();
+        $this->runs++;
     }
 
     public function excel(): ?StreamedResponse
@@ -128,7 +138,7 @@ class ClientAccountStatement extends Page
     public function clear(): void
     {
         $this->form->fill($this->defaults());
-        $this->report = null;
+        $this->applied = null;
     }
 
     /** @return array<string, mixed>|null null quando falta o cliente ou a data inicial (a mensagem sai como aviso) */

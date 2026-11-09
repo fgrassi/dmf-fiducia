@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Actions\Fiducia\ClientBookingsReport;
+use App\Filament\Livewire\ReportResult;
 use App\Filament\Pages\FiduciaClientBookings;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -27,13 +29,22 @@ class FiduciaClientBookingsTest extends TestCase
         DB::table('fiducia_desconto')->insert(['pessoa_id' => 7, 'moeda_id' => 1, 'valor' => 10, 'tipo_desconto' => 'c']);
         DB::table('embarque')->insert(['embarque_id' => 10, 'booking' => 'BKG-10', 'cliente_id' => 7, 'saida_efetiva' => now()->startOfMonth()->toDateString(), 'finalizado' => 'a']);
 
-        Livewire::test(FiduciaClientBookings::class)
+        $page = Livewire::test(FiduciaClientBookings::class)
             ->fillForm(['listar_embarques' => true])
             ->call('send')
-            ->assertSee(['Cliente Sete', 'BKG-10', 'Confirmado', 'Total'])
-            ->fillForm(['mes_ini' => 12, 'mes_fim' => 1])
-            ->call('send')
+            ->assertSeeLivewire(ReportResult::class);
+
+        Livewire::test(ReportResult::class, $this->resultComponent($page->get('applied')))
+            ->assertSee(['Cliente Sete', 'BKG-10', 'Confirmado', 'Total']);
+
+        Livewire::test(ReportResult::class, $this->resultComponent(['mes_ini' => 12, 'mes_fim' => 1] + $page->get('applied')))
             ->assertNotified('O período início deve ser anterior ou igual ao período fim.');
+    }
+
+    /** @return array<string, mixed> */
+    private function resultComponent(array $filters): array
+    {
+        return ['action' => ClientBookingsReport::class, 'view' => 'filament.pages.fiducia-client-bookings', 'arguments' => [$filters]];
     }
 
     private function user(string ...$credentials): User

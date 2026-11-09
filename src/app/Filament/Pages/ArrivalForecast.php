@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Actions\Financeiro\ArrivalForecastReport;
+use App\Filament\Livewire\ReportResult;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
@@ -12,7 +13,8 @@ use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Grid;
-use Filament\Schemas\Components\View;
+use Filament\Schemas\Components\Livewire;
+use Filament\Schemas\Components\Text;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use UnitEnum;
@@ -40,8 +42,11 @@ class ArrivalForecast extends Page
     /** @var array<string, mixed>|null */
     public ?array $data = [];
 
-    /** @var array{sea: list<array<string, mixed>>, other: list<array<string, mixed>>}|null */
-    public ?array $report = null;
+    /** Filtros do último "Enviar": o resultado fica no componente filho, fora do estado da página. */
+    public ?array $applied = null;
+
+    /** Muda a cada "Enviar", para o resultado ser refeito mesmo com os mesmos filtros. */
+    public int $runs = 0;
 
     /** security.yml do módulo (financial) mais a checagem da ação: admin, manager ou supervisor. */
     public static function canAccess(): bool
@@ -94,15 +99,22 @@ class ArrivalForecast extends Page
                                 ->alpineClickHandler('window.print()'),
                         ]),
                     ]),
-                View::make('filament.pages.arrival-forecast')
-                    ->viewData(fn () => ['report' => $this->report, 'type' => $this->data['tipo'] ?? 'i']),
+                Text::make('Informe o período para gerar o fluxo de caixa.')
+                    ->visible(fn () => $this->applied === null),
+                Livewire::make(ReportResult::class, fn () => [
+                    'action' => ArrivalForecastReport::class,
+                    'view' => 'filament.pages.arrival-forecast',
+                    'arguments' => [$this->applied['tipo'], $this->applied['data_ini'] ?? null, $this->applied['data_fim'] ?? null],
+                    'viewData' => ['type' => $this->applied['tipo']],
+                ])
+                    ->key('result'.$this->runs)
+                    ->visible(fn () => $this->applied !== null),
             ]);
     }
 
     public function send(): void
     {
-        $filters = $this->form->getState();
-
-        $this->report = app(ArrivalForecastReport::class)($filters['tipo'], $filters['data_ini'] ?? null, $filters['data_fim'] ?? null);
+        $this->applied = $this->form->getState();
+        $this->runs++;
     }
 }

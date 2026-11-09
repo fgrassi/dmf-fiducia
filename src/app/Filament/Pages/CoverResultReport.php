@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Actions\AccountingCovers\CoverResultReport as Report;
 use App\Actions\AccountingCovers\ExportCoverResultReport;
+use App\Filament\Livewire\ReportResult;
 use App\Models\CapaProcessoArquivo;
 use App\Models\Embarque;
 use BackedEnum;
@@ -19,7 +20,7 @@ use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Grid;
-use Filament\Schemas\Components\View;
+use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\DB;
@@ -46,6 +47,9 @@ class CoverResultReport extends Page
 
     /** Filtros do último "Buscar": o relatório só muda quando o botão é usado, não a cada campo mexido. */
     public ?array $applied = null;
+
+    /** Muda a cada "Buscar", para o resultado ser refeito mesmo com os mesmos filtros. */
+    public int $runs = 0;
 
     /** security.yml + executeRelatorio (legado): `director`, ou `financial` junto com `manager` ou `supervisor`. */
     public static function canAccess(): bool
@@ -132,8 +136,14 @@ class CoverResultReport extends Page
                                 ->submit('search'),
                         ]),
                     ]),
-                View::make('filament.pages.cover-result-report')
-                    ->viewData(fn () => ['report' => $this->report(), 'options' => $this->applied]),
+                Livewire::make(ReportResult::class, fn () => [
+                    'action' => Report::class,
+                    'view' => 'filament.pages.cover-result-report',
+                    'arguments' => [$this->applied, $this->applied['group_by'] ?? [], $this->applied['categories'] ?? []],
+                    'viewData' => ['options' => $this->applied],
+                ])
+                    ->key('result'.$this->runs)
+                    ->visible(fn () => $this->applied !== null),
             ]);
     }
 
@@ -165,6 +175,7 @@ class CoverResultReport extends Page
         }
 
         $this->applied = $state;
+        $this->runs++;
     }
 
     private function lookup(string $name, string $label, string $table, string $key, string $column = 'nome'): Select
