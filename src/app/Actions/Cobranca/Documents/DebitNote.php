@@ -37,7 +37,7 @@ class DebitNote
         ]);
     }
 
-    private function fill(Worksheet $sheet, FinCharges $charge, ?int $receiptNumber): void
+    public function fill(Worksheet $sheet, FinCharges $charge, ?int $receiptNumber): void
     {
         $e = $charge->embarque;
         $bl = $charge->ref_bl ? DB::table('bl')->where('bl_id', $charge->ref_bl)->first() : null;
