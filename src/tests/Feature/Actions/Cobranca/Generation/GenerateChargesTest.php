@@ -51,6 +51,20 @@ class GenerateChargesTest extends TestCase
         $this->assertCount(1, Storage::disk('tracking_uploads')->files('cobranca'));
     }
 
+    public function test_client_that_splits_by_expense_group_gets_one_charge_per_rule_and_one_for_the_rest(): void
+    {
+        $this->maritimeExportBooking(carrierRequiresInvoice: false);
+        DB::table('fin_expenses')->insert(['id' => 501, 'name' => 'OUTRA TAXA', 'ref_unity' => 5]);
+        DB::table('fin_expenses_values')->insert(['ref_embarque' => self::BOOKING, 'ref_expense' => 501, 'selling_rate' => 40, 'ref_currency_sr' => 1, 'billing' => 'p']);
+        DB::table('fin_clients_nfse_regra')->insert(['id' => 1, 'ref_client' => 100, 'tomador' => 'cliente', 'justificativa' => 'teste', 'separar_nf_grupo_despesas' => 1]);
+        DB::table('regra_despesa_cobranca')->insert(['regra_despesa_cobranca_id' => 7, 'tipo_embarque' => 'm', 'impor_expor' => 'e', 'nome' => 'Frete']);
+        DB::table('regra_despesa_cobranca_item')->insert(['despesa_id' => 500, 'regra_despesa_cobranca_id' => 7]);
+        DB::table('fin_clients_nfse_regra_despesa')->insert(['ref_nfse_regra' => 1, 'regra_despesa_cobranca_id' => 7]);
+
+        $this->assertSame(2, $this->generate());
+        $this->assertEqualsCanonicalizing([100.0, 40.0], DB::table('fin_charges')->where('ref_booking', self::BOOKING)->pluck('total_value')->map(fn ($v) => (float) $v)->all());
+    }
+
     public function test_does_not_charge_booking_already_fully_billed(): void
     {
         $this->maritimeExportBooking(carrierRequiresInvoice: false);

@@ -251,7 +251,7 @@ class GenerateCharges
             return [];
         }
 
-        $groups = $grouped->except(0)
+        $groups = $grouped->filter(fn (Collection $items, int|string $key) => (int) $key !== 0)
             ->map(fn (Collection $items) => ['rule' => $ruleOf[$items->first()->ref_expense]->nome, 'expenses' => $items])
             ->values();
 

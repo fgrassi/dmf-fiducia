@@ -46,6 +46,7 @@ class RecalculateChargeTest extends TestCase
         $charge = DB::table('fin_charges')->first();
         $this->assertSame([120.0, 3.0], [(float) $charge->total_value, (float) $charge->valor_iof]);
         $this->assertSame('recalculo', DB::table('fin_charges_log')->value('acao'));
+        $this->assertSame('Cobrança recalculada (serviço/cron). Total: 120.00', DB::table('fin_charges_log')->value('historico'));
     }
 
     public function test_returns_the_legacy_errors(): void

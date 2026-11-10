@@ -49,7 +49,7 @@ class RecalculateChargeByService
             FinChargesLog::forceCreate([
                 'ref_charge' => $charge->id,
                 'acao' => 'recalculo',
-                'historico' => "Cobrança recalculada (serviço/cron). Total: {$charge->total_value}",
+                'historico' => 'Cobrança recalculada (serviço/cron). Total: '.number_format((float) $charge->total_value, 2, '.', ''),
                 'status_anterior' => $charge->status->value,
                 'status_novo' => $charge->status->value,
                 'created_at' => now(),
