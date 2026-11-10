@@ -81,6 +81,20 @@ class BookingNotesTest extends TestCase
         $this->assertSame("EXW EXPENSES:\n\rInland/PR: US$ 90,00 x 1,00 PR = US$ 90,00", $note->obs);
     }
 
+    public function test_an_exw_expense_without_selling_rate_counts_as_zero_instead_of_breaking(): void
+    {
+        $booking = $this->booking();
+        DB::table('fin_expenses_unities')->insert(['id' => 3, 'name' => 'Processo', 'acronym' => 'PR']);
+        DB::table('fin_expenses')->insert(['id' => 20, 'name' => 'Inland', 'ref_unity' => 3]);
+        $exw = $this->expense($booking, 20, 0, 0, ['flag_exw' => 1, 'selling_rate' => null, 'ref_currency_sr' => 2]);
+
+        $id = app(CreateNote::class)($booking, NoteType::Debit, [$exw], 7);
+
+        $note = DB::table('fin_debit_notes')->find($id);
+        $this->assertEquals(0.0, $note->exw_expenses);
+        $this->assertSame("EXW EXPENSES:\n\rInland/PR: US$ 0,00 x 1,00 PR = US$ 0,00", $note->obs);
+    }
+
     public function test_the_factor_is_the_bl_count_or_the_container_quantity(): void
     {
         $booking = $this->booking(['qtd_bl' => 2]);

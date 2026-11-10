@@ -214,11 +214,12 @@ class OtherOrderItemsTest extends TestCase
         $instruction = DB::table('instrucao_pagamento_outros')->insertGetId(['ordem_pagamento_id' => $order->getKey(), 'created_at' => '2026-10-01']);
         DB::table('instrucao_pagamento_item_outros')->insert(['instrucao_pagamento_outros_id' => $instruction, 'ordem_pagamento_item_id' => $item->getKey(), 'valor' => 1]);
 
-        app(DeleteOtherPaymentOrder::class)($order);
+        app(DeleteOtherPaymentOrder::class)($order, 7);
 
         $this->assertModelMissing($order);
         $this->assertModelExists($other);
         $this->assertSame([0, 0, 1, 1], [DB::table('instrucao_pagamento_outros')->count(), DB::table('instrucao_pagamento_item_outros')->count(), OrdemPagamentoItem::count(), (int) $booking->fresh()->ctr_pgto_outros]);
+        $this->assertSame(['Ordem de Pagamento Excluída', 7], [DB::table('rastreamento')->where('ref_embarque', $booking->getKey())->value('assunto'), (int) DB::table('rastreamento')->where('ref_embarque', $booking->getKey())->value('created_by')]);
     }
 
     /** @param  array<string, mixed>  $attributes */

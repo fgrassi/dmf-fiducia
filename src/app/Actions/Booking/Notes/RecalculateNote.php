@@ -98,7 +98,7 @@ class RecalculateNote
         $container = $v->ref_container ? DB::table('container')->where('container_id', $v->ref_container)->value('numero') : null;
         $currency = (string) DB::table('cmn_currencies')->where('id', $v->ref_currency_sr)->value('symbol');
         $factor = $this->factor($v);
-        $money = fn (float $value) => $currency.' '.number_format($value, 2, ',', '.');
+        $money = fn (?float $value) => $currency.' '.number_format((float) $value, 2, ',', '.');
 
         return $name?->name.'/'.$name?->acronym
             .($equipment ? " ({$equipment})" : '')

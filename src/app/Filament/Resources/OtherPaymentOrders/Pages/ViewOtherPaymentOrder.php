@@ -61,7 +61,7 @@ class ViewOtherPaymentOrder extends ViewRecord
                 ->modalHeading('Excluir a ordem de pagamento?')
                 ->modalDescription('Apaga a ordem, os itens e as instruções de pagamento e devolve a reserva à fila de pagamento de outros.')
                 ->action(function (OrdemPagamento $record) {
-                    app(DeleteOtherPaymentOrder::class)($record);
+                    app(DeleteOtherPaymentOrder::class)($record, auth()->id());
                     Notification::make()->title('Registro excluído com sucesso.')->success()->send();
 
                     return redirect(OtherPaymentOrderResource::getUrl());

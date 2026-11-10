@@ -29,12 +29,29 @@ class ClientShipmentCostsPdf
     /** @param  array{client: string, shipments: list<array<string, mixed>>}  $report */
     public function render(array $report, string $from, string $to): TCPDF
     {
-        $pdf = new TCPDF('L', 'mm', 'A4', true);
+        // customPdf do legado: "Página X/N" no topo e, no rodapé, título, direitos e "Página X/N"
+        $pdf = new class('L', 'mm', 'A4', true) extends TCPDF
+        {
+            public function Header(): void
+            {
+                $this->SetFont('helvetica', 'B', 8);
+                $this->Cell(0, 10, 'Página '.$this->getAliasNumPage().'/'.$this->getAliasNbPages(), 0, false, 'R', false, '', 0, false, 'T', 'M');
+            }
+
+            public function Footer(): void
+            {
+                $this->SetFont('helvetica', 'B', 8);
+                $this->Cell(70, 10, 'Relatório de Custos de Embarques', 0, false, 'L', false, '', 0, false, 'T', 'M');
+                $this->Cell(50, 10, '© '.date('Y').' DMF Logistics do Brasil LTDA (www.dmflog.com.br)', 0, false, 'C', false, '', 0, false);
+                $this->Cell(0, 10, 'Página '.$this->getAliasNumPage().'/'.$this->getAliasNbPages(), 0, false, 'R', false, '', 0, false, 'T', 'M');
+            }
+        };
         $pdf->SetCreator('DMF Logistics');
         $pdf->SetAuthor('DMF Logistics');
         $pdf->SetTitle('DMF Logistics - Relatório de Custos de Embarques');
-        $pdf->setPrintHeader(false);
-        $pdf->setPrintFooter(false);
+        $pdf->setPrintHeader(true);
+        $pdf->setPrintFooter(true);
+        $pdf->SetFooterMargin(10);
         $pdf->SetMargins(10, 10, 10, 10);
         $pdf->SetAutoPageBreak(true, 7);
         $pdf->AddPage();
@@ -119,7 +136,8 @@ class ClientShipmentCostsPdf
             $pdf->Ln();
         }
 
-        $pdf->Ln(8);
+        // o legado fechava o bloco com 1 linha em branco (4 mm) e, sem agente, com 4 (as linhas do agente ficavam vazias)
+        $pdf->Ln($agent ? 4 : 16);
     }
 
     private function item(TCPDF $pdf, string $name, float|int $rate, string $unit, float|int $index, float|int $value): void

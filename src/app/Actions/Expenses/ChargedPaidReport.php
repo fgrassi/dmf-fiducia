@@ -328,7 +328,8 @@ class ChargedPaidReport
             $this->between($query, $paymentDate, $filters);
         }
 
-        return $orders->union($others);
+        // `in ((select …) union (select …))` não existe no MySQL: a união vai numa tabela derivada
+        return DB::query()->fromSub($orders->union($others), 'u')->select('u.ref_expense');
     }
 
     /** @param  array<string, mixed>  $filters */
