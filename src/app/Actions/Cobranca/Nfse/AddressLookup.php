@@ -133,6 +133,43 @@ class AddressLookup
     }
 
     /**
+     * Cadastro completo do CNPJ na OpenCNPJ (a mesma consulta que o CRM faz na tela do cliente), cacheado por 1 dia.
+     *
+     * @return array{data:?array<string, mixed>, erro:?string}
+     */
+    public function openCnpjData(string $cnpj): array
+    {
+        $cnpj = ServiceTaker::normalizeCnpj($cnpj);
+        $cacheKey = "opencnpj-{$cnpj}";
+
+        if ($cached = Cache::get($cacheKey)) {
+            return ['data' => $cached, 'erro' => null];
+        }
+
+        try {
+            $response = Http::timeout(self::TIMEOUT)->connectTimeout(3)->acceptJson()->get("https://api.opencnpj.org/{$cnpj}");
+        } catch (ConnectionException) {
+            return ['data' => null, 'erro' => 'Não foi possível consultar o CNPJ na OpenCNPJ. Tente novamente em instantes.'];
+        }
+
+        $data = $response->json();
+        $error = match (true) {
+            in_array($response->status(), [400, 404], true) => 'CNPJ não encontrado na OpenCNPJ.',
+            $response->status() === 429 => 'O limite de consultas da OpenCNPJ foi atingido. Aguarde um momento e tente novamente.',
+            ! $response->successful() => 'A consulta de CNPJ está temporariamente indisponível.',
+            ! is_array($data) || empty($data['cnpj']) => 'A consulta de CNPJ retornou dados em um formato inesperado.',
+            default => null,
+        };
+
+        // Só cacheia resposta válida por 1 dia: erro, 404 e limite de consultas não podem ficar presos.
+        if (! $error) {
+            Cache::put($cacheKey, $data, now()->addDay());
+        }
+
+        return ['data' => $error ? null : $data, 'erro' => $error];
+    }
+
+    /**
      * buildEnderecoTomadorFromOpenCnpj: endereço do CNPJ (o IBGE vem da API ou é resolvido pelo nome do município).
      *
      * @return array{endereco:array<string, string>, erro:?string, razao_social:string, municipio:string, pais:string}
@@ -147,20 +184,7 @@ class AddressLookup
             return ['endereco' => $empty, 'erro' => 'CNPJ do tomador inválido para consulta na OpenCNPJ.'] + $extra;
         }
 
-        try {
-            $response = Http::timeout(self::TIMEOUT)->connectTimeout(3)->acceptJson()->get("https://api.opencnpj.org/{$cnpj}");
-        } catch (ConnectionException) {
-            return ['endereco' => $empty, 'erro' => 'Não foi possível consultar o CNPJ na OpenCNPJ. Tente novamente em instantes.'] + $extra;
-        }
-
-        $data = $response->json();
-        $error = match (true) {
-            in_array($response->status(), [400, 404], true) => 'CNPJ não encontrado na OpenCNPJ.',
-            $response->status() === 429 => 'O limite de consultas da OpenCNPJ foi atingido. Aguarde um momento e tente novamente.',
-            ! $response->successful() => 'A consulta de CNPJ está temporariamente indisponível.',
-            ! is_array($data) || empty($data['cnpj']) => 'A consulta de CNPJ retornou dados em um formato inesperado.',
-            default => null,
-        };
+        ['data' => $data, 'erro' => $error] = $this->openCnpjData($cnpj);
 
         if ($error) {
             return ['endereco' => $empty, 'erro' => $error] + $extra;
