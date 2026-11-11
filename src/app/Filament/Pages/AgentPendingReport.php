@@ -83,6 +83,7 @@ class AgentPendingReport extends Page implements HasTable
         return $table
             ->records(fn (): Collection => $this->summary()->keyBy('pessoa_id'))
             ->paginated(false)
+            ->extraAttributes(['class' => '[&_.fi-ta-actions]:flex-col [&_.fi-ta-actions]:items-start'], merge: true)
             ->description(fn () => 'Total '.$this->money($this->summary()->sum('total')))
             ->emptyStateHeading('Nenhum agente encontrado')
             ->headerActions([
@@ -97,7 +98,9 @@ class AgentPendingReport extends Page implements HasTable
             ])
             ->columns([
                 TextColumn::make('agente')
-                    ->label('Agente'),
+                    ->label('Agente')
+                    ->searchable()
+                    ->wrap(),
                 TextColumn::make('data_limite_cambio')
                     ->label('Data Limite Câmbio')
                     ->date('d/m/Y')
@@ -116,13 +119,13 @@ class AgentPendingReport extends Page implements HasTable
                     ->alignEnd()
                     ->formatStateUsing(fn ($state) => $this->money((float) $state)),
                 TextColumn::make('data_obs')
-                    ->label('Último Histórico')
-                    ->date('d/m/Y'),
+                    ->label('Histórico')
+                    ->date('d/m/Y')
+                    ->icon(Heroicon::OutlinedChatBubbleLeftEllipsis)
+                    ->placeholder('incluir')
+                    ->action($this->historyAction()),
             ])
-            ->recordActions([
-                $this->historyAction(),
-                ...$this->statementActions(),
-            ]);
+            ->recordActions($this->statementActions());
     }
 
     private function limitAction(): Action
@@ -145,8 +148,6 @@ class AgentPendingReport extends Page implements HasTable
     private function historyAction(): Action
     {
         return Action::make('history')
-            ->label('Histórico')
-            ->icon(Heroicon::OutlinedChatBubbleLeftEllipsis)
             ->modalHeading(fn (array $record) => 'Histórico para '.$record['agente'])
             ->modalSubmitActionLabel('Salvar')
             ->fillForm(fn (array $record) => ['items' => DB::table('agente_observacao')
