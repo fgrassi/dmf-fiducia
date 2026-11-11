@@ -133,7 +133,7 @@ class AddressLookup
     }
 
     /**
-     * Cadastro completo do CNPJ na OpenCNPJ (a mesma consulta que o CRM faz na tela do cliente), cacheado por 1 dia.
+     * Cadastro completo do CNPJ na OpenCNPJ (a mesma consulta que o CRM faz na tela do cliente), cacheado por 1 hora.
      *
      * @return array{data:?array<string, mixed>, erro:?string}
      */
@@ -161,9 +161,9 @@ class AddressLookup
             default => null,
         };
 
-        // Só cacheia resposta válida por 1 dia: erro, 404 e limite de consultas não podem ficar presos.
+        // Só cacheia resposta válida por 1 hora: erro, 404 e limite de consultas não podem ficar presos.
         if (! $error) {
-            Cache::put($cacheKey, $data, now()->addDay());
+            Cache::put($cacheKey, $data, now()->addHour());
         }
 
         return ['data' => $error ? null : $data, 'erro' => $error];

@@ -163,7 +163,7 @@ class CnpjReviewResourceTest extends TestCase
             ->assertSeeHtml(CompanyResource::getUrl('edit', ['record' => 1]));
     }
 
-    public function test_open_cnpj_lookup_is_cached_for_one_day_but_errors_are_not(): void
+    public function test_open_cnpj_lookup_is_cached_for_one_hour_but_errors_are_not(): void
     {
         $this->actingAs($this->user());
         Http::fake([
@@ -180,7 +180,7 @@ class CnpjReviewResourceTest extends TestCase
         $this->assertNull($lookup->openCnpjData('11222333000181')['erro']);
         Http::assertSentCount(3);
 
-        $this->travel(25)->hours();
+        $this->travel(61)->minutes();
         $lookup->openCnpjData('06990590000123');
         Http::assertSentCount(4);
     }
