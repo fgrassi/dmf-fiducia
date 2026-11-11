@@ -4,6 +4,7 @@ namespace App\Filament\Resources\CnpjReviews;
 
 use App\Actions\Cobranca\Nfse\AddressLookup;
 use App\Actions\Cobranca\Nfse\ServiceTaker;
+use App\Actions\ConsultaCnpj\CompareCompanyAddress;
 use App\Actions\ConsultaCnpj\RegisterCnpjReview;
 use App\Filament\Resources\CnpjReviews\Pages\ListCnpjReviews;
 use App\Filament\Resources\Companies\CompanyResource;
@@ -98,16 +99,12 @@ class CnpjReviewResource extends Resource
         app(RegisterCnpjReview::class)($companyId, (int) $data['status'], $data['observacao'] ?? null, (int) auth()->id());
     }
 
-    /** Cadastro da OpenCNPJ em infolist (o modal pede o schema mais de uma vez, então a consulta fica memorizada por requisição). */
+    /** Cadastro da OpenCNPJ em infolist; o modal monta o schema mais de uma vez, e o cache de 1 dia do AddressLookup evita chamadas repetidas. */
     public static function openCnpjSchema(string $cnpj): array
     {
-        static $lookups = [];
-
-        $lookups[$cnpj] ??= ServiceTaker::validCnpj($cnpj)
+        ['data' => $company, 'erro' => $error] = ServiceTaker::validCnpj($cnpj)
             ? app(AddressLookup::class)->openCnpjData($cnpj)
             : ['data' => null, 'erro' => 'Informe um CNPJ válido com 14 caracteres.'];
-
-        ['data' => $company, 'erro' => $error] = $lookups[$cnpj];
 
         if ($error) {
             return [Text::make($error)->color('danger')];
@@ -128,6 +125,12 @@ class CnpjReviewResource extends Resource
         $normalized = ServiceTaker::normalizeCnpj($cnpj);
         $registered = Pessoa::query()->whereIn('cnpj', array_unique([$cnpj, $normalized, ServiceTaker::formatDocument($normalized)]))->first();
 
+        $differences = $registered ? app(CompareCompanyAddress::class)($company, $registered) : [];
+        // Campo do endereço: em vermelho, com o valor do cadastro ao lado, quando diverge do cadastro da empresa.
+        $addressEntry = fn (string $field, string $label, mixed $state) => $entry($label, $state)
+            ->color(isset($differences[$field]) ? 'danger' : null)
+            ->hint(isset($differences[$field]) ? "Cadastro: {$differences[$field]}" : null)
+            ->hintColor('danger');
         $name = (string) ($company['razao_social'] ?? 'Empresa');
         $title = $registered && CompanyResource::canEdit($registered)
             ? new HtmlString(sprintf(
@@ -160,15 +163,20 @@ class CnpjReviewResource extends Resource
                     $entry('E-mail', $company['email'] ?? null)->columnSpanFull(),
                 ]),
             Section::make('Endereço')
+                ->description(match (true) {
+                    ! $registered => null,
+                    $differences !== [] => 'Em vermelho: diferente do cadastro da empresa.',
+                    default => 'Confere com o cadastro da empresa.',
+                })
                 ->icon(Heroicon::OutlinedMapPin)
                 ->columns(4)
                 ->schema([
-                    $entry('CEP', $cep)->copyable(),
-                    $entry('Logradouro', trim(($company['tipo_logradouro'] ?? '').' '.($company['logradouro'] ?? '')))->columnSpan(2),
-                    $entry('Número', $company['numero'] ?? null),
-                    $entry('Complemento', $company['complemento'] ?? null)->columnSpan(2),
-                    $entry('Bairro', $company['bairro'] ?? null),
-                    $entry('Município / UF', trim(($company['municipio'] ?? '').' - '.($company['uf'] ?? ''), ' -')),
+                    $addressEntry('cep', 'CEP', $cep)->copyable(),
+                    $addressEntry('logradouro', 'Logradouro', trim(($company['tipo_logradouro'] ?? '').' '.($company['logradouro'] ?? '')))->columnSpan(2),
+                    $addressEntry('numero', 'Número', $company['numero'] ?? null),
+                    $addressEntry('complemento', 'Complemento', $company['complemento'] ?? null)->columnSpan(2),
+                    $addressEntry('bairro', 'Bairro', $company['bairro'] ?? null),
+                    $addressEntry('municipio', 'Município / UF', trim(($company['municipio'] ?? '').' - '.($company['uf'] ?? ''), ' -')),
                 ]),
             Section::make('Atividades econômicas (CNAE)')
                 ->icon(Heroicon::OutlinedBriefcase)

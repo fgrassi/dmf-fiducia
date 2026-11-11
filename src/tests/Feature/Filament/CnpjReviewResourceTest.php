@@ -3,6 +3,7 @@
 namespace Tests\Feature\Filament;
 
 use App\Actions\Cobranca\Nfse\AddressLookup;
+use App\Actions\ConsultaCnpj\CompareCompanyAddress;
 use App\Actions\ConsultaCnpj\RegisterCnpjReview;
 use App\Filament\Resources\CnpjReviews\Pages\ListCnpjReviews;
 use App\Filament\Resources\Companies\CompanyResource;
@@ -10,6 +11,7 @@ use App\Models\ConsultaCnpj;
 use App\Models\Pessoa;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -181,6 +183,45 @@ class CnpjReviewResourceTest extends TestCase
         $this->travel(25)->hours();
         $lookup->openCnpjData('06990590000123');
         Http::assertSentCount(4);
+    }
+
+    public function test_address_is_checked_against_the_registered_company(): void
+    {
+        $this->actingAs($this->user());
+        DB::table('estados')->insert(['estados_id' => 1, 'uf' => 'SP', 'nome' => 'São Paulo']);
+        DB::table('cidades')->insert(['cidades_id' => 1, 'estados_id' => 1, 'nome' => 'São Paulo']);
+        DB::table('pessoa')->where('pessoa_id', 1)->update([
+            'cnpj' => '06990590000123',
+            'cep' => '01310-200',
+            'endereco' => 'Av. Paulista, 1000 - conj 12',
+            'bairro' => 'Bela Vista',
+            'cidades_id' => 1,
+        ]);
+        $company = [
+            'cnpj' => '06990590000123', 'cep' => '01310100', 'tipo_logradouro' => 'AVENIDA', 'logradouro' => 'PAULISTA',
+            'numero' => '1000', 'complemento' => 'CONJ 12', 'bairro' => 'BELA VISTA', 'municipio' => 'SAO PAULO', 'uf' => 'SP',
+        ];
+
+        // só o CEP diverge
+        $this->assertSame(['cep' => '01310-200'], app(CompareCompanyAddress::class)($company, Pessoa::find(1)));
+
+        // número, bairro e cidade divergentes; campos vazios na API não contam
+        $diff = app(CompareCompanyAddress::class)([...$company, 'cep' => '01310200', 'numero' => '2000', 'bairro' => 'Centro', 'municipio' => 'CAMPINAS', 'complemento' => null], Pessoa::find(1));
+        $this->assertSame(['numero', 'bairro', 'municipio'], array_keys($diff));
+        $this->assertSame('São Paulo - SP', $diff['municipio']);
+
+        Http::fake(['api.opencnpj.org/*' => Http::response($company)]);
+        Livewire::test(ListCnpjReviews::class)
+            ->mountTableAction('openCnpj', Pessoa::find(1))
+            ->assertMountedActionModalSee('Em vermelho: diferente do cadastro da empresa.')
+            ->assertMountedActionModalSee('Cadastro: 01310-200');
+
+        DB::table('pessoa')->where('pessoa_id', 1)->update(['cep' => '01310100']);
+        Cache::flush();
+        Livewire::test(ListCnpjReviews::class)
+            ->mountTableAction('openCnpj', Pessoa::find(1))
+            ->assertMountedActionModalSee('Confere com o cadastro da empresa.')
+            ->assertMountedActionModalDontSee('Cadastro: ');
     }
 
     public function test_requires_financial_and_import_credentials(): void
