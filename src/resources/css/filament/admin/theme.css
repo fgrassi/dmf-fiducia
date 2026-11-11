@@ -72,3 +72,14 @@ html {
 .fi-order-totals .fi-in-entry-content {
     width: auto;
 }
+
+/*
+ * Hover em todas as linhas das tabelas (o Filament só aplica nas linhas clicáveis).
+ */
+.fi-ta-row:not(.fi-ta-summary-header-row, .fi-ta-individual-search-row):hover {
+    background-color: var(--color-gray-50);
+}
+
+.dark .fi-ta-row:not(.fi-ta-summary-header-row, .fi-ta-individual-search-row):hover {
+    background-color: color-mix(in oklab, var(--color-white) 5%, transparent);
+}

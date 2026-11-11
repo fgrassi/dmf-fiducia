@@ -216,6 +216,8 @@ class TaReportTest extends TestCase
         $this->booking(2, 'BKG-B');
 
         Livewire::test(TaReport::class)
+            ->assertDontSee(['BKG-A', 'BKG-B'])
+            ->call('applyTableFilters')
             ->assertSee(['BKG-A', 'BKG-B'])
             ->selectTableRecords([1])
             ->callAction(TestAction::make('baixar')->table()->bulk(), ['taxa' => 5, 'pagamentos' => [['embarque_id' => 1, 'valor_pago' => 250]]])

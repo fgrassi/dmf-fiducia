@@ -45,7 +45,12 @@ use UnitEnum;
  */
 class TaReport extends Page implements HasTable
 {
-    use InteractsWithTable;
+    use InteractsWithTable {
+        applyTableFilters as protected applyFiltersFromTrait;
+    }
+
+    /** Como no legado, a lista só carrega depois do primeiro "Enviar". */
+    public bool $searched = false;
 
     protected static ?string $title = 'Relatório TA';
 
@@ -67,6 +72,12 @@ class TaReport extends Page implements HasTable
 
         return (bool) ($user?->hasLegacyCredential(['manager', 'director'])
             || ($user?->hasLegacyCredential('financial') && $user?->hasLegacyCredential('supervisor')));
+    }
+
+    public function applyTableFilters(): void
+    {
+        $this->searched = true;
+        $this->applyFiltersFromTrait();
     }
 
     public function content(Schema $schema): Schema
@@ -91,7 +102,7 @@ class TaReport extends Page implements HasTable
     public function table(Table $table): Table
     {
         return $table
-            ->records(fn (TaReportQuery $report): Collection => $report($this->search())->keyBy('embarque_id'))
+            ->records(fn (TaReportQuery $report): Collection => $this->searched ? $report($this->search())->keyBy('embarque_id') : collect())
             ->paginated(false)
             ->heading(function (): string {
                 $rows = $this->getTableRecords();
@@ -99,7 +110,7 @@ class TaReport extends Page implements HasTable
 
                 return $rows->isEmpty() ? '' : "Total: {$rows->count()} reservas · TA {$format('total_ta')} · Valor pago {$format('valor_pago')} · Saldo {$format('saldo')}";
             })
-            ->emptyStateHeading('Nenhum registro encontrado')
+            ->emptyStateHeading(fn (): string => $this->searched ? 'Nenhum registro encontrado' : 'Use os filtros e clique em Enviar')
             ->recordClasses(fn (array $record) => filled($record['saida_efetiva']) ? 'bg-green-100 dark:bg-green-950/40' : null)
             ->selectable()
             ->filtersLayout(FiltersLayout::AboveContent)
@@ -157,15 +168,20 @@ class TaReport extends Page implements HasTable
             ->columns([
                 TextColumn::make('shipper')
                     ->label('Shipper')
-                    ->wrap(),
+                    ->wrap()
+                    ->searchable(),
                 TextColumn::make('booking')
-                    ->label('Booking'),
+                    ->label('Booking')
+                    ->searchable(),
                 TextColumn::make('fatura')
                     ->label('Nr. Fatura'),
                 TextColumn::make('origem')
-                    ->label('Origem'),
+                    ->label('Origem')
+                    ->searchable(),
                 TextColumn::make('destino')
-                    ->label('Destino'),
+                    ->label('Destino')
+                    ->wrap()
+                    ->searchable(),
                 TextColumn::make('etd')
                     ->label('ETD')
                     ->date('d/m/Y'),
