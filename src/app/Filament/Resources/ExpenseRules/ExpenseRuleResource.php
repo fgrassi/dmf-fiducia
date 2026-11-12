@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ExpenseRules;
 
 use App\Actions\ExpenseRules\DeleteExpenseRule;
 use App\Filament\Resources\ExpenseRules\Pages\ManageExpenseRules;
+use App\Filament\Support\OperationBadge;
 use App\Models\RegraDespesaCobranca;
 use BackedEnum;
 use Filament\Actions\DeleteAction;
@@ -92,9 +93,8 @@ class ExpenseRuleResource extends Resource
                 TextColumn::make('tipo_embarque')
                     ->label('Tipo')
                     ->formatStateUsing(fn ($state) => RegraDespesaCobranca::TIPOS_EMBARQUE[$state] ?? $state),
-                TextColumn::make('impor_expor')
-                    ->label('Impo / Expo')
-                    ->formatStateUsing(fn ($state) => RegraDespesaCobranca::IMPOR_EXPOR[$state] ?? $state),
+                OperationBadge::column()
+                    ->label('Impo / Expo'),
                 IconColumn::make('obrigatoria')
                     ->label('Obrigatória')
                     ->boolean(),

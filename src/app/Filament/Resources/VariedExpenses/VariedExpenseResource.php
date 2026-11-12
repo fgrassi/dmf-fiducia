@@ -5,7 +5,9 @@ namespace App\Filament\Resources\VariedExpenses;
 use App\Actions\VariedExpenses\BookingExpenseLines;
 use App\Actions\VariedExpenses\DeleteVariedExpense;
 use App\Actions\VariedExpenses\SaveVariedExpense;
+use App\Enums\OperationType;
 use App\Filament\Resources\VariedExpenses\Pages\ManageVariedExpenses;
+use App\Filament\Support\OperationBadge;
 use App\Models\CmnCurrency;
 use App\Models\Embarque;
 use App\Models\FinDespesasVariadas;
@@ -103,7 +105,7 @@ class VariedExpenseResource extends Resource
                     ->required(),
                 Select::make('impor_expor')
                     ->label('Tipo Embarque')
-                    ->options(Embarque::OPERATIONS)
+                    ->options(OperationType::options())
                     ->default('i')
                     ->selectablePlaceholder(false)
                     ->required(),
@@ -162,9 +164,8 @@ class VariedExpenseResource extends Resource
                 TextColumn::make('data_despesa')
                     ->label('Data')
                     ->date('d/m/Y'),
-                TextColumn::make('impor_expor')
-                    ->label('Tipo Embarque')
-                    ->formatStateUsing(fn (?string $state) => Embarque::OPERATIONS[$state] ?? ''),
+                OperationBadge::column()
+                    ->label('Tipo Embarque'),
                 TextColumn::make('tipo_nota')
                     ->label('Tipo Nota')
                     ->formatStateUsing(fn (?string $state) => FinDespesasVariadas::NOTE_TYPES[$state] ?? ''),
@@ -228,7 +229,7 @@ class VariedExpenseResource extends Resource
                     ->getOptionLabelUsing(fn ($value) => Pessoa::query()->whereKey($value)->value('nome')),
                 SelectFilter::make('impor_expor')
                     ->label('Tipo Embarque')
-                    ->options(Embarque::OPERATIONS),
+                    ->options(OperationType::options()),
             ])
             ->recordActions([
                 EditAction::make()

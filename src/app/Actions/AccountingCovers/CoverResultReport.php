@@ -3,6 +3,7 @@
 namespace App\Actions\AccountingCovers;
 
 use App\Actions\Booking\ExportQuotationReferences;
+use App\Enums\OperationType;
 use App\Models\Embarque;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -309,7 +310,7 @@ class CoverResultReport
     {
         return 'TOTAL '.match ($group) {
             'tipo_embarque' => mb_strtoupper(Embarque::TYPES[$value] ?? $value),
-            'impo_expo' => mb_strtoupper(Embarque::OPERATIONS[$value] ?? $value),
+            'impo_expo' => mb_strtoupper(OperationType::labelFor($value)),
             default => $value,
         };
     }

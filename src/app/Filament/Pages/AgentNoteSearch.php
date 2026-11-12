@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Actions\AgentNotes\AgentNoteLists;
 use App\Filament\Resources\VariedExpenses\VariedExpenseResource;
+use App\Filament\Support\OperationBadge;
 use App\Models\Pessoa;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -124,13 +125,8 @@ class AgentNoteSearch extends Page implements HasTable
                 TextColumn::make('created_at')
                     ->label('Data')
                     ->date('d/m/Y'),
-                TextColumn::make('tipo_embarque')
-                    ->label('Tipo Embarque')
-                    ->formatStateUsing(fn ($state) => match ($state) {
-                        'i' => 'Importação',
-                        'e' => 'Exportação',
-                        default => '',
-                    }),
+                OperationBadge::column('tipo_embarque')
+                    ->label('Tipo Embarque'),
                 TextColumn::make('tipo')
                     ->label('Tipo Nota')
                     ->state(fn (array $record) => ($record['tipo'] === 'c' || $record['tipo_nota'] == 1 && $record['tipo'] === 'v') ? 'Crédito' : (($record['tipo'] === 'd' || $record['tipo_nota'] == 2) ? 'Débito' : '')),

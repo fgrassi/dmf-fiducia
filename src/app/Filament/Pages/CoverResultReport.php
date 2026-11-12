@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Actions\AccountingCovers\CoverResultReport as Report;
 use App\Actions\AccountingCovers\ExportCoverResultReport;
+use App\Enums\OperationType;
 use App\Filament\Livewire\ReportResult;
 use App\Models\CapaProcessoArquivo;
 use App\Models\Embarque;
@@ -82,7 +83,7 @@ class CoverResultReport extends Page
                         $this->lookup('agent_id', 'Agente', 'pessoa', 'pessoa_id'),
                         Select::make('operation')
                             ->label('Impo/Expo')
-                            ->options(Embarque::OPERATIONS),
+                            ->options(OperationType::options()),
                         $this->lookup('origin_country_id', 'País de origem', 'paises', 'paises_id'),
                         $this->lookup('origin_port_id', 'Porto de origem', 'porto', 'porto_id'),
                         TextInput::make('house_bl')

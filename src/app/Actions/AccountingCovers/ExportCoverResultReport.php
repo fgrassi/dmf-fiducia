@@ -2,6 +2,7 @@
 
 namespace App\Actions\AccountingCovers;
 
+use App\Enums\OperationType;
 use App\Models\Embarque;
 use Illuminate\Support\Carbon;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
@@ -72,7 +73,7 @@ class ExportCoverResultReport
             $row->house_bl,
             $row->client,
             $isCover ? mb_strtoupper(Embarque::TYPES[$row->tipo_embarque] ?? '') : 'Capa Manual',
-            $isCover ? Embarque::OPERATIONS[$row->operation] : '',
+            $isCover ? OperationType::labelFor($row->operation) : '',
             $row->mercadoria,
             $row->pais_origem,
             $row->porto_origem,

@@ -6,6 +6,7 @@ use App\Filament\Resources\NfseOperations\Pages\CreateNfseOperation;
 use App\Filament\Resources\NfseOperations\Pages\EditNfseOperation;
 use App\Filament\Resources\NfseOperations\Pages\ListNfseOperations;
 use App\Filament\Resources\NfseOperations\RelationManagers\ExpenseLinksRelationManager;
+use App\Filament\Support\OperationBadge;
 use App\Models\ConfigNfseOperacao;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
@@ -220,11 +221,8 @@ class NfseOperationResource extends Resource
                 TextColumn::make('nome')
                     ->label('Nome')
                     ->searchable(),
-                TextColumn::make('impor_expor')
-                    ->label('Impo/Expo')
-                    ->badge()
-                    ->formatStateUsing(fn ($state) => ConfigNfseOperacao::IMPOR_EXPOR[$state] ?? $state)
-                    ->color(fn ($state) => $state === 'e' ? 'info' : 'warning'),
+                OperationBadge::column()
+                    ->label('Impo/Expo'),
                 TextColumn::make('codigo_tributacao_nacional')
                     ->label('cTribNac'),
                 TextColumn::make('codigo_nbs')

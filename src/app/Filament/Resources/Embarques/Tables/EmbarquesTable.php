@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Embarques\Tables;
 
+use App\Enums\OperationType;
+use App\Filament\Support\OperationBadge;
 use App\Models\Embarque;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
@@ -19,9 +21,8 @@ class EmbarquesTable
                     ->label('Reserva')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('impor_expor')
-                    ->label('Operação')
-                    ->formatStateUsing(fn (?string $state) => Embarque::OPERATIONS[$state] ?? $state),
+                OperationBadge::column()
+                    ->label('Operação'),
                 TextColumn::make('tipo_embarque')
                     ->label('Modal')
                     ->formatStateUsing(fn (?string $state) => Embarque::TYPES[$state] ?? $state),
@@ -47,7 +48,7 @@ class EmbarquesTable
             ->filters([
                 SelectFilter::make('impor_expor')
                     ->label('Operação')
-                    ->options(Embarque::OPERATIONS),
+                    ->options(OperationType::options()),
                 SelectFilter::make('tipo_embarque')
                     ->label('Modal')
                     ->options(Embarque::TYPES),

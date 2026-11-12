@@ -19,8 +19,6 @@ class Embarque extends Model
         'd' => 'Descartado',
     ];
 
-    public const OPERATIONS = ['i' => 'Importação', 'e' => 'Exportação'];
-
     /** tipo_embarque: modal da reserva. */
     public const TYPES = [
         'm' => 'Marítimo',

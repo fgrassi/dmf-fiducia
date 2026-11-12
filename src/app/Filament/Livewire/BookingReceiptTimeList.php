@@ -3,6 +3,7 @@
 namespace App\Filament\Livewire;
 
 use App\Actions\Financeiro\BookingReceiptTimeReport;
+use App\Filament\Support\OperationBadge;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
@@ -71,9 +72,8 @@ class BookingReceiptTimeList extends Component implements HasActions, HasSchemas
                 TextColumn::make('cliente_nome')
                     ->label('Cliente')
                     ->visible(fn () => ! $this->summaryOnly()),
-                TextColumn::make('impor_expor')
+                OperationBadge::column()
                     ->label('Tipo')
-                    ->formatStateUsing(fn ($state) => BookingReceiptTimeReport::TYPES[$state] ?? $state)
                     ->visible(fn () => ! $this->summaryOnly()),
                 TextColumn::make('prazo_imp')
                     ->label('Prazo IMPO')
