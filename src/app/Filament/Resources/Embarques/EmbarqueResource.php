@@ -4,15 +4,18 @@ namespace App\Filament\Resources\Embarques;
 
 use App\Filament\Resources\Embarques\Pages\ListEmbarques;
 use App\Filament\Resources\Embarques\Pages\ViewEmbarque;
+use App\Filament\Resources\Embarques\RelationManagers\ArrivalConfirmationsRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\CommissionsRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\CreditNotesRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\DebitNotesRelationManager;
+use App\Filament\Resources\Embarques\RelationManagers\DepartureConfirmationsRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\ExpensesRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\FreightInvoicesRelationManager;
 use App\Filament\Resources\Embarques\Schemas\EmbarqueInfolist;
 use App\Filament\Resources\Embarques\Tables\EmbarquesTable;
 use App\Models\Embarque;
 use BackedEnum;
+use Filament\Resources\RelationManagers\RelationGroup;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -57,11 +60,19 @@ class EmbarqueResource extends Resource
     public static function getRelations(): array
     {
         return [
-            ExpensesRelationManager::class,
-            CommissionsRelationManager::class,
+            RelationGroup::make('Despesas', [
+                ExpensesRelationManager::class,
+                CommissionsRelationManager::class,
+            ]),
+            RelationGroup::make('Notas', [
+                DebitNotesRelationManager::class,
+                CreditNotesRelationManager::class,
+            ]),
+            RelationGroup::make('Confirmação', [
+                DepartureConfirmationsRelationManager::class,
+                ArrivalConfirmationsRelationManager::class,
+            ]),
             FreightInvoicesRelationManager::class,
-            CreditNotesRelationManager::class,
-            DebitNotesRelationManager::class,
         ];
     }
 

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
@@ -40,9 +41,42 @@ class Embarque extends Model
         return $this->belongsTo(Pessoa::class, 'cliente_id', 'pessoa_id');
     }
 
+    /** Exportador (shipper): no legado fica em pessoa_id_cliente. */
+    public function exportador(): BelongsTo
+    {
+        return $this->belongsTo(Pessoa::class, 'pessoa_id_cliente', 'pessoa_id');
+    }
+
+    public function vendedor(): BelongsTo
+    {
+        return $this->belongsTo(Vendedor::class, 'vendedor_id', 'vendedor_id');
+    }
+
+    /** Agente: pessoa_id_representante no legado. */
+    public function agente(): BelongsTo
+    {
+        return $this->belongsTo(Pessoa::class, 'pessoa_id_representante', 'pessoa_id');
+    }
+
     public function importador(): BelongsTo
     {
         return $this->belongsTo(Pessoa::class, 'pessoa_id_importador', 'pessoa_id');
+    }
+
+    /** Contatos da reserva por parte (tabelas embarque_contato_*, ligadas a usuario). */
+    public function clientContacts(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'embarque_contato_cliente', 'embarque_id', 'usuario_id');
+    }
+
+    public function importerContacts(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'embarque_contato_importador', 'embarque_id', 'usuario_id');
+    }
+
+    public function shipperContacts(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'embarque_contato', 'embarque_id', 'usuario_id');
     }
 
     public function armador(): BelongsTo
@@ -66,6 +100,16 @@ class Embarque extends Model
     public function bls(): HasMany
     {
         return $this->hasMany(Bl::class, 'embarque_id', 'embarque_id');
+    }
+
+    public function departureConfirmations(): HasMany
+    {
+        return $this->hasMany(DepartureConfirmation::class, 'ref_embarque', 'embarque_id');
+    }
+
+    public function arrivalConfirmations(): HasMany
+    {
+        return $this->hasMany(ArrivalConfirmation::class, 'ref_embarque', 'embarque_id');
     }
 
     public function commissions(): HasMany

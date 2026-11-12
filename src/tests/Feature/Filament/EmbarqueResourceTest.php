@@ -8,6 +8,8 @@ use App\Actions\PaymentOrders\Other\GenerateOtherPaymentOrders;
 use App\Filament\Resources\Embarques\EmbarqueResource;
 use App\Filament\Resources\Embarques\Pages\ListEmbarques;
 use App\Filament\Resources\Embarques\Pages\ViewEmbarque;
+use App\Filament\Resources\Embarques\RelationManagers\ArrivalConfirmationsRelationManager;
+use App\Filament\Resources\Embarques\RelationManagers\DepartureConfirmationsRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\ExpensesRelationManager;
 use App\Models\Embarque;
 use App\Models\FinExpensesValues;
@@ -84,6 +86,22 @@ class EmbarqueResourceTest extends TestCase
         Livewire::test(ViewEmbarque::class, ['record' => $booking->getKey()])
             ->assertOk()
             ->assertSee(['IMP1', 'Importação', 'Marítimo', 'ACME', 'Aberto']);
+    }
+
+    public function test_confirmation_tab_has_a_submenu_for_departure_and_arrival(): void
+    {
+        $this->actingAs($this->user('booking'));
+        $booking = $this->booking(['booking' => 'IMP1']);
+        DB::table('departure_confirmation')->insert(['ref_embarque' => $booking->getKey(), 'created_by' => 1, 'created_at' => '2026-11-01 10:00:00']);
+
+        Livewire::test(ViewEmbarque::class, ['record' => $booking->getKey()])
+            ->set('activeRelationManager', '2')
+            ->assertSee(['Confirmação', 'Confirmação de embarque', 'Confirmação de chegada']);
+
+        Livewire::test(DepartureConfirmationsRelationManager::class, ['ownerRecord' => $booking, 'pageClass' => ViewEmbarque::class])
+            ->assertSee('01/11/2026 10:00');
+        Livewire::test(ArrivalConfirmationsRelationManager::class, ['ownerRecord' => $booking, 'pageClass' => ViewEmbarque::class])
+            ->assertSee('Chegada ainda não confirmada');
     }
 
     public function test_expenses_list_the_reservation_expenses_with_unit_bl_container_and_formatted_values(): void

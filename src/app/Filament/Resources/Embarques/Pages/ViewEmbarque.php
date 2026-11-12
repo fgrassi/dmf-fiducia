@@ -12,11 +12,51 @@ use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Resources\RelationManagers\RelationGroup;
+use Filament\Schemas\Components\Livewire;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Support\Icons\Heroicon;
 
 class ViewEmbarque extends ViewRecord
 {
     protected static string $resource = EmbarqueResource::class;
+
+    /** Resumo e relações (despesas, comissões...) viram abas no topo, em vez de empilhadas. */
+    public function hasCombinedRelationManagerTabsWithContent(): bool
+    {
+        return true;
+    }
+
+    public function getContentTabLabel(): ?string
+    {
+        return 'Resumo';
+    }
+
+    /** Grupos que viram submenu (abas internas) em vez de ter os relation managers empilhados na mesma aba. */
+    private const SUBMENU_GROUPS = ['Notas', 'Confirmação'];
+
+    public function getRelationManagerTabComponent(string|int $key): ?Tab
+    {
+        $tab = parent::getRelationManagerTabComponent($key);
+        $group = $this->getCachedRelationManagers()[$key] ?? null;
+
+        if (! $tab || ! $group instanceof RelationGroup || ! in_array($group->getLabel(), self::SUBMENU_GROUPS, true)) {
+            return $tab;
+        }
+
+        return $tab->schema(fn (): array => [
+            Tabs::make()
+                ->contained(false)
+                ->tabs(collect($group->getManagers())
+                    ->map(fn (string $manager): Tab => $manager::getTabComponent($this->getRecord(), static::class)
+                        ->schema([
+                            Livewire::make($manager, [...$this->getRelationManagerLivewireData(), ...$manager::getDefaultProperties()])
+                                ->key($manager),
+                        ]))
+                    ->all()),
+        ]);
+    }
 
     protected function getHeaderActions(): array
     {
