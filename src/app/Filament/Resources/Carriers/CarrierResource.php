@@ -139,6 +139,9 @@ class CarrierResource extends Resource
                         TextEntry::make('embarques_realizados')
                             ->label('Quantidade Embarques Realizados')
                             ->state(fn (Armador $record) => $record->embarques()->where('finalizado', '<>', 'c')->count()),
+                        TextEntry::make('media_atraso_embarque')
+                            ->label('Média de Atrasos (Global):')
+                            ->state(fn (Armador $record) => number_format($record->mediaAtraso(), 4, '.', ',')),
                     ]),
                 Section::make('Consulta ao Portal Integrador (de-para)')
                     ->columns(2)
@@ -152,6 +155,7 @@ class CarrierResource extends Resource
                     ]),
                 Section::make('Observações')
                     ->columns(2)
+                    ->columnSpanFull()
                     ->schema([
                         Section::make('Observações')
                             ->compact()
