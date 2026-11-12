@@ -3,6 +3,7 @@
 namespace Tests\Feature\Filament;
 
 use App\Actions\Companies\SaveCompany;
+use App\Filament\Resources\Companies\Pages\CompanyBookings;
 use App\Filament\Resources\Companies\Pages\CreateCompany;
 use App\Filament\Resources\Companies\Pages\EditCompany;
 use App\Filament\Resources\Companies\Pages\FollowUps;
@@ -110,6 +111,20 @@ class CompanyResourceTest extends TestCase
 
         Livewire::test(FollowUps::class, ['record' => $company->pessoa_id])
             ->assertSeeInOrder(['Proposta enviada', 'Ligou']);
+    }
+
+    public function test_lists_only_open_bookings_of_the_company(): void
+    {
+        $this->actingAs($this->user('empresa'));
+        $company = Pessoa::forceCreate(['nome' => 'ACME']);
+        $open = DB::table('embarque')->insertGetId(['booking' => 'OPEN1', 'finalizado' => 'n', 'cliente_id' => $company->pessoa_id]);
+        $asImporter = DB::table('embarque')->insertGetId(['booking' => 'OPEN2', 'finalizado' => 'n', 'pessoa_id_importador' => $company->pessoa_id]);
+        $closed = DB::table('embarque')->insertGetId(['booking' => 'CLOSED', 'finalizado' => 'e', 'cliente_id' => $company->pessoa_id]);
+        $other = DB::table('embarque')->insertGetId(['booking' => 'OTHER', 'finalizado' => 'n', 'cliente_id' => 999]);
+
+        Livewire::test(CompanyBookings::class, ['record' => $company->pessoa_id])
+            ->assertCanSeeTableRecords([$open, $asImporter])
+            ->assertCanNotSeeTableRecords([$closed, $other]);
     }
 
     public function test_manages_contacts(): void
