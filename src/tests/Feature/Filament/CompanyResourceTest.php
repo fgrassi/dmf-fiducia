@@ -100,6 +100,55 @@ class CompanyResourceTest extends TestCase
             ->assertSet('data.codigo_municipio_ibge', '4208203');
     }
 
+    public function test_fills_selected_company_data_from_opencnpj(): void
+    {
+        $this->actingAs($this->user('empresa'));
+        DB::table('paises')->insert(['paises_id' => 1, 'nome' => 'Brasil']);
+        DB::table('estados')->insert(['estados_id' => 5, 'paises_id' => 1, 'nome' => 'São Paulo', 'uf' => 'SP']);
+        DB::table('cidades')->insert(['cidades_id' => 9, 'estados_id' => 5, 'nome' => 'São Paulo']);
+        Http::fake(['api.opencnpj.org/06990590000123' => Http::response([
+            'cnpj' => '06990590000123',
+            'razao_social' => 'Empresa Teste Ltda.',
+            'email' => 'contato@teste.com',
+            'telefones' => [['ddd' => '11', 'numero' => '40028922']],
+            'tipo_logradouro' => 'AV',
+            'logradouro' => 'PAULISTA',
+            'numero' => '1000',
+            'complemento' => 'SALA 2',
+            'bairro' => 'BELA VISTA',
+            'cep' => '01310100',
+            'municipio' => 'São Paulo',
+            'uf' => 'SP',
+            'codigo_municipio_ibge' => '3550308',
+        ])]);
+
+        Livewire::test(CreateCompany::class)
+            ->fillForm(['cnpj' => '06.990.590/0001-23', 'email' => 'antigo@teste.com'])
+            ->callAction(TestAction::make('lookupCnpj')->schemaComponent('cnpj', schema: 'form'), ['fields' => ['razao_social', 'endereco', 'bairro', 'cep', 'cidade']])
+            ->assertSet('data.razao_social', 'Empresa Teste Ltda.')
+            ->assertSet('data.email', 'antigo@teste.com')
+            ->assertSet('data.endereco', 'AV PAULISTA, 1000 - SALA 2')
+            ->assertSet('data.bairro', 'BELA VISTA')
+            ->assertSet('data.cep', '01310-100')
+            ->assertSet('data.paises_id', 1)
+            ->assertSet('data.estados_id', 5)
+            ->assertSet('data.cidades_id', 9)
+            ->assertSet('data.codigo_municipio_ibge', '3550308');
+    }
+
+    public function test_opencnpj_lookup_does_not_fill_when_cnpj_is_invalid(): void
+    {
+        $this->actingAs($this->user('empresa'));
+        Http::fake();
+
+        Livewire::test(CreateCompany::class)
+            ->fillForm(['cnpj' => '123', 'razao_social' => 'ACME'])
+            ->callAction(TestAction::make('lookupCnpj')->schemaComponent('cnpj', schema: 'form'))
+            ->assertSet('data.razao_social', 'ACME');
+
+        Http::assertNothingSent();
+    }
+
     public function test_lists_follow_ups_newest_first(): void
     {
         $this->actingAs($this->user('empresa'));
