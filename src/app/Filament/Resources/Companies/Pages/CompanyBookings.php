@@ -31,6 +31,12 @@ class CompanyBookings extends Page implements HasTable
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-cube';
 
+    /** Lista reservas: além da credencial empresa (resource), exige booking, como o EmbarqueResource. */
+    public static function canAccess(array $parameters = []): bool
+    {
+        return parent::canAccess($parameters) && (bool) auth()->user()?->hasLegacyCredential('booking');
+    }
+
     public function mount(int|string $record): void
     {
         $this->record = $this->resolveRecord($record);

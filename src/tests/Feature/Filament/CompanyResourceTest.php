@@ -115,7 +115,7 @@ class CompanyResourceTest extends TestCase
 
     public function test_lists_only_open_bookings_of_the_company(): void
     {
-        $this->actingAs($this->user('empresa'));
+        $this->actingAs($this->user('empresa,booking'));
         $company = Pessoa::forceCreate(['nome' => 'ACME']);
         $open = DB::table('embarque')->insertGetId(['booking' => 'OPEN1', 'finalizado' => 'n', 'cliente_id' => $company->pessoa_id]);
         $asImporter = DB::table('embarque')->insertGetId(['booking' => 'OPEN2', 'finalizado' => 'n', 'pessoa_id_importador' => $company->pessoa_id]);
@@ -125,6 +125,14 @@ class CompanyResourceTest extends TestCase
         Livewire::test(CompanyBookings::class, ['record' => $company->pessoa_id])
             ->assertCanSeeTableRecords([$open, $asImporter])
             ->assertCanNotSeeTableRecords([$closed, $other]);
+    }
+
+    public function test_bookings_page_requires_booking_credential(): void
+    {
+        $this->actingAs($this->user('empresa'));
+        $company = Pessoa::forceCreate(['nome' => 'ACME']);
+
+        Livewire::test(CompanyBookings::class, ['record' => $company->pessoa_id])->assertForbidden();
     }
 
     public function test_manages_contacts(): void
