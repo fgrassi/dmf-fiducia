@@ -4,8 +4,10 @@ namespace App\Filament\Resources\Embarques\Schemas;
 
 use App\Filament\Support\OperationBadge;
 use App\Models\Embarque;
+use Carbon\Carbon;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
@@ -92,7 +94,60 @@ class EmbarqueInfolist
                         self::goods('goods_import', ['nome', 'quantidade', 'equipment', 'free_time', 'quimico', 'carga_perigosa'])
                             ->visible(fn (Embarque $record) => $record->tipo_embarque !== 'a' && $record->impor_expor !== 'e'),
                     ]),
+                Section::make('Informações gerais')
+                    ->columnSpanFull()
+                    ->columns(2)
+                    ->visible(fn (Embarque $record) => $record->impor_expor === 'e' && $record->tipo_embarque !== 'a')
+                    ->schema([
+                        Group::make([
+                            self::deadline('dead_line_draft_armador', 'Dead line Draft'),
+                            TextEntry::make('dead_line_draft')
+                                ->label('Obs. dead line Draft')
+                                ->placeholder('-'),
+                            TextEntry::make('controle_confirmacao')
+                                ->label('Controle prontidão')
+                                ->formatStateUsing(fn ($state) => (int) $state === 1 ? 'SIM' : 'NÃO'),
+                            self::deadline('dead_line_vgm', 'Dead line VGM'),
+                            self::deadline('dead_line_carga_time', 'Dead line Carga'),
+                            TextEntry::make('dead_line_carga')
+                                ->label('Obs. dead line Carga')
+                                ->placeholder('-'),
+                            self::deadline('dead_line_carta_temperatura', 'Dead line Carta Temperatura', false),
+                            self::deadline('dead_line_dde', 'Dead line DDE Liberada'),
+                            // o legado mostra o texto da lista de embarque no lugar da data, quando preenchido
+                            TextEntry::make('dead_line_imo')
+                                ->label('Dead line IMO')
+                                ->state(fn (Embarque $record) => filled($record->lista_embarque)
+                                    ? $record->lista_embarque
+                                    : ($record->dead_line_imo ? Carbon::parse($record->dead_line_imo)->format('d/m/Y H:i') : null))
+                                ->placeholder('N/D'),
+                            self::deadline('prontidao', 'Prontidão', false),
+                        ]),
+                        Group::make([
+                            self::deadline('deadline_draft_armador', 'Dead line Draft Armador'),
+                            self::deadline('deadline_carga_armador', 'Dead line Carga Armador'),
+                            self::multiline('local_retirada', 'Local de retirada dos containers'),
+                            self::multiline('local_entrega', 'Local de entrega dos containers'),
+                            self::multiline('comentarios', 'Comentários'),
+                        ]),
+                    ]),
             ]);
+    }
+
+    private static function deadline(string $field, string $label, bool $withTime = true): TextEntry
+    {
+        return TextEntry::make($field)
+            ->label($label)
+            ->dateTime($withTime ? 'd/m/Y H:i' : 'd/m/Y')
+            ->placeholder('N/D');
+    }
+
+    private static function multiline(string $field, string $label): TextEntry
+    {
+        return TextEntry::make($field)
+            ->label($label)
+            ->extraAttributes(['class' => 'whitespace-pre-line'])
+            ->placeholder('-');
     }
 
     /**

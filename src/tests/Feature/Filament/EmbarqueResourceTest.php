@@ -116,6 +116,27 @@ class EmbarqueResourceTest extends TestCase
             ->assertDontSee(['IMO', 'Free time']);
     }
 
+    public function test_view_page_shows_the_general_information_only_on_maritime_exports(): void
+    {
+        $this->actingAs($this->user('booking'));
+        $fields = [
+            'dead_line_vgm' => '2026-11-20 14:30:00', 'dead_line_carta_temperatura' => '2026-11-18', 'lista_embarque' => null, 'dead_line_imo' => '2026-11-19 09:00:00',
+            'controle_confirmacao' => 1, 'local_retirada' => "Depot A\nDepot B", 'comentarios' => 'Avisar o cliente',
+        ];
+
+        $export = $this->booking(['impor_expor' => 'e', 'tipo_embarque' => 'm', ...$fields]);
+        Livewire::test(ViewEmbarque::class, ['record' => $export->getKey()])
+            ->assertSee(['Informações gerais', '20/11/2026 14:30', '18/11/2026', '19/11/2026 09:00', 'SIM', 'Depot A', 'Avisar o cliente', 'Dead line DDE Liberada', 'N/D']);
+
+        $withList = $this->booking(['impor_expor' => 'e', 'tipo_embarque' => 'm', 'lista_embarque' => 'LISTA 123']);
+        Livewire::test(ViewEmbarque::class, ['record' => $withList->getKey()])
+            ->assertSee('LISTA 123');
+
+        $import = $this->booking(['impor_expor' => 'i', 'tipo_embarque' => 'm', ...$fields]);
+        Livewire::test(ViewEmbarque::class, ['record' => $import->getKey()])
+            ->assertDontSee('Informações gerais');
+    }
+
     public function test_confirmation_tab_has_a_submenu_for_departure_and_arrival(): void
     {
         $this->actingAs($this->user('booking'));
