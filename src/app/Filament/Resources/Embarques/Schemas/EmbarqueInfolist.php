@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Embarques\Schemas;
 
 use App\Filament\Support\OperationBadge;
 use App\Models\Embarque;
+use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -81,7 +82,63 @@ class EmbarqueInfolist
                     ]),
                 self::party('Dados do importador', 'importador', 'importerContacts'),
                 self::party('Dados do exportador', 'exportador', 'shipperContacts'),
+                Section::make('Mercadoria')
+                    ->columnSpanFull()
+                    ->schema([
+                        self::goods('goods_air', ['nome', 'quantidade', 'equipment', 'gross_weight', 'net_weight', 'cubature', 'width', 'height', 'depth'])
+                            ->visible(fn (Embarque $record) => $record->tipo_embarque === 'a'),
+                        self::goods('goods_export', ['nome', 'quantidade', 'equipment', 'free_time', 'gross_weight', 'net_weight', 'cubature', 'width', 'height', 'depth', 'quimico', 'carga_perigosa', 'super_testado', 'temperatura'])
+                            ->visible(fn (Embarque $record) => $record->tipo_embarque !== 'a' && $record->impor_expor === 'e'),
+                        self::goods('goods_import', ['nome', 'quantidade', 'equipment', 'free_time', 'quimico', 'carga_perigosa'])
+                            ->visible(fn (Embarque $record) => $record->tipo_embarque !== 'a' && $record->impor_expor !== 'e'),
+                    ]),
             ]);
+    }
+
+    /**
+     * Mercadorias da reserva, só com as colunas da tela do legado (showAereo / showExpo / showImp).
+     *
+     * @param  list<string>  $fields
+     */
+    private static function goods(string $name, array $fields): RepeatableEntry
+    {
+        $triState = fn (?int $state) => match ((int) $state) {
+            0 => 'Não',
+            1 => 'Sim',
+            default => '-',
+        };
+        $weight = fn (string $field, string $label) => TextEntry::make($field)
+            ->label($label)
+            ->numeric(4, ',', '.')
+            ->placeholder('-');
+
+        $entries = [
+            'nome' => TextEntry::make('nome')->label('Mercadoria')->placeholder('Não informada'),
+            'quantidade' => TextEntry::make('quantidade')->label('Quantidade'),
+            'equipment' => TextEntry::make('equipment.nome')->label('Equipamento')->placeholder('Não informado'),
+            'free_time' => TextEntry::make('free_time')->label('Free time')->placeholder('-'),
+            'gross_weight' => $weight('gross_weight', 'Gross weight'),
+            'net_weight' => $weight('net_weight', $name === 'goods_air' ? 'Chargeable weight' : 'Net weight'),
+            'cubature' => $weight('cubature', 'Peso volumétrico'),
+            'width' => $weight('width', 'Width'),
+            'height' => $weight('height', 'Height'),
+            'depth' => $weight('depth', 'Depth'),
+            'quimico' => TextEntry::make('quimico')->label('Químico')->formatStateUsing($triState),
+            'carga_perigosa' => TextEntry::make('carga_perigosa')->label('IMO')->formatStateUsing($triState),
+            'super_testado' => TextEntry::make('super_testado')->label('Super testado?')->formatStateUsing(fn ($state) => $state ? 'Sim' : 'Não'),
+            // temperatura só vale para os equipamentos reefer (ids do legado)
+            'temperatura' => TextEntry::make('temperatura')
+                ->label('Temperatura')
+                ->state(fn ($record) => in_array((int) $record->tipo_container_id, [8, 10, 19, 39], true) ? $record->temperatura : null)
+                ->placeholder('-'),
+        ];
+
+        return RepeatableEntry::make($name)
+            ->state(fn (Embarque $record) => $record->goods)
+            ->hiddenLabel()
+            ->placeholder('Nenhuma mercadoria adicionada')
+            ->columns(4)
+            ->schema(array_map(fn (string $field) => $entries[$field], $fields));
     }
 
     private static function party(string $title, string $relation, string $contacts): Section

@@ -102,6 +102,11 @@ class Embarque extends Model
         return $this->hasMany(Bl::class, 'embarque_id', 'embarque_id');
     }
 
+    public function goods(): HasMany
+    {
+        return $this->hasMany(Mercadoria::class, 'embarque_id', 'embarque_id')->orderBy('nome');
+    }
+
     public function departureConfirmations(): HasMany
     {
         return $this->hasMany(DepartureConfirmation::class, 'ref_embarque', 'embarque_id');

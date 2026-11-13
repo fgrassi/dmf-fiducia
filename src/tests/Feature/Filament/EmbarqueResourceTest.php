@@ -88,6 +88,34 @@ class EmbarqueResourceTest extends TestCase
             ->assertSee(['IMP1', 'Importação', 'Marítimo', 'ACME', 'Aberto']);
     }
 
+    public function test_view_page_lists_the_goods_with_the_columns_of_each_operation(): void
+    {
+        $this->actingAs($this->user('booking'));
+        $equipment = DB::table('tipo_container')->insertGetId(['nome' => '40HC']);
+        $reefer = DB::table('tipo_container')->insertGetId(['tipo_container_id' => 8, 'nome' => '40RF']);
+        $goods = fn (Embarque $booking, int $type) => DB::table('mercadoria')->insert([
+            'embarque_id' => $booking->getKey(), 'nome' => 'Peças de aço', 'quantidade' => '2', 'tipo_container_id' => $type,
+            'gross_weight' => 1234.5, 'net_weight' => 1000, 'carga_perigosa' => 1, 'quimico' => 2, 'super_testado' => 1, 'free_time' => 7, 'temperatura' => -18,
+        ]);
+
+        $import = $this->booking(['impor_expor' => 'i', 'tipo_embarque' => 'm']);
+        $goods($import, $equipment);
+        Livewire::test(ViewEmbarque::class, ['record' => $import->getKey()])
+            ->assertSeeInOrder(['Peças de aço', '40HC', 'IMO', 'Sim'])
+            ->assertDontSee(['Gross weight', 'Temperatura']);
+
+        $export = $this->booking(['impor_expor' => 'e', 'tipo_embarque' => 'm']);
+        $goods($export, $reefer);
+        Livewire::test(ViewEmbarque::class, ['record' => $export->getKey()])
+            ->assertSee(['40RF', '1.234,5000', 'Super testado?', 'Temperatura', '-18']);
+
+        $air = $this->booking(['impor_expor' => 'i', 'tipo_embarque' => 'a']);
+        $goods($air, $equipment);
+        Livewire::test(ViewEmbarque::class, ['record' => $air->getKey()])
+            ->assertSee(['Chargeable weight', '1.234,5000'])
+            ->assertDontSee(['IMO', 'Free time']);
+    }
+
     public function test_confirmation_tab_has_a_submenu_for_departure_and_arrival(): void
     {
         $this->actingAs($this->user('booking'));
