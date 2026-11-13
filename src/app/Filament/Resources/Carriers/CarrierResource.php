@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Carriers;
 
 use App\Actions\Carriers\PortalReferenceMap;
+use App\Filament\Actions\MergeRecordsAction;
 use App\Filament\Resources\Carriers\Pages\ManageCarriers;
 use App\Filament\Resources\Carriers\Pages\ViewCarrier;
 use App\Filament\Resources\Carriers\RelationManagers\BanksRelationManager;
@@ -10,6 +11,7 @@ use App\Filament\Resources\Carriers\RelationManagers\GuaranteeDepositsRelationMa
 use App\Filament\Resources\Carriers\RelationManagers\PortsRelationManager;
 use App\Models\Armador;
 use BackedEnum;
+use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\RichEditor;
@@ -217,6 +219,11 @@ class CarrierResource extends Resource
                 DeleteAction::make()
                     ->modalDescription('Confirmar exclusão?')
                     ->hidden(fn (Armador $record) => $record->embarques()->exists() || $record->invoiceControls()->exists()),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    MergeRecordsAction::make('carrier'),
+                ]),
             ]);
     }
 

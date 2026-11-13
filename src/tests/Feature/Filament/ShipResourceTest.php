@@ -53,6 +53,27 @@ class ShipResourceTest extends TestCase
             ->assertTableActionHidden(DeleteAction::class, $destination);
     }
 
+    public function test_admin_merges_selected_ships_into_the_chosen_one(): void
+    {
+        $this->actingAs($this->user('admin'));
+        $keep = Navio::create(['nome' => 'A', 'tamanho' => 1]);
+        $duplicate = Navio::create(['nome' => 'A ', 'tamanho' => 1]);
+        $booking = DB::table('embarque')->insertGetId(['navio_id' => $duplicate->navio_id]);
+
+        Livewire::test(ManageShips::class)
+            ->callTableBulkAction('merge', [$keep, $duplicate], ['target' => $keep->navio_id]);
+
+        $this->assertSame($keep->navio_id, (int) DB::table('embarque')->where('embarque_id', $booking)->value('navio_id'));
+        $this->assertNull($duplicate->fresh());
+    }
+
+    public function test_merge_is_hidden_from_non_admin(): void
+    {
+        $this->actingAs($this->user('auxiliares'));
+
+        Livewire::test(ManageShips::class)->assertTableBulkActionHidden('merge');
+    }
+
     public function test_requires_credential(): void
     {
         $this->actingAs($this->user('booking'));

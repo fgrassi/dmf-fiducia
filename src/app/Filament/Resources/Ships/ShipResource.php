@@ -2,9 +2,11 @@
 
 namespace App\Filament\Resources\Ships;
 
+use App\Filament\Actions\MergeRecordsAction;
 use App\Filament\Resources\Ships\Pages\ManageShips;
 use App\Models\Navio;
 use BackedEnum;
+use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\TextInput;
@@ -73,6 +75,11 @@ class ShipResource extends Resource
                 EditAction::make(),
                 DeleteAction::make()
                     ->hidden(fn (Navio $record) => $record->isReferenced()),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    MergeRecordsAction::make('ship'),
+                ]),
             ]);
     }
 

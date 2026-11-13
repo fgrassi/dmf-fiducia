@@ -3,7 +3,9 @@
 namespace App\Filament\Resources\Companies\Tables;
 
 use App\Actions\Companies\DeleteCompany;
+use App\Filament\Actions\MergeRecordsAction;
 use App\Models\Pessoa;
+use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
@@ -79,6 +81,11 @@ class CompaniesTable
                 DeleteAction::make()
                     ->using(fn (Pessoa $record) => app(DeleteCompany::class)($record))
                     ->failureNotificationTitle('Empresa em uso por outros registros: não pode ser excluída'),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    MergeRecordsAction::make('company'),
+                ]),
             ]);
     }
 }
