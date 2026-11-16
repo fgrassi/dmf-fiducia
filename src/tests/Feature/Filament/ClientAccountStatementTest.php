@@ -115,13 +115,14 @@ class ClientAccountStatementTest extends TestCase
         $this->charge(['total_value' => 1000, 'num_nota_fiscal' => 'NF-77', 'due_date' => '2026-03-20']);
 
         Livewire::test(ClientAccountStatement::class)
-            ->call('send')
-            ->assertHasFormErrors(['cliente_id' => 'required', 'data_ini' => 'required'])
-            ->fillForm(['cliente_id' => 7, 'data_ini' => '2026-03-01', 'data_fim' => '2026-03-31'])
-            ->call('send')
-            ->assertSee(['Extrato de Conta - Cliente Sete', '11.222.333/0001-44', 'NF-77', 'R$ 1.000,00', 'BKG-1', 'Open'])
-            ->assertSeeHtml('rgba(239, 68, 68, .15)')
-            ->call('excel')
+            ->assertSee('Informe o cliente e a data inicial.')
+            ->callAction('excel')
+            ->assertNotified('Informe o cliente e a data inicial.')
+            ->filterTable('busca', ['cliente_id' => 7, 'data_ini' => '2026-03-01', 'data_fim' => '2026-03-31'])
+            ->assertSee(['Cliente Sete', '11.222.333/0001-44', 'NF-77', 'R$ 1.000,00', 'BKG-1', 'Open'])
+            ->assertSeeHtml('bg-red-100')
+            ->assertSee(['Totais', 'Itens em aberto até 31/03/2026', 'Invoices no período', 'Payments no período'])
+            ->callAction('excel')
             ->assertFileDownloaded();
 
         $book = app(ExportClientAccountStatement::class)->build($this->report());
