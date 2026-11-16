@@ -138,6 +138,16 @@ class Embarque extends Model
         return $this->hasMany(FinCreditNotes::class, 'ref_embarque', 'embarque_id');
     }
 
+    public function demurrages(): HasMany
+    {
+        return $this->hasMany(FinDemurrage::class, 'ref_embarque', 'embarque_id')->orderBy('id');
+    }
+
+    public function detentions(): HasMany
+    {
+        return $this->hasMany(FinDetention::class, 'ref_embarque', 'embarque_id')->orderBy('id');
+    }
+
     /** Observações/lembretes da reserva, a mais nova primeiro. */
     public function remarks(): HasMany
     {

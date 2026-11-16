@@ -8,7 +8,9 @@ use App\Filament\Resources\Embarques\RelationManagers\ArrivalConfirmationsRelati
 use App\Filament\Resources\Embarques\RelationManagers\CommissionsRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\CreditNotesRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\DebitNotesRelationManager;
+use App\Filament\Resources\Embarques\RelationManagers\DemurrageRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\DepartureConfirmationsRelationManager;
+use App\Filament\Resources\Embarques\RelationManagers\DetentionRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\ExpensesRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\FreightInvoicesRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\RemarksRelationManager;
@@ -74,6 +76,8 @@ class EmbarqueResource extends Resource
                 ArrivalConfirmationsRelationManager::class,
             ]),
             FreightInvoicesRelationManager::class,
+            DemurrageRelationManager::class,
+            DetentionRelationManager::class,
             RemarksRelationManager::class,
         ];
     }
