@@ -119,6 +119,7 @@ class AgentNoteControl extends Page implements HasTable
                 return $this->isPaid() ? $lists->paid((int) $agentId, $from, $to) : $lists->open((int) $agentId, $from, $to);
             })
             ->paginated(false)
+            ->description(fn () => $this->totalsLabel())
             ->emptyStateHeading('Nenhum registro encontrado')
             ->emptyStateDescription('Escolha o agente e clique em Visualizar.')
             ->filtersLayout(FiltersLayout::AboveContent)
@@ -225,6 +226,19 @@ class AgentNoteControl extends Page implements HasTable
                     })
                     ->deselectRecordsAfterCompletion(),
             ]);
+    }
+
+    /** Crédito e débito não se somam entre si: um total por tipo e moeda (vazio sem notas). */
+    private function totalsLabel(): ?string
+    {
+        $labels = collect($this->getTableRecords())
+            ->groupBy(fn (array $record) => ($record['tipo'] === 'c' || ($record['tipo'] === 'v' && (int) $record['tipo_nota'] === 1)) ? 'Crédito' : 'Débito')
+            ->map(fn (Collection $notes, string $type) => $notes
+                ->groupBy('symbol')
+                ->map(fn (Collection $group, string $symbol) => $type.': '.trim($symbol.' '.number_format((float) $group->sum('valor'), 2, ',', '.')))
+                ->implode(' | '));
+
+        return $labels->isEmpty() ? null : $labels->sortKeys()->implode(' | ');
     }
 
     public function switchMode(string $mode): void

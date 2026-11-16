@@ -41,6 +41,18 @@ class AgentNotePagesTest extends TestCase
         $this->assertDatabaseHas('fin_debit_notes', ['id' => $second, 'status_pagamento' => 0]);
     }
 
+    public function test_settlement_shows_the_totals_by_note_type_and_currency(): void
+    {
+        $this->actingAs($this->user('financial'));
+        $this->debit(['name' => 'DN-1']);
+        $this->debit(['name' => 'DN-2', 'due_to_dmf' => 5]);
+
+        Livewire::test(AgentNoteControl::class)
+            ->filterTable('busca', ['agente_id' => 5])
+            ->assertSee('Débito: US$ 20,00')
+            ->assertDontSee('Crédito:');
+    }
+
     public function test_settlement_requires_the_payment_date(): void
     {
         $this->actingAs($this->user('financial'));

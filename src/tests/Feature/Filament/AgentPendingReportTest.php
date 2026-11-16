@@ -133,6 +133,22 @@ class AgentPendingReportTest extends TestCase
         $this->assertSame('2026-12-01', substr((string) DB::table('pessoa')->where('pessoa_id', 5)->value('data_limite_cambio'), 0, 10));
     }
 
+    public function test_highlights_the_agent_whose_exchange_deadline_has_passed(): void
+    {
+        $this->actingAs($this->user());
+        $this->agent(5, 'Agente Um');
+        $this->shipment('i');
+        $this->debit(5, 10);
+
+        Livewire::test(AgentPendingReport::class)->assertDontSeeHtml('bg-red-100');
+
+        DB::table('pessoa')->where('pessoa_id', 5)->update(['data_limite_cambio' => today()->subDay()->toDateString()]);
+        Livewire::test(AgentPendingReport::class)->assertSeeHtml('bg-red-100');
+
+        DB::table('pessoa')->where('pessoa_id', 5)->update(['data_limite_cambio' => today()->addDay()->toDateString()]);
+        Livewire::test(AgentPendingReport::class)->assertDontSeeHtml('bg-red-100');
+    }
+
     public function test_history_adds_and_removes_observations(): void
     {
         $user = $this->user();

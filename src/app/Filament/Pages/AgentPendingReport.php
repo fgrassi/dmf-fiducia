@@ -83,6 +83,7 @@ class AgentPendingReport extends Page implements HasTable
         return $table
             ->records(fn (): Collection => $this->summary()->keyBy('pessoa_id'))
             ->paginated(false)
+            ->recordClasses(fn (array $record) => filled($record['data_limite_cambio']) && $record['data_limite_cambio'] < today()->toDateString() ? 'bg-red-100 dark:bg-red-950/40' : null)
             ->extraAttributes(['class' => '[&_.fi-ta-actions]:flex-col [&_.fi-ta-actions]:items-start'], merge: true)
             ->description(fn () => 'Total '.$this->money($this->summary()->sum('total')))
             ->emptyStateHeading('Nenhum agente encontrado')

@@ -62,7 +62,7 @@
                 </thead>
                 <tbody>
                     @foreach ($report['statement'] as $row)
-                        <tr>
+                        <tr @style(['background: rgba(239, 68, 68, .15)' => (int) $row['days_overdue'] > 0])>
                             <td style="{{ $td }}">{{ $row['id'] }}</td>
                             <td style="{{ $td }}">{{ $row['num_nota_fiscal'] }}</td>
                             <td style="{{ $td }} text-align: center;">{{ $date($row['created_at']) }}</td>

@@ -120,6 +120,7 @@ class ClientAccountStatementTest extends TestCase
             ->fillForm(['cliente_id' => 7, 'data_ini' => '2026-03-01', 'data_fim' => '2026-03-31'])
             ->call('send')
             ->assertSee(['Extrato de Conta - Cliente Sete', '11.222.333/0001-44', 'NF-77', 'R$ 1.000,00', 'BKG-1', 'Open'])
+            ->assertSeeHtml('rgba(239, 68, 68, .15)')
             ->call('excel')
             ->assertFileDownloaded();
 
