@@ -3,6 +3,7 @@
 namespace App\Actions\Contabilidade;
 
 use Carbon\Carbon;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -33,22 +34,29 @@ class ExportAccountingReport
         $keys = array_keys($columns);
         $last = count($keys);
 
-        $sheet->fromArray(array_map(fn (array $column) => $column[0], array_values($columns)), null, 'A1');
+        foreach (array_values($columns) as $x => $column) {
+            $sheet->setCellValueExplicit([$x + 1, 1], $column[0], DataType::TYPE_STRING);
+        }
+
         $sheet->getStyle([1, 1, $last, 1])->getFont()->setBold(true);
 
         foreach ($rows as $y => $row) {
             foreach ($keys as $x => $key) {
                 $value = $row[$key];
-                $sheet->setCellValue([$x + 1, $y + 2], $columns[$key][1] === 'date' && filled($value) ? Carbon::parse($value)->format('d/m/Y') : $value);
+
+                // Texto (cliente, reserva, NF) nunca vira fórmula, mesmo começando por =, +, - ou @.
+                $columns[$key][1] === 'money'
+                    ? $sheet->setCellValueExplicit([$x + 1, $y + 2], (float) $value, DataType::TYPE_NUMERIC)
+                    : $sheet->setCellValueExplicit([$x + 1, $y + 2], $columns[$key][1] === 'date' && filled($value) ? Carbon::parse($value)->format('d/m/Y') : (string) $value, DataType::TYPE_STRING);
             }
         }
 
         $footer = count($rows) + 2;
         $firstTotal = min(array_map(fn (string $key) => array_search($key, $keys, true), array_keys($totals)));
-        $sheet->setCellValue([$firstTotal, $footer], 'Total');
+        $sheet->setCellValueExplicit([$firstTotal, $footer], 'Total', DataType::TYPE_STRING);
 
         foreach ($totals as $key => $total) {
-            $sheet->setCellValue([array_search($key, $keys, true) + 1, $footer], $total);
+            $sheet->setCellValueExplicit([array_search($key, $keys, true) + 1, $footer], $total, DataType::TYPE_NUMERIC);
         }
 
         $sheet->getStyle([1, $footer, $last, $footer])->getFont()->setBold(true);

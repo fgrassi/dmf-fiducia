@@ -3,6 +3,7 @@
 namespace Tests\Feature\Actions\Contabilidade;
 
 use App\Actions\Contabilidade\CostsToAccrueReport;
+use App\Actions\Contabilidade\ExportAccountingReport;
 use App\Actions\Contabilidade\IssuedInvoiceCostsReport;
 use App\Actions\Contabilidade\ReceivableClientsReport;
 use DomainException;
@@ -120,6 +121,16 @@ class AccountingReportsTest extends TestCase
             $report['rows'][0]['nf_data'], $report['rows'][0]['nf_numero'], $report['rows'][0]['reserva_numero'], $report['rows'][0]['usd'], $report['rows'][0]['eur'], $report['rows'][0]['brl'],
         ]);
         $this->assertSame(['usd' => 30.0, 'eur' => 5.0, 'brl' => 50.0], $report['totals']);
+    }
+
+    public function test_the_excel_never_turns_text_into_a_formula(): void
+    {
+        $book = app(ExportAccountingReport::class)->build('Teste', ['cliente' => ['Cliente', 'text'], 'valor' => ['R$', 'money']], [['cliente' => '=HYPERLINK("http://x","clique")', 'valor' => 10.5]], ['valor' => 10.5]);
+        $cell = $book->getActiveSheet()->getCell('A2');
+
+        $this->assertSame('s', $cell->getDataType());
+        $this->assertSame('=HYPERLINK("http://x","clique")', $cell->getValue());
+        $this->assertSame(10.5, $book->getActiveSheet()->getCell('B3')->getValue());
     }
 
     private function booking(int $id, string $booking, string $client, int $qtdBl = 1): void
