@@ -3,25 +3,30 @@
 namespace App\Filament\Pages;
 
 use App\Actions\Financeiro\DailyRatesReport;
-use App\Filament\Livewire\ReportResult;
+use App\Filament\Support\ReportRecords;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Pages\Page;
-use Filament\Schemas\Components\Actions;
-use Filament\Schemas\Components\EmbeddedSchema;
-use Filament\Schemas\Components\Form;
+use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\Grid;
-use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Concerns\InteractsWithTable;
+use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Enums\FiltersLayout;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Table;
 use UnitEnum;
 
 /**
  * cotacao/index (legado), "Consulta Cotação Diária" (menu 308), no menu Consultas: valor de cada cotação e taxa de armador por dia, no período.
  */
-class DailyRates extends Page
+class DailyRates extends Page implements HasTable
 {
+    use InteractsWithTable;
+
     protected static ?string $title = 'Consulta Cotação Diária';
 
     protected static ?string $navigationLabel = 'Consulta Cotação Diária';
@@ -36,88 +41,87 @@ class DailyRates extends Page
 
     protected static ?int $navigationSort = 10;
 
-    /** @var array<string, mixed>|null */
-    public ?array $data = [];
-
-    /** Filtros do último "Enviar": o resultado fica no componente filho, fora do estado da página. */
-    public ?array $applied = null;
-
-    /** Muda a cada "Enviar", para o resultado ser refeito mesmo com os mesmos filtros. */
-    public int $runs = 0;
-
     /** security.yml do módulo (legado): credencial financial. */
     public static function canAccess(): bool
     {
         return (bool) auth()->user()?->hasLegacyCredential('financial');
     }
 
-    public function mount(): void
-    {
-        $this->form->fill($this->defaults());
-        $this->send();
-    }
-
-    public function form(Schema $schema): Schema
-    {
-        return $schema
-            ->statePath('data')
-            ->components([
-                Grid::make(['default' => 1, 'md' => 2])
-                    ->schema([
-                        DatePicker::make('data_ini')
-                            ->label('Data inicial')
-                            ->required(),
-                        DatePicker::make('data_fim')
-                            ->label('Data final')
-                            ->required()
-                            ->afterOrEqual('data_ini'),
-                    ]),
-            ]);
-    }
-
     public function content(Schema $schema): Schema
     {
         return $schema
             ->components([
-                Form::make([EmbeddedSchema::make('form')])
-                    ->id('form')
-                    ->livewireSubmitHandler('send')
-                    ->footer([
-                        Actions::make([
-                            Action::make('send')
-                                ->label('Enviar')
-                                ->submit('send'),
-                            Action::make('clear')
-                                ->label('Limpar')
-                                ->color('gray')
-                                ->action(fn () => $this->clear()),
-                        ]),
-                    ]),
-                Livewire::make(ReportResult::class, fn () => [
-                    'action' => DailyRatesReport::class,
-                    'view' => 'filament.pages.daily-rates',
-                    'arguments' => [$this->applied],
-                ])
-                    ->key('result'.$this->runs)
-                    ->visible(fn () => $this->applied !== null),
+                EmbeddedTable::make(),
             ]);
     }
 
-    public function send(): void
+    public function table(Table $table): Table
     {
-        $this->applied = $this->form->getState();
-        $this->runs++;
+        return $table
+            ->records(fn (int $page, int|string $recordsPerPage, ?string $sortColumn, ?string $sortDirection) => ReportRecords::paginate(
+                array_map(fn (array $row) => ['date' => $row['date']] + array_combine(array_map(fn (int $index) => "v{$index}", array_keys($row['values'])), $row['values']), $this->report($this->tableFilters['periodo'] ?? [])['rows']),
+                $page,
+                $recordsPerPage,
+                $sortColumn,
+                $sortDirection,
+            ))
+            ->paginated([25, 50, 100])
+            ->defaultPaginationPageOption(50)
+            ->defaultSort('date', 'desc')
+            ->emptyStateHeading('Nenhuma cotação no período informado')
+            ->filtersLayout(FiltersLayout::AboveContent)
+            ->deferFilters()
+            ->filtersApplyAction(fn (Action $action) => $action->label('Enviar'))
+            ->filtersResetAction(fn (Action $action) => $action->label('Limpar'))
+            ->filters([
+                Filter::make('periodo')
+                    ->columnSpanFull()
+                    ->schema([
+                        Grid::make(['default' => 1, 'md' => 2])
+                            ->schema([
+                                DatePicker::make('data_ini')
+                                    ->label('Data inicial')
+                                    ->default(now()->subMonthNoOverflow()),
+                                DatePicker::make('data_fim')
+                                    ->label('Data final')
+                                    ->default(now())
+                                    ->afterOrEqual('data_ini'),
+                            ]),
+                    ]),
+            ])
+            ->columns([
+                TextColumn::make('date')
+                    ->label('Data')
+                    ->sortable()
+                    ->date('d/m/Y'),
+                ...$this->rateColumns(),
+            ]);
     }
 
-    public function clear(): void
+    /**
+     * Uma coluna por cotação e taxa de armador, no cabeçalho "nome · moeda". Elas não dependem do período: saem do relatório de um dia.
+     *
+     * @return list<TextColumn>
+     */
+    private function rateColumns(): array
     {
-        $this->form->fill($this->defaults());
-        $this->send();
+        $columns = $this->report(['data_ini' => now()->toDateString(), 'data_fim' => now()->toDateString()])['columns'];
+
+        return array_map(fn (array $column, int $index) => TextColumn::make("v{$index}")
+            ->label(trim($column['name'].' · '.$column['currency'], ' ·'))
+            ->alignEnd()
+            ->formatStateUsing(fn ($state) => $state === null ? '' : number_format((float) $state, 4, ',', '.')), $columns, array_keys($columns));
     }
 
-    /** @return array<string, string> como o legado: de um mês atrás até hoje, já consultado ao abrir */
-    private function defaults(): array
+    /**
+     * @param  array{data_ini?: ?string, data_fim?: ?string}  $filters
+     * @return array{columns: list<array{name: string, currency: string}>, rows: list<array{date: string, values: list<?float>}>}
+     */
+    private function report(array $filters): array
     {
-        return ['data_ini' => now()->subMonthNoOverflow()->toDateString(), 'data_fim' => now()->toDateString()];
+        return app(DailyRatesReport::class)([
+            'data_ini' => $filters['data_ini'] ?? now()->subMonthNoOverflow()->toDateString(),
+            'data_fim' => $filters['data_fim'] ?? now()->toDateString(),
+        ]);
     }
 }

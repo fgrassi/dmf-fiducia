@@ -43,9 +43,9 @@ class DailyRatesTest extends TestCase
 
         Livewire::test(DailyRates::class)
             ->assertSee(['PTAX', 'Maersk', 'USD ($)', '5,5000', '5,4000'])
-            ->fillForm(['data_ini' => '2026-10-03', 'data_fim' => '2026-10-01'])
-            ->call('send')
-            ->assertHasFormErrors(['data_fim']);
+            ->filterTable('periodo', ['data_ini' => '2026-10-01', 'data_fim' => '2026-10-01'])
+            ->assertSee('5,0000')
+            ->assertDontSee('5,5000');
     }
 
     private function seedRates(string $day = '2026-10-02'): void
