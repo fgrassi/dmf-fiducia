@@ -2,6 +2,7 @@
 
 namespace App\Actions\Financeiro;
 
+use App\Actions\Contabilidade\NfseInvoice;
 use App\Models\CapaProcessoArquivo;
 use Carbon\Carbon;
 use DomainException;
@@ -130,7 +131,7 @@ class InvoiceCoverFileReport
         $invoices = [];
 
         foreach ($rows as $row) {
-            $issued = $this->issueDate($row->payload_json, $row->created_at);
+            $issued = NfseInvoice::issueDate($row->payload_json, $row->created_at);
 
             if ($issued === null || $issued < $start || $issued > $end) {
                 continue;
@@ -140,7 +141,7 @@ class InvoiceCoverFileReport
                 'nfse_id' => (int) $row->fin_charges_nfse_id,
                 'ref_charge' => (int) $row->ref_charge,
                 'data_iso' => $issued,
-                'numero_nf' => $this->invoiceNumber($row->chave_acesso, $row->num_nota_fiscal),
+                'numero_nf' => NfseInvoice::number($row->chave_acesso, $row->num_nota_fiscal),
                 'valor_nf' => (float) $row->valor_servicos,
                 'booking' => trim((string) $row->booking),
             ];
@@ -285,38 +286,6 @@ class InvoiceCoverFileReport
     private function countInvoices(array $rows): int
     {
         return count(array_unique(array_column($rows, 'nfse_id')));
-    }
-
-    /** Número da NFS-e nacional: 13 dígitos a partir da posição 24 da chave de 50 dígitos; senão o número da cobrança; senão a chave. */
-    private function invoiceNumber(mixed $key, mixed $fallback): string
-    {
-        $digits = preg_replace('/\D/', '', (string) $key);
-
-        if (strlen($digits) === 50 && ltrim(substr($digits, 23, 13), '0') !== '') {
-            return ltrim(substr($digits, 23, 13), '0');
-        }
-
-        return filled(trim((string) $fallback)) ? trim((string) $fallback) : trim((string) $key);
-    }
-
-    /** Emissão do payload (`data_emissao`), senão a criação do registro. */
-    private function issueDate(mixed $payloadJson, mixed $createdAt): ?string
-    {
-        $payload = json_decode((string) $payloadJson, true);
-
-        return (is_array($payload) ? $this->normalizeDate($payload['data_emissao'] ?? null) : null) ?? $this->normalizeDate($createdAt);
-    }
-
-    /** Aceita Y-m-d (com hora) ou d/m/Y. */
-    private function normalizeDate(mixed $value): ?string
-    {
-        $value = trim((string) $value);
-
-        return match (true) {
-            (bool) preg_match('/^(\d{4}-\d{2}-\d{2})/', $value, $m) => $m[1],
-            (bool) preg_match('#^(\d{2})/(\d{2})/(\d{4})#', $value, $m) => "{$m[3]}-{$m[2]}-{$m[1]}",
-            default => null,
-        };
     }
 
     private function date(mixed $value): ?string
