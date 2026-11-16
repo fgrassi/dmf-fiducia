@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\DB;
 
 class Embarque extends Model
 {
@@ -135,6 +136,18 @@ class Embarque extends Model
     public function creditNotes(): HasMany
     {
         return $this->hasMany(FinCreditNotes::class, 'ref_embarque', 'embarque_id');
+    }
+
+    /** Observações/lembretes da reserva, a mais nova primeiro. */
+    public function remarks(): HasMany
+    {
+        return $this->hasMany(ObservacaoEmbarque::class, 'embarque_id', 'embarque_id')->orderByDesc('created_at');
+    }
+
+    /** Há pendência de liberação do embarque (`liberacao_embarque` com status 0)? */
+    public function hasPendingRelease(): bool
+    {
+        return DB::table('liberacao_embarque')->where('embarque_id', $this->getKey())->where('status', 0)->exists();
     }
 
     /** Embarque::getRefArmadorParaPagamentoId (legado): o coloader, se informado, senão o armador da reserva. */

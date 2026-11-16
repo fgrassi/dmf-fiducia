@@ -2,14 +2,20 @@
 
 namespace App\Filament\Resources\Embarques\Pages;
 
+use App\Actions\Booking\ChangeStatus;
 use App\Actions\Booking\Documents\BillingInstructionPdf;
 use App\Actions\Booking\Documents\ExpenseStatement;
 use App\Actions\Booking\Documents\ExpenseStatementPdf;
+use App\Actions\Booking\ReleaseShipment;
+use App\Actions\Booking\UpdateEtd;
 use App\Filament\Resources\Embarques\EmbarqueResource;
 use App\Models\Embarque;
+use Carbon\Carbon;
 use DomainException;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Resources\RelationManagers\RelationGroup;
@@ -74,7 +80,85 @@ class ViewEmbarque extends ViewRecord
                 ->label('Documentos')
                 ->icon(Heroicon::OutlinedDocumentText)
                 ->button(),
+            ActionGroup::make([
+                $this->statusAction('reativar', 'Reativar reserva', ChangeStatus::OPEN, Heroicon::OutlinedPlayCircle)
+                    ->visible(fn (Embarque $record) => $record->finalizado === ChangeStatus::SUSPENDED),
+                $this->statusAction('suspender', 'Suspender reserva', ChangeStatus::SUSPENDED, Heroicon::OutlinedPauseCircle)
+                    ->visible(fn (Embarque $record) => $record->finalizado !== ChangeStatus::CANCELLED && $record->impor_expor === 'e' && $record->tipo_embarque === 'm'),
+                $this->statusAction('cancelar', 'Cancelar reserva', ChangeStatus::CANCELLED, Heroicon::OutlinedXCircle)
+                    ->color('danger')
+                    ->visible(fn (Embarque $record) => $record->finalizado !== ChangeStatus::CANCELLED),
+                $this->etdAction(),
+                $this->releaseAction(),
+            ])
+                ->label('Reserva')
+                ->icon(Heroicon::OutlinedCog6Tooth)
+                ->button(),
         ];
+    }
+
+    /** cancelarEmbarque, suspenderEmbarque e removerPendencia (legado): exigem justificativa, que vai para o rastreamento. */
+    private function statusAction(string $name, string $label, string $status, Heroicon $icon): Action
+    {
+        return Action::make($name)
+            ->label($label)
+            ->icon($icon)
+            ->modalHeading($label)
+            ->schema([
+                Textarea::make('justificativa')
+                    ->label('Justificativa')
+                    ->helperText('Fica registrada na rastreabilidade da reserva.')
+                    ->required()
+                    ->rows(4),
+            ])
+            ->action(function (Embarque $record, array $data) use ($status, $label) {
+                try {
+                    app(ChangeStatus::class)($record, $status, $data['justificativa'], auth()->id());
+                } catch (DomainException $e) {
+                    return Notification::make()->title($e->getMessage())->danger()->send();
+                }
+
+                Notification::make()->title("{$label}: feito")->success()->send();
+            });
+    }
+
+    /** atualizarEtd (legado): o ETA acompanha, mantendo o transit time. Some depois da confirmação de embarque. */
+    private function etdAction(): Action
+    {
+        return Action::make('atualizarEtd')
+            ->label('Atualizar ETD')
+            ->icon(Heroicon::OutlinedCalendarDays)
+            ->visible(fn (Embarque $record) => $record->finalizado !== ChangeStatus::CANCELLED && ! $record->departureConfirmations()->exists())
+            ->fillForm(fn (Embarque $record): array => ['etd' => $record->saida_prevista])
+            ->schema([
+                DatePicker::make('etd')
+                    ->label('Saída prevista (ETD)')
+                    ->required(),
+            ])
+            ->action(function (Embarque $record, array $data) {
+                try {
+                    app(UpdateEtd::class)($record, Carbon::parse($data['etd']), auth()->id());
+                } catch (DomainException $e) {
+                    return Notification::make()->title($e->getMessage())->danger()->send();
+                }
+
+                Notification::make()->title('ETD atualizado')->success()->send();
+            });
+    }
+
+    /** liberaEmbarque (legado): só a credencial lib_emb dá baixa. */
+    private function releaseAction(): Action
+    {
+        return Action::make('liberarEmbarque')
+            ->label('Liberar embarque')
+            ->icon(Heroicon::OutlinedLockOpen)
+            ->requiresConfirmation()
+            ->visible(fn (Embarque $record) => auth()->user()->hasLegacyCredential('lib_emb') && $record->hasPendingRelease())
+            ->action(function (Embarque $record) {
+                app(ReleaseShipment::class)($record->getKey(), auth()->id());
+
+                Notification::make()->title('Embarque liberado')->success()->send();
+            });
     }
 
     /** valoresCompra, valoresDespesa e valoresDespesasDocumentacao (legado): PDF da relação de despesas. */

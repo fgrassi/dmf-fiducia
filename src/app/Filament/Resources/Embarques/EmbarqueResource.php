@@ -11,6 +11,7 @@ use App\Filament\Resources\Embarques\RelationManagers\DebitNotesRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\DepartureConfirmationsRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\ExpensesRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\FreightInvoicesRelationManager;
+use App\Filament\Resources\Embarques\RelationManagers\RemarksRelationManager;
 use App\Filament\Resources\Embarques\Schemas\EmbarqueInfolist;
 use App\Filament\Resources\Embarques\Tables\EmbarquesTable;
 use App\Models\Embarque;
@@ -73,6 +74,7 @@ class EmbarqueResource extends Resource
                 ArrivalConfirmationsRelationManager::class,
             ]),
             FreightInvoicesRelationManager::class,
+            RemarksRelationManager::class,
         ];
     }
 

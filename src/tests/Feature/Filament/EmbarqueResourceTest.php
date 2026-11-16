@@ -11,6 +11,7 @@ use App\Filament\Resources\Embarques\Pages\ViewEmbarque;
 use App\Filament\Resources\Embarques\RelationManagers\ArrivalConfirmationsRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\DepartureConfirmationsRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\ExpensesRelationManager;
+use App\Filament\Resources\Embarques\RelationManagers\RemarksRelationManager;
 use App\Models\Embarque;
 use App\Models\FinExpensesValues;
 use App\Models\User;
@@ -425,6 +426,91 @@ class EmbarqueResourceTest extends TestCase
             ->assertActionHidden(TestAction::make('gerarOrdemPagamentoOutros')->table()->bulk());
     }
 
+    public function test_header_actions_follow_the_status_of_the_booking(): void
+    {
+        $this->actingAs($this->user('booking'));
+        $export = $this->booking(['impor_expor' => 'e', 'tipo_embarque' => 'm', 'finalizado' => 'n']);
+        $suspended = $this->booking(['impor_expor' => 'e', 'tipo_embarque' => 'm', 'finalizado' => 'p']);
+        $cancelled = $this->booking(['finalizado' => 'c']);
+
+        Livewire::test(ViewEmbarque::class, ['record' => $export->getKey()])
+            ->assertActionVisible('suspender')
+            ->assertActionVisible('cancelar')
+            ->assertActionHidden('reativar');
+        Livewire::test(ViewEmbarque::class, ['record' => $suspended->getKey()])->assertActionVisible('reativar');
+        Livewire::test(ViewEmbarque::class, ['record' => $cancelled->getKey()])
+            ->assertActionHidden('cancelar')
+            ->assertActionHidden('atualizarEtd');
+    }
+
+    public function test_cancelling_requires_a_justification_and_updates_the_booking(): void
+    {
+        $this->actingAs($this->user('booking'));
+        $booking = $this->booking(['finalizado' => 'n']);
+
+        Livewire::test(ViewEmbarque::class, ['record' => $booking->getKey()])
+            ->callAction('cancelar', ['justificativa' => ''])
+            ->assertHasActionErrors(['justificativa' => 'required']);
+        $this->assertSame('n', $booking->fresh()->finalizado);
+
+        Livewire::test(ViewEmbarque::class, ['record' => $booking->getKey()])
+            ->callAction('cancelar', ['justificativa' => 'Cliente desistiu'])
+            ->assertHasNoActionErrors();
+
+        $this->assertSame('c', $booking->fresh()->finalizado);
+        $this->assertSame('Cliente desistiu', DB::table('rastreamento')->value('historico'));
+    }
+
+    public function test_updates_the_etd_and_hides_the_action_after_the_departure_confirmation(): void
+    {
+        $this->actingAs($this->user('booking'));
+        $booking = $this->booking(['saida_prevista' => '2026-11-01', 'chegada_prevista' => '2026-11-21']);
+
+        Livewire::test(ViewEmbarque::class, ['record' => $booking->getKey()])
+            ->callAction('atualizarEtd', ['etd' => '2026-11-05']);
+
+        $this->assertSame('2026-11-25', substr($booking->fresh()->chegada_prevista, 0, 10));
+
+        DB::table('departure_confirmation')->insert(['ref_embarque' => $booking->getKey(), 'created_by' => 7]);
+        Livewire::test(ViewEmbarque::class, ['record' => $booking->getKey()])->assertActionHidden('atualizarEtd');
+    }
+
+    public function test_release_action_needs_a_pending_release_and_the_lib_emb_credential(): void
+    {
+        $booking = $this->booking();
+        DB::table('liberacao_embarque')->insert(['embarque_id' => $booking->getKey(), 'status' => 0]);
+
+        $this->actingAs($this->user('booking'));
+        Livewire::test(ViewEmbarque::class, ['record' => $booking->getKey()])->assertActionHidden('liberarEmbarque');
+
+        $this->actingAs($this->user('booking,lib_emb', 'rel'));
+        Livewire::test(ViewEmbarque::class, ['record' => $booking->getKey()])
+            ->assertActionVisible('liberarEmbarque')
+            ->callAction('liberarEmbarque')
+            ->assertActionHidden('liberarEmbarque');
+        $this->assertSame(1, (int) DB::table('liberacao_embarque')->value('status'));
+    }
+
+    public function test_remarks_tab_adds_and_removes_remarks_and_saves_the_booking_notes(): void
+    {
+        $user = $this->user('booking');
+        $this->actingAs($user);
+        $booking = $this->booking();
+
+        $component = Livewire::test(RemarksRelationManager::class, ['ownerRecord' => $booking, 'pageClass' => ViewEmbarque::class])
+            ->callAction(TestAction::make(CreateAction::class)->table(), ['mensagem' => 'Ligar amanhã'])
+            ->assertHasNoActionErrors()
+            ->assertSee('Ligar amanhã')
+            ->callAction(TestAction::make('bookingNotes')->table(), ['embarque_obs' => 'Carga frágil']);
+
+        $this->assertSame('Carga frágil', $booking->fresh()->embarque_obs);
+        $this->assertSame('2', RemarksRelationManager::getBadge($booking->fresh(), ViewEmbarque::class));
+
+        $remark = $booking->remarks()->first();
+        $component->callAction(TestAction::make(DeleteAction::class)->table($remark));
+        $this->assertSame(0, $booking->remarks()->count());
+    }
+
     /** @param  array<string, mixed>  $attributes */
     private function booking(array $attributes = []): Embarque
     {
@@ -437,8 +523,8 @@ class EmbarqueResourceTest extends TestCase
         return FinExpensesValues::find(DB::table('fin_expenses_values')->insertGetId($attributes + ['ref_embarque' => $booking->getKey()]));
     }
 
-    private function user(string $credentials): User
+    private function user(string $credentials, string $login = 'ana'): User
     {
-        return User::find(DB::table('usuario')->insertGetId(['nome' => 'Ana', 'login' => 'ana', 'senha' => 'x', 'status' => 1, 'credentials' => $credentials]));
+        return User::find(DB::table('usuario')->insertGetId(['nome' => 'Ana', 'login' => $login, 'senha' => 'x', 'status' => 1, 'credentials' => $credentials]));
     }
 }
