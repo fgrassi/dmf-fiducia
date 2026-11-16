@@ -2,8 +2,7 @@
 
 namespace Tests\Feature\Filament;
 
-use App\Actions\Fiducia\ClientBookingsReport;
-use App\Filament\Livewire\ReportResult;
+use App\Filament\Livewire\ReportSectionTable;
 use App\Filament\Pages\FiduciaClientBookings;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -32,19 +31,36 @@ class FiduciaClientBookingsTest extends TestCase
         $page = Livewire::test(FiduciaClientBookings::class)
             ->fillForm(['listar_embarques' => true])
             ->call('send')
-            ->assertSeeLivewire(ReportResult::class);
+            ->assertSeeLivewire(ReportSectionTable::class);
 
-        Livewire::test(ReportResult::class, $this->resultComponent($page->get('applied')))
-            ->assertSee(['Cliente Sete', 'BKG-10', 'Confirmado', 'Total']);
+        $section = fn (string $name) => Livewire::test(ReportSectionTable::class, ['page' => FiduciaClientBookings::class, 'section' => $name, 'filters' => $page->get('applied')]);
 
-        Livewire::test(ReportResult::class, $this->resultComponent(['mes_ini' => 12, 'mes_fim' => 1] + $page->get('applied')))
-            ->assertNotified('O período início deve ser anterior ou igual ao período fim.');
+        $section('table0')->assertSee(['Cliente Sete', 'Emb. confirmados', 'Total']);
+        $section('details0')->assertSee(['Embarques', 'Cliente Sete', 'BKG-10', 'Confirmado']);
+
+        Livewire::test(FiduciaClientBookings::class)
+            ->fillForm(['mes_ini' => 12, 'mes_fim' => 1])
+            ->call('send')
+            ->assertNotified('O período início deve ser anterior ou igual ao período fim.')
+            ->assertDontSeeLivewire(ReportSectionTable::class);
     }
 
-    /** @return array<string, mixed> */
-    private function resultComponent(array $filters): array
+    public function test_groups_the_tables_by_month_with_subtotals_and_a_grand_total(): void
     {
-        return ['action' => ClientBookingsReport::class, 'view' => 'filament.pages.fiducia-client-bookings', 'arguments' => [$filters]];
+        $this->actingAs($this->user('director'));
+        DB::table('pessoa')->insert(['pessoa_id' => 7, 'nome' => 'Cliente Sete']);
+        DB::table('fiducia_desconto')->insert(['pessoa_id' => 7, 'moeda_id' => 1, 'valor' => 10, 'tipo_desconto' => 'c']);
+        DB::table('embarque')->insert(['embarque_id' => 10, 'booking' => 'BKG-10', 'cliente_id' => 7, 'saida_efetiva' => now()->startOfMonth()->toDateString(), 'finalizado' => 'a']);
+
+        $page = Livewire::test(FiduciaClientBookings::class)
+            ->fillForm(['agrupar_por_mes' => true])
+            ->call('send')
+            ->assertSeeLivewire(ReportSectionTable::class);
+
+        $section = fn (string $name) => Livewire::test(ReportSectionTable::class, ['page' => FiduciaClientBookings::class, 'section' => $name, 'filters' => $page->get('applied')]);
+
+        $section('table0')->assertSee(['Cliente Sete', 'Subtotal'])->assertDontSee('méd.');
+        $section('totals')->assertSee(['Total geral', 'méd.']);
     }
 
     private function user(string ...$credentials): User
