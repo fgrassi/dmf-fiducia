@@ -4,6 +4,7 @@ namespace Tests\Feature\Filament;
 
 use App\Actions\Financeiro\ExportInvoiceCoverFileReport;
 use App\Actions\Financeiro\InvoiceCoverFileReport;
+use App\Filament\Livewire\ReportSectionTable;
 use App\Filament\Pages\InvoiceCoverFile;
 use App\Models\User;
 use DomainException;
@@ -97,10 +98,17 @@ class InvoiceCoverFileTest extends TestCase
             ->assertHasFormErrors(['data_ini' => 'required', 'data_fim' => 'required', 'capa_processo_arquivo_id' => 'required'])
             ->fillForm(['data_ini' => '2026-03-01', 'data_fim' => '2026-03-31', 'capa_processo_arquivo_id' => 1])
             ->call('send')
-            ->assertSee(['NFS-e com capa em arquivo posterior', 'NF-LATER', 'Maio 2026', '250,00', 'BKG-1'])
-            ->assertDontSee('NFS-e em outro arquivo do mesmo mês')
+            ->assertSeeLivewire(ReportSectionTable::class)
             ->call('excel')
             ->assertFileDownloaded();
+
+        $filters = ['data_ini' => '2026-03-01', 'data_fim' => '2026-03-31', 'capa_processo_arquivo_id' => 1];
+        $section = fn (string $name) => Livewire::test(ReportSectionTable::class, ['page' => InvoiceCoverFile::class, 'section' => $name, 'filters' => $filters]);
+
+        $section('summary')->assertSee(['Resumo', '01/03/2026 a 31/03/2026', 'Março 2026']);
+        $section('posterior')->assertSee(['NFS-e com capa em arquivo posterior', 'NF-LATER', 'Maio 2026', '250,00', 'BKG-1']);
+        $section('anterior')->assertSee('Nenhuma nota neste grupo.');
+        $section('totals')->assertSee(['Total em aberto (sem repetir capa)', '250,00']);
 
         $book = app(ExportInvoiceCoverFileReport::class)->build($this->report());
 
