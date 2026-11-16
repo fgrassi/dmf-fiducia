@@ -78,7 +78,7 @@
                                 <td class="px-2 py-1 align-top whitespace-pre">{{ preg_replace('/\s*\/\s*/', " /\n", (string) $row->house_bl) }}</td>
                                 <td class="{{ $td }} condensable">{{ $row->client }}</td>
                                 <td class="{{ $td }} condensable">{{ $row->capa_processo_id ? mb_strtoupper(Embarque::TYPES[$row->tipo_embarque] ?? '') : 'Capa Manual' }}</td>
-                                <td class="{{ $td }} condensable">{{ $row->capa_processo_id ? Embarque::OPERATIONS[$row->operation] : '' }}</td>
+                                <td class="{{ $td }} condensable">{{ $row->capa_processo_id ? \App\Enums\OperationType::labelFor($row->operation) : '' }}</td>
                                 <td class="{{ $td }} condensable">{{ $row->mercadoria }}</td>
                                 <td class="{{ $td }} condensable">{{ $row->pais_origem }}</td>
                                 <td class="{{ $td }} condensable">{{ $row->porto_origem }}</td>

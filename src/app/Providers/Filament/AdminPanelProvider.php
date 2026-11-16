@@ -53,6 +53,7 @@ class AdminPanelProvider extends PanelProvider
                 'Config IT',
                 'Configurações',
                 'Financeiro',
+                'Relatórios',
             ])
             ->navigationItems([
                 NavigationItem::make('Cadastros')
