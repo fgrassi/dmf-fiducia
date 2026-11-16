@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Actions\Booking\GenerateValueDispatchPendency;
 use App\Actions\Reports\ValueDispatchPendenciesReport;
 use App\Filament\Pages\ValueDispatchPendencies;
 use App\Models\User;
@@ -50,6 +51,38 @@ class ValueDispatchPendenciesTest extends TestCase
             ->call('applyTableFilters')
             ->assertSee('BKG-2')
             ->assertDontSee(['BKG-1', 'BKG-3']);
+    }
+
+    public function test_generation_only_for_flagged_clients_and_never_twice(): void
+    {
+        DB::table('pessoa')->insert([['pessoa_id' => 1, 'nome' => 'Controlado', 'ctr_envio_valores' => 's'], ['pessoa_id' => 2, 'nome' => 'Livre', 'ctr_envio_valores' => 'n']]);
+        DB::table('embarque')->insert([['embarque_id' => 1, 'booking' => 'BKG-1', 'cliente_id' => 1], ['embarque_id' => 2, 'booking' => 'BKG-2', 'cliente_id' => 2]]);
+
+        $generate = app(GenerateValueDispatchPendency::class);
+
+        $this->assertTrue($generate(1));
+        $this->assertFalse($generate(1));
+        $this->assertFalse($generate(2));
+        $this->assertSame([['embarque_id' => 1, 'status' => 1]], DB::table('controle_envio_valores')->get(['embarque_id', 'status'])->map(fn ($r) => (array) $r)->all());
+    }
+
+    public function test_release_marks_only_the_pending_control_and_needs_lib_val_des(): void
+    {
+        $this->travelTo('2026-11-16 09:30');
+        DB::table('pessoa')->insert(['pessoa_id' => 1, 'nome' => 'Cliente A']);
+        DB::table('embarque')->insert([['embarque_id' => 1, 'booking' => 'BKG-1', 'cliente_id' => 1], ['embarque_id' => 2, 'booking' => 'BKG-2', 'cliente_id' => 1]]);
+        DB::table('controle_envio_valores')->insert([['embarque_id' => 1, 'status' => 1, 'updated_by' => null, 'updated_at' => null], ['embarque_id' => 2, 'status' => 1, 'updated_by' => null, 'updated_at' => null]]);
+
+        $this->actingAs($this->user('followup'));
+        Livewire::test(ValueDispatchPendencies::class)->assertTableActionHidden('liberar', '1');
+
+        $releaser = $this->user('followup', 'lib_val_des');
+        $this->actingAs($releaser);
+        Livewire::test(ValueDispatchPendencies::class)->callTableAction('liberar', '1');
+
+        $row = DB::table('controle_envio_valores')->where('embarque_id', 1)->first();
+        $this->assertSame([2, $releaser->getKey(), '2026-11-16 09:30:00'], [(int) $row->status, (int) $row->updated_by, $row->updated_at]);
+        $this->assertSame(1, (int) DB::table('controle_envio_valores')->where('embarque_id', 2)->value('status'));
     }
 
     private function user(string ...$credentials): User

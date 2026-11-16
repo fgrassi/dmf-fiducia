@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Actions\Booking\ReleaseValueDispatch;
 use App\Actions\Reports\ValueDispatchPendenciesReport;
 use App\Filament\Resources\Embarques\EmbarqueResource;
 use App\Filament\Support\ReportRecords;
@@ -9,6 +10,7 @@ use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\Grid;
@@ -85,6 +87,19 @@ class ValueDispatchPendencies extends Page implements HasTable
                                     ->label('Data Liberação'),
                             ]),
                     ]),
+            ])
+            ->recordActions([
+                Action::make('liberar')
+                    ->label('Liberar')
+                    ->icon(Heroicon::OutlinedLockOpen)
+                    ->requiresConfirmation()
+                    ->modalHeading('Remover a pendência?')
+                    ->visible(fn (array $record) => $record['status'] === 'Pendente' && auth()->user()->hasLegacyCredential('lib_val_des'))
+                    ->action(function (array $record) {
+                        app(ReleaseValueDispatch::class)($record['id'], auth()->id());
+
+                        Notification::make()->title('Pendência liberada')->success()->send();
+                    }),
             ])
             ->columns([
                 TextColumn::make('booking')
