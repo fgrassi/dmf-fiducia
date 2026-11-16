@@ -38,6 +38,15 @@ class NotesReportTest extends TestCase
         $this->actingAs($this->user('financial'))->get(NotesReport::getUrl())->assertOk();
     }
 
+    public function test_page_lists_the_companies_of_each_report(): void
+    {
+        DB::table('pessoa')->insert(['pessoa_id' => 7, 'nome' => 'Faros Um']);
+        DB::table('grupo_empresa_membro')->insert(['grupo_empresa_id' => 1, 'pessoa_id' => 7, 'created_by' => 1]);
+
+        Livewire::actingAs($this->user('financial'))->test(NotesReport::class)
+            ->assertSee(['Grupo Faros', 'Faros Um', 'JR COMÉRCIO DE BICICLETAS E ACESSÓRIOS LTDA']);
+    }
+
     public function test_faros_sheets_are_the_paid_charges_of_group_clients_in_the_payment_month(): void
     {
         DB::table('grupo_empresa_membro')->insert(['grupo_empresa_id' => 1, 'pessoa_id' => 7, 'created_by' => 1]);

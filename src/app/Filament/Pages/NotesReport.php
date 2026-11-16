@@ -11,8 +11,11 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Grid;
-use Filament\Schemas\Components\View;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Text;
+use Filament\Schemas\Components\UnorderedList;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\DB;
 use UnitEnum;
@@ -73,10 +76,20 @@ class NotesReport extends Page
             ->components([
                 Form::make([EmbeddedSchema::make('form')])
                     ->id('form'),
-                View::make('filament.pages.notes-report')
-                    ->viewData(fn () => ['faros' => DB::table('grupo_empresa_membro as gem')
-                        ->join('pessoa as p', 'p.pessoa_id', '=', 'gem.pessoa_id')
-                        ->where('gem.grupo_empresa_id', 1)->orderBy('p.nome')->pluck('p.nome')]),
+                Section::make('Empresas')
+                    ->schema([
+                        Text::make('Grupo Faros')
+                            ->weight(FontWeight::SemiBold),
+                        UnorderedList::make(fn () => DB::table('grupo_empresa_membro as gem')
+                            ->join('pessoa as p', 'p.pessoa_id', '=', 'gem.pessoa_id')
+                            ->where('gem.grupo_empresa_id', 1)
+                            ->orderBy('p.nome')
+                            ->pluck('p.nome')
+                            ->all()),
+                        Text::make('JR')
+                            ->weight(FontWeight::SemiBold),
+                        UnorderedList::make(['JR COMÉRCIO DE BICICLETAS E ACESSÓRIOS LTDA']),
+                    ]),
             ]);
     }
 
