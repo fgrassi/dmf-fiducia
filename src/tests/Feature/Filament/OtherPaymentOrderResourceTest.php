@@ -122,7 +122,7 @@ class OtherPaymentOrderResourceTest extends TestCase
         $text = preg_replace('/\s+/', ' ', strip_tags($component->html()));
         $this->assertStringContainsString('Subtotal R$ 450,00 Despesas Financeiras/IOF R$ 10,00 Total R$ 460,00', $text);
 
-        $component->callAction(TestAction::make('alterarIof')->schemaComponent('iof', schema: 'content'), ['iof' => 20.5]);
+        $component->callAction('alterarIof', ['iof' => 20.5]);
 
         $this->assertStringContainsString('Despesas Financeiras/IOF R$ 20,50 Total R$ 470,50', preg_replace('/\s+/', ' ', strip_tags($component->html())));
     }

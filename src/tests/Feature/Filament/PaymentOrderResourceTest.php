@@ -142,7 +142,7 @@ class PaymentOrderResourceTest extends TestCase
 
         $this->assertStringContainsString('Subtotal R$ 500,00 Despesas Financeiras/IOF R$ 10,00 Total R$ 510,00', $text());
 
-        $component->callAction(TestAction::make('alterarIof')->schemaComponent('iof', schema: 'content'), ['iof' => 25.5]);
+        $component->callAction('alterarIof', ['iof' => 25.5]);
 
         $this->assertStringContainsString('Subtotal R$ 500,00 Despesas Financeiras/IOF R$ 25,50 Total R$ 525,50', $text());
     }
@@ -308,7 +308,7 @@ class PaymentOrderResourceTest extends TestCase
             ->callAction('codigoIdentificador', ['code' => 'ABC-1']);
 
         Livewire::test(ItemsRelationManager::class, ['ownerRecord' => $order, 'pageClass' => ViewPaymentOrder::class])
-            ->callAction(TestAction::make('alterarIof')->schemaComponent('iof', schema: 'content'), ['iof' => 9.9])
+            ->callAction('alterarIof', ['iof' => 9.9])
             ->assertNotified('IOF atualizado.');
 
         Livewire::test(InstructionsRelationManager::class, ['ownerRecord' => $order, 'pageClass' => ViewPaymentOrder::class])

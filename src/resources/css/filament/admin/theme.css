@@ -67,13 +67,6 @@ html {
 }
 
 /*
- * Totais do resumo da ordem de pagamento: o valor não estica, então o botão de editar fica colado a ele.
- */
-.fi-order-totals .fi-in-entry-content {
-    width: auto;
-}
-
-/*
  * Hover em todas as linhas das tabelas (o Filament só aplica nas linhas clicáveis).
  */
 .fi-ta-row:not(.fi-ta-summary-header-row, .fi-ta-individual-search-row):hover {

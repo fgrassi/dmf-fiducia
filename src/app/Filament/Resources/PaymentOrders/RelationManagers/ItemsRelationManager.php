@@ -10,12 +10,8 @@ use App\Services\Cobranca\ChargeDetails;
 use DomainException;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
-use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Schemas\Components\EmbeddedTable;
-use Filament\Schemas\Components\Group;
-use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -38,40 +34,10 @@ class ItemsRelationManager extends RelationManager
         return false;
     }
 
-    /** A tabela do resumo e, depois das linhas, Subtotal, Despesas Financeiras/IOF (com o botão de editar) e Total. */
-    public function content(Schema $schema): Schema
-    {
-        $order = fn () => $this->getOwnerRecord();
-        $money = fn (float $value) => 'R$ '.number_format($value, 2, ',', '.');
-
-        return $schema
-            ->components([
-                EmbeddedTable::make(),
-                Group::make([
-                    TextEntry::make('subtotal')
-                        ->label('Subtotal')
-                        ->inlineLabel()
-                        ->state(fn () => $money($order()->enabledTotal())),
-                    TextEntry::make('iof')
-                        ->label('Despesas Financeiras/IOF')
-                        ->inlineLabel()
-                        ->state(fn () => $money((float) $order()->valor_iof))
-                        ->suffixAction($this->editIof()),
-                    TextEntry::make('total')
-                        ->label('Total')
-                        ->inlineLabel()
-                        ->weight('bold')
-                        ->state(fn () => $money($order()->enabledTotal() + (float) $order()->valor_iof)),
-                ])->extraAttributes(['class' => 'fi-order-totals', 'style' => 'padding-left: 2rem']),
-            ]);
-    }
-
-    /** Despesas Financeiras/IOF da ordem, editado pelo botão simples ao lado do campo. */
-    private function editIof(): Action
+    /** Despesas Financeiras/IOF da ordem, editado pelo lápis do rodapé da tabela (a view chama mountAction). */
+    public function alterarIofAction(): Action
     {
         return Action::make('alterarIof')
-            ->icon('heroicon-o-pencil-square')
-            ->tooltip('Alterar Despesas Financeiras/IOF')
             ->modalHeading('Alterar Despesas Financeiras/IOF')
             ->modalWidth('sm')
             ->fillForm(fn () => ['iof' => $this->getOwnerRecord()->valor_iof])
@@ -86,6 +52,11 @@ class ItemsRelationManager extends RelationManager
 
                 Notification::make()->title('IOF atualizado.')->success()->send();
             });
+    }
+
+    private static function money(float $value): string
+    {
+        return 'R$ '.number_format($value, 2, ',', '.');
     }
 
     public function table(Table $table): Table
@@ -116,6 +87,12 @@ class ItemsRelationManager extends RelationManager
                     ->groupBy('l.ref_expense'))
                 ->orderBy('fin_payment_order_items.id'))
             ->paginated(false)
+            ->contentFooter(fn () => view('filament.payment-orders.totals-footer', [
+                'valueColumn' => 5,
+                'subtotal' => self::money($this->getOwnerRecord()->enabledTotal()),
+                'iof' => self::money((float) $this->getOwnerRecord()->valor_iof),
+                'total' => self::money($this->getOwnerRecord()->enabledTotal() + (float) $this->getOwnerRecord()->valor_iof),
+            ]))
             ->columns([
                 TextColumn::make('expense')
                     ->label('Despesa')
