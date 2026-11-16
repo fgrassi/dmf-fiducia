@@ -26,7 +26,7 @@ class MailAndRatesReportsTest extends TestCase
         $rows = app(NegotiatedRatesReport::class)('2026-11-01', '2026-11-16');
 
         $this->assertSame(['EXP1', 'IMP1'], array_column($rows, 'booking'));
-        $this->assertSame(['Importação', 'ACME (11.111)', 'Dólar (US$)', 1500.0, 5.25, 'Ana', 'combinado'], [$rows[1]['operation'], $rows[1]['client'], $rows[1]['currency'], $rows[1]['total'], $rows[1]['rate'], $rows[1]['author'], $rows[1]['note']]);
+        $this->assertSame(['i', 'ACME (11.111)', 'Dólar (US$)', 1500.0, 5.25, 'Ana', 'combinado'], [$rows[1]['operation'], $rows[1]['client'], $rows[1]['currency'], $rows[1]['total'], $rows[1]['rate'], $rows[1]['author'], $rows[1]['note']]);
         $this->assertSame(['IMP1'], array_column(app(NegotiatedRatesReport::class)('2026-11-01', '2026-11-16', 'i'), 'booking'));
     }
 

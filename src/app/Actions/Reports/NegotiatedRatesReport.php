@@ -29,7 +29,7 @@ class NegotiatedRatesReport
             ->map(fn ($row) => [
                 'id' => $row->id,
                 'date' => $row->created_at,
-                'operation' => $row->impor_expor === 'e' ? 'Exportação' : ($row->impor_expor === 'i' ? 'Importação' : ''),
+                'operation' => $row->impor_expor,
                 'booking' => $row->booking,
                 'total' => (float) $row->total_value,
                 'client' => $row->client ? "{$row->client} ({$row->cnpj})" : '',

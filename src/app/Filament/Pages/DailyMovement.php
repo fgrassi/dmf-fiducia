@@ -122,7 +122,9 @@ class DailyMovement extends Page
                     TextColumn::make('date')
                         ->label('Data Reserva'),
                     TextColumn::make('type')
-                        ->label('Tipo'),
+                        ->label('Tipo')
+                        ->badge()
+                        ->color(fn (array $record) => OperationType::tryFrom((string) ($record['operation'] ?? ''))?->getColor()),
                     TextColumn::make('star')
                         ->label('')
                         ->formatStateUsing(fn ($state) => $state ? '★' : ''),

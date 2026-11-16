@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Actions\Reports\NegotiatedRatesReport;
 use App\Enums\OperationType;
+use App\Filament\Support\OperationBadge;
 use App\Filament\Support\ReportRecords;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -91,7 +92,7 @@ class NegotiatedRates extends Page implements HasTable
                     ->label('Data')
                     ->sortable()
                     ->date('d/m/Y'),
-                TextColumn::make('operation')
+                OperationBadge::column('operation')
                     ->label('Tipo embarque')
                     ->sortable(),
                 TextColumn::make('booking')

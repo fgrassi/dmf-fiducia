@@ -121,6 +121,7 @@ class DailyMovementReport
             'id' => $booking->embarque_id,
             'date' => $booking->dteCadastro ? date('d/m/Y', strtotime($booking->dteCadastro)) : '',
             'type' => $this->operationLabel($booking),
+            'operation' => $booking->impor_expor,
             'booking' => $booking->booking,
             'client' => (string) $booking->client,
             'seller' => $booking->seller ? strtok(trim($booking->seller), ' ') : '',

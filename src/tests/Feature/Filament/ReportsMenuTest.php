@@ -2,9 +2,11 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Pages\ArrivalConfirmations;
 use App\Filament\Pages\BookingsBySeller;
 use App\Filament\Pages\BookingsReportPage;
 use App\Filament\Pages\DailyMovement;
+use App\Filament\Pages\DepartureConfirmations;
 use App\Filament\Pages\LocalCharges;
 use App\Filament\Pages\NegotiatedRates;
 use App\Filament\Pages\TransitTimeByCarrier;
@@ -22,25 +24,29 @@ class ReportsMenuTest extends TestCase
 
     public function test_menu_groups_the_reports_under_relatorios_by_credential(): void
     {
-        $this->actingAs($this->user('manager,relatorio'));
+        $this->actingAs($this->user('manager,relatorio,booking'));
         Filament::setCurrentPanel('admin');
 
         $group = collect(Filament::getNavigation())->first(fn ($group) => $group->getLabel() === 'Relatórios');
 
-        $this->assertEqualsCanonicalizing(['Taxas Negociadas', 'Taxas Locais', 'Movimento Diário', 'Transit Time - Armador', 'Transit Time - Destino', 'Reserva/Vendedor', 'Reservas'], collect($group->getItems())->map->getLabel()->all());
+        $this->assertEqualsCanonicalizing(['Taxas Negociadas', 'Taxas Locais', 'Movimento Diário', 'Transit Time - Armador', 'Transit Time - Destino', 'Reserva/Vendedor', 'Reservas', 'Confirmações de Chegada', 'Confirmações de Embarque'], collect($group->getItems())->map->getLabel()->all());
     }
 
     public function test_pages_forbid_users_without_the_legacy_credential(): void
     {
-        $this->actingAs($this->user('booking'));
+        $this->actingAs($this->user('financial'));
 
+        $this->get(ArrivalConfirmations::getUrl())->assertForbidden();
+        $this->get(DepartureConfirmations::getUrl())->assertForbidden();
         $this->get(NegotiatedRates::getUrl())->assertForbidden();
         $this->get(TransitTimeByCarrier::getUrl())->assertForbidden();
         $this->get(TransitTimeByPort::getUrl())->assertForbidden();
         $this->get(DailyMovement::getUrl())->assertForbidden();
         $this->get(BookingsBySeller::getUrl())->assertForbidden();
         $this->get(BookingsReportPage::getUrl())->assertForbidden();
+        $this->actingAs($this->user('booking'));
         $this->get(LocalCharges::getUrl())->assertOk();
+        $this->get(ArrivalConfirmations::getUrl())->assertOk();
     }
 
     public function test_negotiated_rates_lists_the_default_period(): void
@@ -52,6 +58,17 @@ class ReportsMenuTest extends TestCase
 
         Livewire::test(NegotiatedRates::class)
             ->assertSee(['IMP1', 'combinado', '5,25']);
+    }
+
+    public function test_confirmations_list_the_default_period(): void
+    {
+        $this->actingAs($this->user('booking'));
+        $this->travelTo('2026-11-16 10:00');
+        $id = DB::table('embarque')->insertGetId(['booking' => 'IMP9', 'impor_expor' => 'i', 'chegada_prevista' => '2026-11-10']);
+        DB::table('arrival_confirmation')->insert(['ref_embarque' => $id, 'created_by' => 1, 'created_at' => '2026-11-05']);
+
+        Livewire::test(ArrivalConfirmations::class)->assertSee('IMP9');
+        Livewire::test(DepartureConfirmations::class)->assertDontSee('IMP9');
     }
 
     public function test_local_charges_search_renders_the_groups(): void
