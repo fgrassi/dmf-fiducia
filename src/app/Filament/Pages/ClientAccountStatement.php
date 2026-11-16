@@ -26,6 +26,7 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Cache;
 use UnitEnum;
 
 /**
@@ -49,9 +50,6 @@ class ClientAccountStatement extends Page implements HasTable
     protected static ?string $navigationParentItem = 'Relatórios';
 
     protected static ?int $navigationSort = 15;
-
-    /** @var array<string, array<string, mixed>> relatório por filtros, para a tabela e a dos totais não o refazerem */
-    private static array $reports = [];
 
     /** Relatório da requisição: a tabela, o resumo e o Excel leem o mesmo resultado. */
     protected ?array $report = null;
@@ -261,7 +259,7 @@ class ClientAccountStatement extends Page implements HasTable
      */
     private static function run(array $filters): array
     {
-        return self::$reports[md5(json_encode($filters))] ??= app(ClientAccountStatementReport::class)($filters);
+        return Cache::driver('array')->rememberForever('account-statement:'.md5(json_encode($filters)), fn () => app(ClientAccountStatementReport::class)($filters));
     }
 
     /** @return array<string, mixed> vazio, com o aviso em `$error`, quando falta o cliente ou a data inicial */

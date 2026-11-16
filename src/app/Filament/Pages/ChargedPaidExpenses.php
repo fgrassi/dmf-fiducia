@@ -4,7 +4,8 @@ namespace App\Filament\Pages;
 
 use App\Actions\Expenses\ChargedPaidReport;
 use App\Actions\Expenses\ExportChargedPaidReport;
-use App\Filament\Livewire\ReportResult;
+use App\Filament\Livewire\ReportSectionTable;
+use App\Filament\Resources\Embarques\EmbarqueResource;
 use App\Models\CapaProcessoArquivo;
 use App\Models\FinExpenses;
 use App\Models\Pessoa;
@@ -20,9 +21,15 @@ use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Livewire;
+use Filament\Schemas\Components\Text;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
+use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use UnitEnum;
 
@@ -49,7 +56,7 @@ class ChargedPaidExpenses extends Page
     /** @var array<string, mixed>|null */
     public ?array $data = [];
 
-    /** Filtros do último "Enviar": o resultado fica no componente filho, fora do estado da página. */
+    /** Filtros do último "Enviar": o resultado fica nas tabelas filhas, fora do estado da página. */
     public ?array $applied = null;
 
     /** Muda a cada "Enviar", para o resultado ser refeito mesmo com os mesmos filtros. */
@@ -133,13 +140,9 @@ class ChargedPaidExpenses extends Page
                                 ->action(fn () => $this->clear()),
                         ]),
                     ]),
-                Livewire::make(ReportResult::class, fn () => [
-                    'action' => ChargedPaidReport::class,
-                    'view' => 'filament.pages.charged-paid-expenses',
-                    'arguments' => [$this->applied],
-                ])
-                    ->key('result'.$this->runs)
-                    ->visible(fn () => $this->applied !== null),
+                Text::make('Nenhum registro encontrado para os filtros informados.')
+                    ->visible(fn () => $this->applied !== null && self::run($this->applied)['grupos'] === []),
+                Group::make(fn () => $this->sections()),
             ]);
     }
 
@@ -147,6 +150,10 @@ class ChargedPaidExpenses extends Page
     {
         $this->applied = $this->filters();
         $this->runs++;
+
+        if (! $this->build()) {
+            $this->applied = null;
+        }
     }
 
     public function excel(): ?StreamedResponse
@@ -162,11 +169,114 @@ class ChargedPaidExpenses extends Page
         $this->applied = null;
     }
 
+    /**
+     * Resumo por despesa, uma tabela de reservas por despesa e os totais, todas sob o mesmo "Enviar". Montadas na hora de desenhar,
+     * porque o conteúdo da página já pode ter sido montado antes de o "Enviar" chegar.
+     *
+     * @return list<Livewire>
+     */
+    private function sections(): array
+    {
+        if ($this->applied === null || ($groups = self::run($this->applied)['grupos']) === []) {
+            return [];
+        }
+
+        return array_map(fn (string $section) => Livewire::make(ReportSectionTable::class, fn () => ['page' => static::class, 'section' => $section, 'filters' => $this->applied])
+            ->key($section.$this->runs), ['summary', ...array_map(fn (int $index) => "group{$index}", array_keys($groups)), 'totals']);
+    }
+
+    /** @param array<string, mixed> $filters */
+    public static function sectionTable(Table $table, string $section, array $filters): Table
+    {
+        $report = self::run($filters);
+        $keyed = fn (array $rows) => collect($rows)->mapWithKeys(fn (array $row, int $index) => ["r{$index}" => $row])->all();
+        $money = fn ($state) => number_format((float) $state, 2, ',', '.');
+        $date = fn ($state) => filled($state) && ($time = strtotime($state)) ? date('d/m/Y', $time) : '';
+        $result = fn ($state) => (float) $state < 0 ? 'danger' : null;
+        $amounts = fn (array $columns) => array_map(fn (string $key, string $label) => TextColumn::make($key)
+            ->label($label)
+            ->alignEnd()
+            ->formatStateUsing($money)
+            ->color($key === 'resultado' ? $result : null), array_keys($columns), $columns);
+
+        if ($section === 'summary') {
+            return $table
+                ->heading('Resumo por despesa — '.$report['periodo'])
+                ->records(fn () => $keyed($report['grupos']))
+                ->columns([
+                    TextColumn::make('despesa_nome')
+                        ->label('Despesa')
+                        ->wrap(),
+                    TextColumn::make('despesa_tipo')
+                        ->label('Tipo')
+                        ->badge()
+                        ->placeholder(''),
+                    TextColumn::make('reservas')
+                        ->label('Reservas')
+                        ->alignCenter(),
+                    ...$amounts(['cobrado' => 'Cobrado', 'pago' => 'Pago', 'resultado' => 'Resultado']),
+                ]);
+        }
+
+        if ($section === 'totals') {
+            return $table
+                ->heading('Totais')
+                ->records(fn () => ['total' => $report['totais']])
+                ->columns([
+                    TextColumn::make('reservas')
+                        ->label('Reservas')
+                        ->weight(FontWeight::SemiBold),
+                    ...$amounts(['cobrado' => 'Cobrado', 'pago' => 'Pago', 'resultado' => 'Resultado']),
+                ]);
+        }
+
+        $group = $report['grupos'][(int) substr($section, 5)];
+
+        return $table
+            ->heading($group['titulo'])
+            ->description("Subtotal ({$group['reservas']} reservas): cobrado {$money($group['cobrado'])} | pago {$money($group['pago'])} | resultado {$money($group['resultado'])}")
+            ->records(fn () => $keyed($group['rows']))
+            ->columns([
+                TextColumn::make('booking')
+                    ->label('Booking')
+                    ->url(fn (array $record) => $record['embarque_id'] ? EmbarqueResource::getUrl('view', ['record' => $record['embarque_id']]) : null),
+                TextColumn::make('cliente_nome')
+                    ->label('Cliente')
+                    ->wrap(),
+                TextColumn::make('etd')
+                    ->label('ETD')
+                    ->formatStateUsing($date),
+                TextColumn::make('eta')
+                    ->label('ETA')
+                    ->formatStateUsing($date),
+                TextColumn::make('data_cobranca')
+                    ->label('Data da cobrança')
+                    ->formatStateUsing($date),
+                TextColumn::make('data_pagamento')
+                    ->label('Data do pagamento')
+                    ->formatStateUsing($date),
+                ...$amounts(['cobrado' => 'Cobrado', 'pago' => 'Pago', 'resultado' => 'Resultado']),
+            ]);
+    }
+
+    /**
+     * Relatório dos filtros, o mesmo para as tabelas e o Excel na requisição.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     *
+     * @throws DomainException
+     */
+    private static function run(array $filters): array
+    {
+        return Cache::driver('array')->rememberForever('charged-paid:'.md5(json_encode($filters)), fn () => app(ChargedPaidReport::class)($filters));
+    }
+
     /** @return array<string, mixed>|null null quando o filtro é inválido (a mensagem sai como aviso) */
     private function build(): ?array
     {
         try {
-            return app(ChargedPaidReport::class)($this->filters());
+            return self::run($this->filters());
         } catch (DomainException $e) {
             Notification::make()
                 ->title($e->getMessage())

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Livewire\ReportSectionTable;
 use App\Filament\Pages\ChargedPaidExpenses;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -28,15 +29,22 @@ class ChargedPaidExpensesTest extends TestCase
             ->assertNotified('Informe o período ou o arquivo de capa.');
     }
 
-    public function test_sends_the_report_and_shows_totals_and_the_booking_rows(): void
+    public function test_sends_the_report_and_shows_the_summary_the_booking_rows_and_the_totals(): void
     {
         $this->actingAs($this->user('financial'));
         $this->charge();
+        $filters = ['data_ini' => '2026-10-01', 'data_fim' => '2026-10-31', 'tipo_data' => 'cobranca'];
 
         Livewire::test(ChargedPaidExpenses::class)
-            ->fillForm(['data_ini' => '2026-10-01', 'data_fim' => '2026-10-31', 'tipo_data' => 'cobranca'])
+            ->fillForm($filters)
             ->call('send')
-            ->assertSee(['THC', 'BKG-10', '300,00', '120,00', '180,00', 'THC / 01/10/2026 até 31/10/2026']);
+            ->assertSeeLivewire(ReportSectionTable::class);
+
+        $section = fn (string $name) => Livewire::test(ReportSectionTable::class, ['page' => ChargedPaidExpenses::class, 'section' => $name, 'filters' => $filters + ['despesa_ids' => [], 'regra_ids' => [], 'cliente_id' => null, 'arquivo_id' => null]]);
+
+        $section('summary')->assertSee(['Resumo por despesa', 'THC', '300,00', '120,00', '180,00']);
+        $section('group0')->assertSee(['THC / 01/10/2026 até 31/10/2026', 'BKG-10', '300,00', '120,00', '180,00', 'Subtotal (1 reservas)']);
+        $section('totals')->assertSee(['Totais', '300,00', '120,00', '180,00']);
     }
 
     public function test_no_rows_say_so_and_clear_resets_the_report(): void
