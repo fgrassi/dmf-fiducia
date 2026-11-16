@@ -59,7 +59,7 @@ class ChangeStatus
 
     private function warnExport(Embarque $booking, string $justification): void
     {
-        $html = "A reserva {$booking->booking} foi cancelada, gentileza verificar, pois existe seguro adicionado."
+        $html = 'A reserva '.e($booking->booking).' foi cancelada, gentileza verificar, pois existe seguro adicionado.'
             .'<br/><br/>Segue a justificativa do cancelamento:<br/>'.nl2br(e($justification));
 
         Mail::html($html, fn ($mail) => $mail
