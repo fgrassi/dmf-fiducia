@@ -24,12 +24,12 @@ class ReportsMenuTest extends TestCase
 
     public function test_menu_groups_the_reports_under_relatorios_by_credential(): void
     {
-        $this->actingAs($this->user('manager,relatorio,booking'));
+        $this->actingAs($this->user('manager,relatorio,booking,followup'));
         Filament::setCurrentPanel('admin');
 
         $group = collect(Filament::getNavigation())->first(fn ($group) => $group->getLabel() === 'Relatórios');
 
-        $this->assertEqualsCanonicalizing(['Taxas Negociadas', 'Taxas Locais', 'Movimento Diário', 'Transit Time - Armador', 'Transit Time - Destino', 'Reserva/Vendedor', 'Reservas', 'Confirmações de Chegada', 'Confirmações de Embarque', 'Pendências Debit/Credit Notes'], collect($group->getItems())->map->getLabel()->all());
+        $this->assertEqualsCanonicalizing(['Taxas Negociadas', 'Taxas Locais', 'Movimento Diário', 'Transit Time - Armador', 'Transit Time - Destino', 'Reserva/Vendedor', 'Reservas', 'Confirmações de Chegada', 'Confirmações de Embarque', 'Pendências Debit/Credit Notes', 'Pendências - Envio de Valores'], collect($group->getItems())->map->getLabel()->all());
     }
 
     public function test_pages_forbid_users_without_the_legacy_credential(): void
