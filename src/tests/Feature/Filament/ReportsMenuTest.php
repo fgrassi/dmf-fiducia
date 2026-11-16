@@ -29,7 +29,7 @@ class ReportsMenuTest extends TestCase
 
         $group = collect(Filament::getNavigation())->first(fn ($group) => $group->getLabel() === 'Relatórios');
 
-        $this->assertEqualsCanonicalizing(['Taxas Negociadas', 'Taxas Locais', 'Movimento Diário', 'Transit Time - Armador', 'Transit Time - Destino', 'Reserva/Vendedor', 'Reservas', 'Confirmações de Chegada', 'Confirmações de Embarque'], collect($group->getItems())->map->getLabel()->all());
+        $this->assertEqualsCanonicalizing(['Taxas Negociadas', 'Taxas Locais', 'Movimento Diário', 'Transit Time - Armador', 'Transit Time - Destino', 'Reserva/Vendedor', 'Reservas', 'Confirmações de Chegada', 'Confirmações de Embarque', 'Pendências Debit/Credit Notes'], collect($group->getItems())->map->getLabel()->all());
     }
 
     public function test_pages_forbid_users_without_the_legacy_credential(): void
