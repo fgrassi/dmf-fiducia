@@ -3,13 +3,24 @@
 namespace App\Filament\Resources\Embarques\Schemas;
 
 use App\Filament\Support\OperationBadge;
+use App\Models\Cidade;
+use App\Models\Container;
 use App\Models\Embarque;
+use App\Models\Estado;
+use App\Models\FinExpensesValues;
+use App\Models\Navio;
+use App\Models\Pais;
 use Carbon\Carbon;
+use Closure;
+use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\IconSize;
+use Illuminate\Support\Facades\DB;
 
 class EmbarqueInfolist
 {
@@ -18,61 +29,160 @@ class EmbarqueInfolist
         return $schema
             ->columns(2)
             ->components([
-                Section::make('Reserva')
+                Grid::make(3)
                     ->columnSpanFull()
-                    ->columns(3)
                     ->schema([
-                        TextEntry::make('booking')
-                            ->label('Reserva'),
-                        TextEntry::make('vendedor.nome')
-                            ->label('Vendedor')
-                            ->placeholder('Não informado'),
-                        OperationBadge::entry()
-                            ->label('Tipo de reserva'),
-                        TextEntry::make('tipo_embarque')
-                            ->label('Modal')
-                            ->formatStateUsing(fn (?string $state) => Embarque::TYPES[$state] ?? $state),
-                        TextEntry::make('cliente.nome')
-                            ->label('Cliente')
-                            ->placeholder('Não informado'),
-                        TextEntry::make('data_topo')
-                            ->label('Data de solicitação')
-                            ->date('d/m/Y')
-                            ->placeholder('Não informada'),
-                        TextEntry::make('agente.nome')
-                            ->label('Agente')
-                            ->placeholder('Não informado'),
-                        TextEntry::make('importador.nome')
-                            ->label('Importador')
-                            ->placeholder('Não informado'),
-                        TextEntry::make('armador.nome')
-                            ->label('Armador')
-                            ->placeholder('Não informado'),
-                        TextEntry::make('house_bl')
-                            ->label('HBL')
-                            ->placeholder('Não informado'),
-                        TextEntry::make('master_bl')
-                            ->label('MBL')
-                            ->placeholder('Não informado'),
-                        TextEntry::make('invoice')
-                            ->label('Invoice')
-                            ->placeholder('Não informado'),
-                        TextEntry::make('saida_prevista')
-                            ->label('Saída prevista')
-                            ->date('d/m/Y')
-                            ->placeholder('Não informada'),
-                        TextEntry::make('chegada_prevista')
-                            ->label('Chegada prevista')
-                            ->date('d/m/Y')
-                            ->placeholder('Não informada'),
-                        TextEntry::make('finalizado')
-                            ->label('Situação')
-                            ->badge()
-                            ->formatStateUsing(fn (?string $state) => Embarque::STATUSES[$state] ?? $state),
-                        TextEntry::make('ctr_desp')
-                            ->label('Despesas pendentes de cobrança')
-                            ->formatStateUsing(fn ($state) => (int) $state === 1 ? 'Sim' : 'Não'),
+                        Section::make('Reserva')
+                            ->columnSpan(fn (Embarque $record) => ($record->impor_expor === 'e' && $record->tipo_embarque !== 'a') ? 2 : 3)
+                            ->extraAttributes(['style' => 'height: 100%; display: grid'])
+                            ->columns(3)
+                            ->schema([
+                                Group::make([
+                                    TextEntry::make('vendedor.nome')
+                                        ->label('Vendedor')
+                                        ->placeholder('Não informado'),
+                                    TextEntry::make('finalizado')
+                                        ->label('Situação')
+                                        ->badge()
+                                        ->formatStateUsing(fn (?string $state) => Embarque::STATUSES[$state] ?? $state),
+                                    OperationBadge::entry()
+                                        ->label('Tipo de reserva'),
+                                    TextEntry::make('data_topo')
+                                        ->label('Data de solicitação')
+                                        ->date('d/m/Y')
+                                        ->placeholder('Não informada'),
+                                    TextEntry::make('agente.nome')
+                                        ->label('Agente')
+                                        ->placeholder('Não informado'),
+                                    TextEntry::make('escritorio.nome')
+                                        ->label('Escritório do agente')
+                                        ->state(fn (Embarque $record) => $record->escritorio
+                                            ? collect([$record->escritorio->nome, $record->escritorio->nif ? "NIF: {$record->escritorio->nif}" : null, $record->escritorio->observacoes ? "Endereço: {$record->escritorio->observacoes}" : null])->filter()->implode("\n")
+                                            : null)
+                                        ->extraAttributes(['class' => 'whitespace-pre-line'])
+                                        ->placeholder('Não informado')
+                                        ->visible(fn (Embarque $record) => $record->impor_expor !== 'e' && $record->tipo_embarque === 'm'),
+                                    TextEntry::make('bl_direto')
+                                        ->label('BL direto')
+                                        ->formatStateUsing(fn ($state) => $state ? 'SIM' : 'NÃO')
+                                        ->visible(fn (Embarque $record) => $record->impor_expor === 'e' && $record->tipo_embarque === 'm'),
+                                    TextEntry::make('tipo_fechamento')
+                                        ->label('Tipo de fechamento')
+                                        ->formatStateUsing(fn (?string $state) => ['o' => 'Origem / DMF', 'd' => 'Destino / Agente'][$state] ?? null)
+                                        ->placeholder('N/D')
+                                        ->visible(fn (Embarque $record) => $record->impor_expor === 'e' && $record->tipo_embarque === 'm'),
+                                    TextEntry::make('autor.nome')
+                                        ->label('Criado por')
+                                        ->placeholder('Não informado'),
+                                    TextEntry::make('de')
+                                        ->label('Responsável')
+                                        ->placeholder('Não informado')
+                                        ->visible(fn (Embarque $record) => ! self::isMaritimeExport($record)),
+                                    TextEntry::make('de_fone')
+                                        ->label('Fone')
+                                        ->placeholder('Não informado')
+                                        ->visible(fn (Embarque $record) => ! self::isMaritimeExport($record)),
+                                    self::multiline('observacaoint', 'Observação'),
+                                ]),
+                                Group::make([
+                                    TextEntry::make('booking')
+                                        ->label('Reserva'),
+                                    TextEntry::make('invoice')
+                                        ->label('Invoice')
+                                        ->placeholder('Não informado'),
+                                    TextEntry::make('customer_ref')
+                                        ->label('Customer reference')
+                                        ->placeholder('Não informado'),
+                                    TextEntry::make('house_bl')
+                                        ->label('HBL')
+                                        ->placeholder('Não informado'),
+                                    TextEntry::make('qtd_bl')
+                                        ->label('Quantidade HBL')
+                                        ->placeholder('Não informada')
+                                        ->visible(fn (Embarque $record) => $record->tipo_embarque === 'm'),
+                                    TextEntry::make('master_bl')
+                                        ->label('MBL')
+                                        ->placeholder('Não informado'),
+                                    TextEntry::make('nr_container')
+                                        ->label('Nr. do(s) container(s)')
+                                        ->extraAttributes(['class' => 'whitespace-pre-line'])
+                                        ->placeholder('Não informado')
+                                        ->visible(fn (Embarque $record) => $record->impor_expor !== 'e' && $record->tipo_embarque === 'm'),
+                                    TextEntry::make('ce_mercante')
+                                        ->label('CE Mercante')
+                                        ->placeholder('Não informado')
+                                        ->visible(fn (Embarque $record) => $record->impor_expor !== 'e' && $record->tipo_embarque === 'm'),
+                                    self::date('data_validade', 'Validade da cotação')
+                                        ->visible(fn (Embarque $record) => $record->tipo_embarque === 'm'),
+                                    TextEntry::make('consolidado')
+                                        ->label('Consolidado')
+                                        ->formatStateUsing(fn (?string $state) => ['n' => 'NÃO', 's' => 'SIM'][$state] ?? null)
+                                        ->placeholder('N/D')
+                                        ->visible(fn (Embarque $record) => $record->tipo_embarque === 'm'),
+                                    TextEntry::make('tipo_frete')
+                                        ->label('Local de pagamento do frete')
+                                        ->formatStateUsing(fn (?string $state) => ['p' => 'PP', 'c' => 'CC', 'a' => 'ABROAD'][$state] ?? null)
+                                        ->placeholder('N/D')
+                                        ->visible(fn (Embarque $record) => $record->tipo_embarque === 'm'),
+                                    TextEntry::make('controle_imo')
+                                        ->label('Controle IMO')
+                                        ->formatStateUsing(fn (?string $state) => $state === 's' ? 'OK' : null)
+                                        ->placeholder('-')
+                                        ->visible(fn (Embarque $record) => $record->impor_expor !== 'e' && $record->tipo_embarque === 'm'),
+                                ]),
+                                Group::make([
+                                    TextEntry::make('de')
+                                        ->label('Responsável pelo fechamento')
+                                        ->placeholder('Não informado')
+                                        ->visible(fn (Embarque $record) => self::isMaritimeExport($record)),
+                                    TextEntry::make('tipo_embarque')
+                                        ->label('Modal')
+                                        ->formatStateUsing(fn (?string $state) => Embarque::TYPES[$state] ?? $state),
+                                    TextEntry::make('cliente.nome')
+                                        ->label('Cliente')
+                                        ->placeholder('Não informado'),
+                                    TextEntry::make('importador.nome')
+                                        ->label('Importador')
+                                        ->placeholder('Não informado'),
+                                    TextEntry::make('ctr_desp')
+                                        ->label('Despesas pendentes de cobrança')
+                                        ->formatStateUsing(fn ($state) => (int) $state === 1 ? 'Sim' : 'Não'),
+                                ]),
+                            ]),
+                        Group::make([
+                            Section::make('Status do embarque')
+                                ->columns(2)
+                                ->compact()
+                                ->schema(fn (Embarque $record) => collect($record->shipmentStatus())
+                                    ->map(fn (bool $done, string $label) => IconEntry::make("status_{$label}")
+                                        ->label($label)
+                                        ->state($done)
+                                        ->size(IconSize::Small)
+                                        ->boolean())
+                                    ->values()
+                                    ->all()),
+                            Section::make('Consignar MBL para')
+                                ->columns(1)
+                                ->compact()
+                                ->schema([
+                                    TextEntry::make('agente.consignar_mbl')
+                                        ->label('Observações do agente')
+                                        ->extraAttributes(['class' => 'whitespace-pre-line'])
+                                        ->placeholder('Não informado'),
+                                    TextEntry::make('observacoes_pais')
+                                        ->label('Observações do país')
+                                        ->state(fn (Embarque $record) => Pais::find($record->agente?->paises_id)?->observacao)
+                                        ->extraAttributes(['class' => 'whitespace-pre-line'])
+                                        ->placeholder('Não informadas'),
+                                ]),
+                        ])
+                            ->columnSpan(1)
+                            ->visible(fn (Embarque $record) => $record->impor_expor === 'e' && $record->tipo_embarque !== 'a'),
                     ]),
+                Section::make('Embarque')
+                    ->columnSpanFull()
+                    ->columns(4)
+                    ->schema(fn (Embarque $record) => self::shipment($record)),
                 Section::make('Dados do cliente')
                     ->columnSpanFull()
                     ->columns(2)
@@ -132,6 +242,176 @@ class EmbarqueInfolist
                         ]),
                     ]),
             ]);
+    }
+
+    /** Data do legado: '0000-00-00' e vazio viram "sem valor". */
+    /**
+     * Informações do EMBARQUE: cada modal tem a sua ordem no legado (showExpo, showImp, showAereo), em duas colunas.
+     *
+     * @return list<Group>
+     */
+    private static function shipment(Embarque $record): array
+    {
+        $export = $record->impor_expor === 'e';
+
+        [$left, $right] = match (true) {
+            $record->tipo_embarque === 'a' => [
+                [...($export ? ['etd_inicial', 'eta_inicial'] : []), 'saida_prevista', 'chegada_prevista', 'transit', 'saida_efetiva', 'chegada_efetiva', 'transit_efetivo', 'incoterm', 'embarque_obs'],
+                ['portoOrigem', 'portoDestino', 'via' => 'Rota', 'cia_aerea', 'peso_cotacao', 'volume_cotacao', 'fator_wm'],
+            ],
+            $export => [
+                ['navio', 'navioDestino', 'vg', 'etd_inicial', 'eta_inicial', 'transit_inicial', 'saida_prevista', 'chegada_prevista', 'transit', 'data_entrega_agente', 'saida_efetiva', 'chegada_efetiva', 'transit_efetivo', 'incoterm', 'fretes', 'embarque_obs', 'flag_fi', 'pagador', 'recebedor'],
+                ['place_of_receipt', 'portoOrigem' => 'Porto de embarque', 'via' => 'Transbordo', 'portoDestino' => 'Porto de descarga', 'place_of_delivery', 'destino_final', 'inland', 'free_time_detention', 'free_time' => 'Free time (destino)', 'obs_free_time_destino', 'armador', 'type_of_service'],
+            ],
+            default => [
+                ['navio', 'navioDestino', 'vg', 'saida_prevista', 'chegada_prevista', 'chegada_desejada', 'transit', 'data_entrega_agente', 'saida_efetiva', 'chegada_efetiva', 'transit_efetivo', 'loading_type', 'armador', 'coloader', 'free_time', 'incoterm', 'embarque_obs', 'data_entrega_container_origem', 'flag_fi', 'pagador', 'recebedor'],
+                ['portoOrigem', 'portoDestino', 'via', 'garantee', 'insurance', 'demurrage', 'demurrage_days', 'redestinacao', 'autorizacao', 'etd_inicial', 'eta_inicial', 'transit_inicial'],
+            ],
+        };
+
+        // as duas colunas do legado, cada uma partida ao meio, viram 4 colunas na mesma ordem de leitura
+        return array_map(
+            fn (array $keys) => self::shipmentGroup($keys),
+            [...array_chunk($left, (int) ceil(count($left) / 2), true), ...array_chunk($right, (int) ceil(count($right) / 2), true)],
+        );
+    }
+
+    /** @param  array<int|string, string>  $keys  "chave" ou "chave" => "rótulo do legado" */
+    private static function shipmentGroup(array $keys): Group
+    {
+        $entries = [];
+
+        foreach ($keys as $key => $label) {
+            $entry = self::shipmentEntry(is_int($key) ? $label : $key);
+            $entries[] = is_int($key) ? $entry : $entry->label($label);
+        }
+
+        return Group::make($entries);
+    }
+
+    private static function shipmentEntry(string $key): TextEntry
+    {
+        $text = fn (string $field, string $label, string $placeholder = 'Não informado') => TextEntry::make($field)->label($label)->placeholder($placeholder);
+        $computed = fn (string $name, string $label, Closure $state, string $placeholder = '-') => TextEntry::make($name)->label($label)->state($state)->placeholder($placeholder);
+        $lookup = fn (string $name, string $label, array $options) => TextEntry::make($name)->label($label)->state(fn (Embarque $record) => $options[$record->{$name}] ?? null)->placeholder('-');
+        $multiline = fn (string $field, string $label) => self::multiline($field, $label);
+        $invoiceOnly = fn (TextEntry $entry) => $entry->visible(fn (Embarque $record) => (int) $record->flag_fi === 1);
+
+        return match ($key) {
+            'navio' => $computed('navio', 'Navio', fn (Embarque $record) => self::ship($record->navio), 'Não informado'),
+            'navioDestino' => $computed('navioDestino', 'Navio destino', fn (Embarque $record) => self::ship($record->navioDestino), 'Não informado'),
+            'vg' => $text('vg', 'VG'),
+            'etd_inicial' => self::date('etd_inicial', 'ETD inicial'),
+            'eta_inicial' => self::date('eta_inicial', 'ETA inicial'),
+            'transit_inicial' => $computed('transit_inicial', 'Transit time inicial', fn (Embarque $record) => self::days($record->etd_inicial, $record->eta_inicial)),
+            'saida_prevista' => self::date('saida_prevista', 'ETD'),
+            'chegada_prevista' => self::date('chegada_prevista', 'ETA'),
+            'chegada_desejada' => self::date('chegada_desejada', 'ETA desejado')->visible(fn (Embarque $record) => (int) $record->flag_prioritario === 1),
+            'transit' => $computed('transit', 'Transit time', fn (Embarque $record) => self::days($record->saida_prevista, $record->chegada_prevista)),
+            'data_entrega_agente' => self::date('data_entrega_agente', 'Data de entrega ao agente'),
+            'saida_efetiva' => self::date('saida_efetiva', 'Data de saída efetiva'),
+            'chegada_efetiva' => self::date('chegada_efetiva', 'Data de chegada efetiva'),
+            'transit_efetivo' => $computed('transit_efetivo', 'Transit time efetivo', fn (Embarque $record) => self::days($record->saida_efetiva, $record->chegada_efetiva)),
+            'loading_type' => $lookup('loading_type', 'Tipo de embarque', ['f' => 'Free Hand', 'd' => 'DMF']),
+            'armador' => $text('armador.nome', 'Armador'),
+            'coloader' => $text('coloader.nome', 'Coloader'),
+            'free_time' => $text('free_time', 'Free time', '-'),
+            'incoterm' => $computed('incoterm', 'Incoterm do embarque', fn (Embarque $record) => $record->incoterm_id ? DB::table('incoterm')->where('incoterm_id', $record->incoterm_id)->value('nome') : null, 'Não informado'),
+            'fretes' => $computed('fretes', 'Fretes negociados', fn (Embarque $record) => self::negotiatedFreights($record))->listWithLineBreaks(),
+            'embarque_obs' => $multiline('embarque_obs', 'Obs. do embarque'),
+            'data_entrega_container_origem' => self::date('data_entrega_container_origem', 'Entrega do container na origem'),
+            'flag_fi' => TextEntry::make('flag_fi')->label('Freight Invoice?')->formatStateUsing(fn ($state) => (int) $state === 0 ? 'Não' : 'Sim'),
+            'pagador' => $invoiceOnly($text('pagador.nome', 'Pagador')),
+            'recebedor' => $invoiceOnly(TextEntry::make('recebedor_freight_invoice')->label('Recebedor')->formatStateUsing(fn (?string $state) => ['d' => 'DMF INTERNACIONAL', 'a' => 'AIC', 'j' => 'JADE'][$state] ?? $state)->placeholder('Não informado')),
+            'portoOrigem' => $text('portoOrigem.label', 'Origem'),
+            'portoDestino' => $text('portoDestino.label', 'Destino'),
+            'via' => $text('via', 'Via'),
+            'cia_aerea' => $computed('cia_aerea', 'Cia aérea', fn (Embarque $record) => $record->ciaAerea?->name, 'Não informada'),
+            'peso_cotacao' => TextEntry::make('peso_cotacao')->label('Peso cotação')->numeric(4, ',', '.'),
+            'volume_cotacao' => TextEntry::make('volume_cotacao')->label('Volume cotação')->numeric(4, ',', '.'),
+            'fator_wm' => TextEntry::make('fator_wm')->label('Fator WM')->state(fn (Embarque $record) => max((float) $record->volume_cotacao / 0.006, (float) $record->peso_cotacao))->numeric(4, ',', '.'),
+            'garantee' => $lookup('garantee', 'Security deposit', ['n' => 'NO', 's' => 'YES', '3' => '30 DAYS', '4' => '45 DAYS', '5' => '50 DAYS', '6' => '60 DAYS', '9' => '90 DAYS']),
+            'insurance' => $lookup('insurance', 'Seguro contratado', ['s' => 'SIM', 'n' => 'NÃO']),
+            'demurrage' => $lookup('demurrage', 'Gerou demurrage', ['s' => 'SIM', 'n' => 'NÃO']),
+            'demurrage_days' => $text('demurrage_days', 'Dias de demurrage', '-'),
+            'redestinacao' => $lookup('ctr_redestinacao', 'Redestinação', [1 => 'Pendente', 2 => 'OK']),
+            'autorizacao' => $lookup('ctrl_autorizacao_impo', 'Autorização', [1 => 'SIM', 2 => 'NÃO']),
+            'place_of_receipt' => $multiline('place_of_receipt', 'Place of receipt'),
+            // informação antiga: só aparece quando preenchida
+            'place_of_delivery' => $multiline('place_of_delivery', 'Final destination*')->visible(fn (Embarque $record) => filled($record->place_of_delivery)),
+            'destino_final' => $computed('destino_final', 'Final destination', fn (Embarque $record) => self::finalDestination($record), 'Nenhum endereço selecionado')->extraAttributes(['class' => 'whitespace-pre-line']),
+            'inland' => $lookup('inland', 'Inland', [1 => 'Armador', 2 => 'Agente']),
+            'free_time_detention' => $text('free_time_detention', 'Free time detention (origem)', '-'),
+            'obs_free_time_destino' => $multiline('obs_free_time_destino', 'Obs. free time (destino)'),
+            'type_of_service' => $lookup('type_of_service', 'Type of service', [
+                'aa' => 'AIR TO AIR', 'ad' => 'AIR TO DOOR', 'da' => 'DOOR TO AIRPORT', 'dd' => 'DOOR TO DOOR', 'dp' => 'DOOR/PORT', 'pd' => 'PORT/DOOR',
+                'pp' => 'PORT/PORT', 'rd' => 'RAIL/DOOR', 'rp' => 'RAIL/PORT', 'te' => 'AIR FREIGHT', 'tt' => 'TRUCK/TRUCK',
+            ]),
+        };
+    }
+
+    /** Embarque::getDespesasFrete (legado): despesas de frete da reserva com a forma de cobrança ("Despesa/Un (equip) (BL) container - CC"). */
+    private static function negotiatedFreights(Embarque $record): array
+    {
+        $ids = DB::table('regra_despesa_cobranca_item')->where('regra_despesa_cobranca_id', 4)->pluck('despesa_id')->push(703, 1612, 1613);
+
+        return $record->expenses()
+            ->whereIn('ref_expense', $ids)
+            ->with(['despesa.unity', 'equipment', 'bl'])
+            ->get()
+            ->map(fn (FinExpensesValues $expense) => $expense->despesa?->label
+                .($expense->equipment ? " ({$expense->equipment->nome})" : '')
+                .($expense->bl ? " ({$expense->bl->bl})" : '')
+                .($expense->ref_container ? ' '.Container::find($expense->ref_container)?->numero : '')
+                .' - '.(['a' => 'PA', 'c' => 'CC', 'p' => 'PP', 's' => 'SEG', 'f' => 'FI'][$expense->billing] ?? ''))
+            ->all();
+    }
+
+    /** Endereço do Final Destination (destino_final) em linhas, ou null quando não há. */
+    private static function finalDestination(Embarque $record): ?string
+    {
+        $destination = DB::table('destino_final')->where('destino_final_id', $record->destino_final_id)->first();
+
+        if (! $destination) {
+            return null;
+        }
+
+        return implode("\n", [
+            "Endereço: {$destination->endereco}",
+            "Zip Code: {$destination->zip_code}",
+            'País: '.Pais::find($destination->pais_id)?->nome,
+            'Estado: '.Estado::find($destination->estado_id)?->nome,
+            'Cidade: '.Cidade::find($destination->cidade_id)?->nome,
+        ]);
+    }
+
+    /** Reserva de exportação marítima: o legado mostra "Responsável pelo fechamento" e não mostra o fone. */
+    private static function isMaritimeExport(Embarque $record): bool
+    {
+        return $record->impor_expor === 'e' && $record->tipo_embarque !== 'a';
+    }
+
+    private static function date(string $field, string $label): TextEntry
+    {
+        return TextEntry::make($field)
+            ->label($label)
+            ->state(fn (Embarque $record) => filled($record->{$field}) && ! str_starts_with((string) $record->{$field}, '0000') ? $record->{$field} : null)
+            ->date('d/m/Y')
+            ->placeholder('Não informada');
+    }
+
+    /** Dias entre duas datas do legado (transit time), ou null se faltar uma delas. */
+    private static function days(?string $from, ?string $to): ?int
+    {
+        $valid = fn (?string $date) => filled($date) && ! str_starts_with($date, '0000');
+
+        return $valid($from) && $valid($to) ? Carbon::parse($from)->startOfDay()->diffInDays(Carbon::parse($to)->startOfDay(), true) : null;
+    }
+
+    /** "Nome (N metros)" como o legado (Embarque::getInfoNavio). */
+    private static function ship(?Navio $ship): ?string
+    {
+        return $ship ? $ship->nome.($ship->tamanho > 0 ? " ({$ship->tamanho} metros)" : '') : null;
     }
 
     private static function deadline(string $field, string $label, bool $withTime = true): TextEntry

@@ -117,6 +117,106 @@ class EmbarqueResourceTest extends TestCase
             ->assertDontSee(['IMO', 'Free time']);
     }
 
+    public function test_view_page_shows_the_legacy_summary_fields_of_each_operation(): void
+    {
+        $this->actingAs($this->user('booking'));
+        $ship = DB::table('navio')->insertGetId(['nome' => 'MSC Aurora', 'tamanho' => 300]);
+        $port = fn (string $name) => DB::table('porto')->insertGetId(['nome' => $name]);
+        $coloader = DB::table('armador')->insertGetId(['nome' => 'Coloader X']);
+        $office = DB::table('escritorio')->insertGetId(['nome' => 'Office Lisboa', 'nif' => '123', 'observacoes' => 'Rua A']);
+        $incoterm = DB::table('incoterm')->insertGetId(['nome' => 'FOB']);
+        $author = $this->user('booking', 'criador')->getKey();
+
+        $import = $this->booking([
+            'impor_expor' => 'i', 'tipo_embarque' => 'm', 'intIdUser' => $author, 'navio_id' => $ship, 'coloader_id' => $coloader,
+            'escritorio_id' => $office, 'incoterm_id' => $incoterm, 'porto_origem_id' => $port('Santos'), 'porto_destino_id' => $port('Lisboa'),
+            'saida_prevista' => '2026-11-01', 'chegada_prevista' => '2026-11-11', 'saida_efetiva' => '0000-00-00', 'garantee' => '4',
+            'ctr_redestinacao' => 1, 'ctrl_autorizacao_impo' => 2, 'controle_imo' => 's', 'ce_mercante' => 'CE9', 'de' => 'Joana', 'de_fone' => '1199',
+            'tipo_frete' => 'c', 'free_time' => 14, 'embarque_obs' => 'Obs do embarque',
+        ]);
+        Livewire::test(ViewEmbarque::class, ['record' => $import->getKey()])
+            ->assertSee(['Ana', 'MSC Aurora (300 metros)', 'Coloader X', 'Office Lisboa', 'NIF: 123', 'Endereço: Rua A', 'FOB', 'Santos', 'Lisboa', '01/11/2026', '11/11/2026', '45 DAYS', 'Pendente', 'NÃO', 'CE9', 'OK', 'Joana', '1199', 'CC', 'Obs do embarque'])
+            ->assertSeeInOrder(['Transit time', '10'])
+            ->assertDontSee(['BL direto', 'Fator WM']);
+
+        $export = $this->booking(['impor_expor' => 'e', 'tipo_embarque' => 'm', 'bl_direto' => 1, 'tipo_fechamento' => 'd', 'de' => 'Paulo', 'de_fone' => '5555']);
+        Livewire::test(ViewEmbarque::class, ['record' => $export->getKey()])
+            ->assertSee(['BL direto', 'SIM', 'Destino / Agente', 'Responsável pelo fechamento', 'Paulo'])
+            ->assertDontSee(['5555', 'Security deposit', 'CE Mercante']);
+
+        $air = $this->booking(['impor_expor' => 'i', 'tipo_embarque' => 'a', 'peso_cotacao' => 100, 'volume_cotacao' => 0.9]);
+        Livewire::test(ViewEmbarque::class, ['record' => $air->getKey()])
+            ->assertSee(['Peso cotação', 'Fator WM', '150,0000'])
+            ->assertDontSee(['Navio', 'Security deposit']);
+    }
+
+    public function test_view_page_shows_the_shipment_status_and_the_mbl_consignee_on_maritime_exports_only(): void
+    {
+        $this->actingAs($this->user('booking'));
+        $country = DB::table('paises')->insertGetId(['nome' => 'Chile', 'observacao' => 'Exige carta de crédito']);
+        $agent = DB::table('pessoa')->insertGetId(['nome' => 'Agente Sul', 'paises_id' => $country, 'consignar_mbl' => "TO ORDER OF\nBANCO X"]);
+        $export = $this->booking(['impor_expor' => 'e', 'tipo_embarque' => 'm', 'pessoa_id_representante' => $agent, 'controle_debit' => '2026-11-02 10:00:00']);
+
+        DB::table('transborda')->insert(['embarque_id' => $export->getKey(), 'ref_frase_transborda' => 16]);
+        DB::table('fin_payment_orders')->insert(['ref_embarque' => $export->getKey(), 'ref_armador' => 1, 'ref_type' => 1, 'created_at' => '2026-11-01', 'status' => 0]);
+
+        $this->assertSame([
+            'Booking enviado' => true, 'Embarque confirmado' => false, 'Cobrança enviada' => false, 'Pagamento cliente recebido' => false,
+            'Recibo enviado' => false, 'Pagamento armador enviado' => false, 'Pré-aviso enviado' => false, 'Debit/Credit note enviado' => true,
+            'Chegou no destino' => false,
+        ], $export->shipmentStatus());
+
+        DB::table('fin_payment_orders')->update(['status' => 1]);
+        $this->assertTrue($export->shipmentStatus()['Pagamento armador enviado']);
+
+        Livewire::test(ViewEmbarque::class, ['record' => $export->getKey()])
+            ->assertSee(['Status do embarque', 'Booking enviado', 'Chegou no destino', 'Consignar MBL para', 'TO ORDER OF', 'BANCO X', 'Exige carta de crédito'])
+            ->assertDontSee('NRA');
+
+        $import = $this->booking(['impor_expor' => 'i', 'tipo_embarque' => 'm', 'pessoa_id_representante' => $agent]);
+        Livewire::test(ViewEmbarque::class, ['record' => $import->getKey()])
+            ->assertDontSee(['Status do embarque', 'Consignar MBL para']);
+    }
+
+    public function test_shipment_status_adds_the_nra_step_for_aic_exports_to_the_usa(): void
+    {
+        $usa = DB::table('porto')->insertGetId(['nome' => 'Miami', 'ref_pais' => 4]);
+        $booking = $this->booking(['impor_expor' => 'e', 'tipo_embarque' => 'm', 'tipo_fechamento' => 'o', 'bl_direto' => 0, 'pessoa_id_representante' => 1838, 'porto_destino_id' => $usa]);
+        $this->assertArrayNotHasKey('NRA', $booking->shipmentStatus());
+
+        DB::table('emb_embarque_files')->insert(['ref_embarque' => $booking->getKey(), 'ref_file_type' => 44, 'ref_file' => 1]);
+        $this->assertFalse($booking->shipmentStatus()['NRA']);
+
+        DB::table('embarque_nra')->insert(['embarque_id' => $booking->getKey()]);
+        $this->assertTrue($booking->shipmentStatus()['NRA']);
+    }
+
+    public function test_export_shipment_shows_the_legacy_export_fields_and_the_negotiated_freights(): void
+    {
+        $this->actingAs($this->user('booking'));
+        $country = DB::table('paises')->insertGetId(['nome' => 'Brasil']);
+        $state = DB::table('estados')->insertGetId(['nome' => 'São Paulo', 'paises_id' => $country]);
+        $city = DB::table('cidades')->insertGetId(['nome' => 'Santos', 'estados_id' => $state]);
+        $final = DB::table('destino_final')->insertGetId(['endereco' => 'Rua do Porto 1', 'zip_code' => '11000', 'pessoa_id' => 1, 'cidade_id' => $city, 'estado_id' => $state, 'pais_id' => $country]);
+        DB::table('fin_expenses')->insert(['id' => 703, 'name' => 'Ocean Freight']);
+
+        $export = $this->booking([
+            'impor_expor' => 'e', 'tipo_embarque' => 'm', 'place_of_receipt' => 'Santos CY', 'inland' => 2, 'type_of_service' => 'pp',
+            'destino_final_id' => $final, 'free_time_detention' => 5, 'free_time' => 14, 'obs_free_time_destino' => 'Contar da descarga',
+        ]);
+        DB::table('fin_expenses_values')->insert(['ref_embarque' => $export->getKey(), 'ref_expense' => 703, 'billing' => 'c']);
+
+        Livewire::test(ViewEmbarque::class, ['record' => $export->getKey()])
+            ->assertSeeInOrder(['Place of receipt', 'Santos CY', 'Porto de embarque', 'Transbordo', 'Porto de descarga', 'Final destination', 'Rua do Porto 1', 'Zip Code: 11000', 'Inland', 'Agente', 'Free time detention (origem)', 'Free time (destino)', 'Obs. free time (destino)', 'Contar da descarga', 'Type of service', 'PORT/PORT'])
+            ->assertSee(['Fretes negociados', 'Ocean Freight - CC'])
+            ->assertDontSee(['Security deposit', 'Tipo de embarque']);
+
+        $import = $this->booking(['impor_expor' => 'i', 'tipo_embarque' => 'm', 'place_of_receipt' => 'Santos CY']);
+        Livewire::test(ViewEmbarque::class, ['record' => $import->getKey()])
+            ->assertDontSee(['Place of receipt', 'Fretes negociados', 'Type of service'])
+            ->assertSee('Security deposit');
+    }
+
     public function test_view_page_shows_the_general_information_only_on_maritime_exports(): void
     {
         $this->actingAs($this->user('booking'));

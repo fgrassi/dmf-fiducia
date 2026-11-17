@@ -85,6 +85,64 @@ class Embarque extends Model
         return $this->belongsTo(Armador::class, 'armador_id', 'armador_id');
     }
 
+    /** Coloader: um armador (coloader_id). */
+    public function coloader(): BelongsTo
+    {
+        return $this->belongsTo(Armador::class, 'coloader_id', 'armador_id');
+    }
+
+    public function navio(): BelongsTo
+    {
+        return $this->belongsTo(Navio::class, 'navio_id', 'navio_id');
+    }
+
+    public function navioDestino(): BelongsTo
+    {
+        return $this->belongsTo(Navio::class, 'navio_id_destino', 'navio_id');
+    }
+
+    public function portoOrigem(): BelongsTo
+    {
+        return $this->belongsTo(Porto::class, 'porto_origem_id', 'porto_id');
+    }
+
+    public function portoDestino(): BelongsTo
+    {
+        return $this->belongsTo(Porto::class, 'porto_destino_id', 'porto_id');
+    }
+
+    public function escritorio(): BelongsTo
+    {
+        return $this->belongsTo(Escritorio::class, 'escritorio_id', 'escritorio_id');
+    }
+
+    public function ciaAerea(): BelongsTo
+    {
+        return $this->belongsTo(CiaAerea::class, 'ref_cia_aerea', 'id');
+    }
+
+    /** Pagador da Freight Invoice. */
+    public function pagador(): BelongsTo
+    {
+        return $this->belongsTo(Pessoa::class, 'pessoa_id_pagador', 'pessoa_id');
+    }
+
+    /** Quem criou a reserva (intIdUser no legado). */
+    public function autor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'intIdUser', 'usuario_id');
+    }
+
+    public function charges(): HasMany
+    {
+        return $this->hasMany(FinCharges::class, 'ref_booking', 'embarque_id');
+    }
+
+    public function paymentOrders(): HasMany
+    {
+        return $this->hasMany(FinPaymentOrder::class, 'ref_embarque', 'embarque_id');
+    }
+
     public function controlePa(): HasOne
     {
         return $this->hasOne(ControlePa::class, 'embarque_id', 'embarque_id');
@@ -189,5 +247,52 @@ class Embarque extends Model
         }
 
         return max($this->tipo_embarque === 'm' ? $volume : $volume / 0.006, $weight);
+    }
+
+    /**
+     * Quadro "Status do Embarque" do show de exportação do legado. A NRA só entra quando a regra do legado se aplica
+     * (export para os EUA, fechamento na origem, com NRA nos docs, sem BL direto e agente da AIC).
+     * "Pagamento Armador Enviado" no legado nunca marca (verificaPagamento tem um contador que nunca sobe): aqui marca
+     * quando há ordens de pagamento e nenhuma pendente.
+     *
+     * @return array<string, bool>
+     */
+    public function shipmentStatus(): array
+    {
+        $id = $this->getKey();
+        $valid = fn (?string $date) => filled($date) && ! str_starts_with($date, '0000');
+        $notes = $this->debitNotes->concat($this->creditNotes);
+        $received = $this->charges()->where(fn ($query) => $query->whereHas('receipts')->orWhereHas('boletoPayments'))->exists();
+        $orders = $this->paymentOrders()->pluck('status');
+
+        $status = [
+            'Booking enviado' => $this->trackings()->where('ref_frase_transborda', 16)->exists(),
+            'Embarque confirmado' => $this->departureConfirmations()->exists(),
+            'Cobrança enviada' => $this->charges()->exists(),
+            'Pagamento cliente recebido' => $received,
+            'Recibo enviado' => $received,
+            'Pagamento armador enviado' => $orders->isNotEmpty() && $orders->every(fn ($value) => (int) $value !== 0),
+            'Pré-aviso enviado' => DB::table('emb_pre_advise')->where('ref_embarque', $id)->exists(),
+            'Debit/Credit note enviado' => $valid($this->controle_credit) || $valid($this->controle_debit)
+                || ($notes->isNotEmpty() && $notes->every(fn ($note) => (int) $note->status === 1)),
+            'Chegou no destino' => $this->arrivalConfirmations()->exists(),
+        ];
+
+        if ($this->requiresNra()) {
+            $status['NRA'] = DB::table('embarque_nra')->where('embarque_id', $id)->exists();
+        }
+
+        return $status;
+    }
+
+    /** Embarque::getFlagNra (legado) diferente de 0. */
+    private function requiresNra(): bool
+    {
+        return $this->tipo_fechamento === 'o'
+            && $this->impor_expor === 'e'
+            && ! $this->bl_direto
+            && in_array((int) $this->pessoa_id_representante, [1838, 3548, 10959, 10960, 10961, 11517], true)
+            && (int) $this->portoDestino?->ref_pais === 4
+            && EmbEmbarqueFile::where('ref_embarque', $this->getKey())->where('ref_file_type', 44)->exists();
     }
 }
