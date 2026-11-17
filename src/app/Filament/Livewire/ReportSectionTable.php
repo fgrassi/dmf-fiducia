@@ -15,7 +15,7 @@ use Livewire\Component;
 
 /**
  * Uma seção (tabela) de um relatório com várias listas: a página monta uma por seção, com os filtros já aplicados, e é ela
- * quem define as colunas, em `sectionTable()`.
+ * quem define as colunas, em `sectionTable()`. Sem paginação, a menos que a seção peça com `->paginated()`.
  */
 class ReportSectionTable extends Component implements HasActions, HasSchemas, HasTable
 {
@@ -49,8 +49,7 @@ class ReportSectionTable extends Component implements HasActions, HasSchemas, Ha
 
     public function table(Table $table): Table
     {
-        return $this->page::sectionTable($table, $this->section, $this->filters)
-            ->paginated(false)
+        return $this->page::sectionTable($table->paginated(false), $this->section, $this->filters)
             ->extraAttributes(['class' => 'sas-ta-compact'], merge: true);
     }
 
