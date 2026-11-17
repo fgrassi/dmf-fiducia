@@ -34,7 +34,7 @@ class FinalizeBl
     /** geraPdfBl: grava o PDF em docs_emb e o registra na reserva. Devolve o nome do arquivo. */
     public function store(Embarque $booking, Bl $bl): string
     {
-        $name = 'dmf_hbl'.$bl->bl.'_'.date('dmyGis').'.pdf';
+        $name = 'dmf_hbl'.preg_replace('/[^A-Za-z0-9._-]+/', '_', (string) $bl->bl).'_'.date('dmyGis').'.pdf';
 
         DB::transaction(function () use ($booking, $name) {
             $file = CmnFile::forceCreate(['name' => $name, 'created_at' => now()->toDateString(), 'uid' => sha1((string) time()), 'subject' => 'Documento Anexo a Reserva']);

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Actions\Booking\Bls;
 
 use App\Actions\Booking\Bls\BlPdf;
+use App\Actions\Booking\Bls\FinalizeBl;
 use App\Actions\Booking\Bls\PrintBl;
 use App\Actions\Booking\Bls\SaveBl;
 use App\Models\Bl;
@@ -112,6 +113,19 @@ class BlPrintTest extends TestCase
         $this->assertSame("DMF Logistics: CÓPIA DE BL - Shipper: ACME / INV-9 / {$booking->booking}", $message->getSubject());
         $this->assertEqualsCanonicalizing(['docs@client.com', 'shipper@client.com', 'broker@x.com', 'documentacao@dmflog.com.br'], collect($message->getTo())->map->getAddress()->all());
         $this->assertCount(1, $message->getAttachments());
+    }
+
+    public function test_the_stored_pdf_name_never_carries_path_characters_from_the_bl_number(): void
+    {
+        Storage::fake('tracking_uploads');
+        $booking = $this->booking();
+        $bl = $this->bl(['embarque_id' => $booking->getKey(), 'bl' => '../../etc/HBL 1']);
+
+        $name = app(FinalizeBl::class)->store($booking, $bl);
+
+        $this->assertMatchesRegularExpression('/^dmf_hbl[A-Za-z0-9._-]+_\d{6}\d+\.pdf$/', $name);
+        $this->assertStringNotContainsString('/', $name);
+        Storage::disk('tracking_uploads')->assertExists("docs_emb/{$name}");
     }
 
     public function test_changing_an_approved_bl_stores_a_new_pdf_but_an_open_one_does_not(): void
