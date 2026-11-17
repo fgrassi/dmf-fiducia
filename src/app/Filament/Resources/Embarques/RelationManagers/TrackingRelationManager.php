@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Embarques\RelationManagers;
 
 use App\Actions\Booking\Tracking\DuplicateTracking;
 use App\Actions\Booking\Tracking\FillTrackingPhrase;
+use App\Actions\Booking\Tracking\RemoveAgentContact;
 use App\Actions\Booking\Tracking\SaveTracking;
 use App\Actions\Booking\Tracking\TrackingRecipients;
 use App\Filament\Support\ReportFields;
@@ -30,7 +31,7 @@ use Illuminate\Support\HtmlString;
 /**
  * Rastreamento da reserva (booking/listRastreamento do legado): as mensagens de tracking, com a frase pronta, o ETA e o
  * navio de destino; cada mensagem salva ou duplicada sai por e-mail aos contatos da reserva. Fica de fora o "Enviar histórico", o
- * cadastro de contatos da reserva e o Portal Integrador.
+ * cadastro de contatos extras da reserva e o Portal Integrador.
  */
 class TrackingRelationManager extends RelationManager
 {
@@ -101,6 +102,7 @@ class TrackingRelationManager extends RelationManager
                     ->label('Usuário'),
             ])
             ->headerActions([
+                $this->removeAgentContactAction(),
                 CreateAction::make()
                     ->label('Adicionar mensagem')
                     ->using(fn (array $data) => $this->save($data)),
@@ -121,6 +123,40 @@ class TrackingRelationManager extends RelationManager
                 DeleteAction::make()
                     ->visible(fn (Transborda $record) => ! $record->isSystemGenerated()),
             ]);
+    }
+
+    /** Contatos do agente que hoje recebem o rastreamento (id => "nome (e-mail)"). */
+    private function agentContacts(): array
+    {
+        return collect(app(TrackingRecipients::class)($this->getOwnerRecord()))
+            ->where('tipo', 'Agente')
+            ->mapWithKeys(fn (array $c) => [$c['agente_contato_id'] => "{$c['nome']} ({$c['email']})"])
+            ->all();
+    }
+
+    private function removeAgentContactAction(): Action
+    {
+        return Action::make('removerContatoAgente')
+            ->label('Remover contato do agente')
+            ->icon('heroicon-o-user-minus')
+            ->color('gray')
+            ->visible(fn () => $this->agentContacts() !== [])
+            ->modalHeading('Remover contato do agente')
+            ->modalDescription('O contato deixa de receber o rastreamento só desta reserva. O cadastro do agente não muda.')
+            ->schema([
+                Select::make('contact')
+                    ->label('Contato')
+                    ->options(fn () => $this->agentContacts())
+                    ->required(),
+            ])
+            ->action(function (array $data): void {
+                app(RemoveAgentContact::class)($this->getOwnerRecord(), (int) $data['contact'], auth()->id());
+
+                Notification::make()
+                    ->title('Contato removido desta reserva')
+                    ->success()
+                    ->send();
+            });
     }
 
     private function recipientsList(): string

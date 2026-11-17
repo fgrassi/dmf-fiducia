@@ -79,6 +79,28 @@ class BookingTrackingTabTest extends TestCase
         $this->assertFalse(DB::table('transborda')->where('transborda_id', $mine)->exists());
     }
 
+    public function test_removes_an_agent_contact_from_this_booking_only_and_logs_it(): void
+    {
+        $this->actingAs($user = $this->user());
+        $booking = $this->booking(['pessoa_id_representante' => 55]);
+        $other = $this->booking(['pessoa_id_representante' => 55]);
+        DB::table('pessoa')->insert(['pessoa_id' => 55, 'nome' => 'AGENT CO']);
+        DB::table('agente_contato')->insert([
+            ['id' => 1, 'ref_pessoa' => 55, 'name' => 'Joe', 'email' => 'joe@agent.com', 'tipo' => 't', 'operacao' => 'e', 'created_at' => '2026-01-01'],
+            ['id' => 2, 'ref_pessoa' => 56, 'name' => 'Outro agente', 'email' => 'x@agent.com', 'tipo' => 't', 'operacao' => 'e', 'created_at' => '2026-01-01'],
+        ]);
+
+        Livewire::test(TrackingRelationManager::class, ['ownerRecord' => $booking, 'pageClass' => ViewEmbarque::class])
+            ->callAction(TestAction::make('removerContatoAgente')->table(), ['contact' => 1])
+            ->assertHasNoActionErrors()
+            ->assertActionHidden(TestAction::make('removerContatoAgente')->table());
+
+        $this->assertSame([[$booking->getKey(), 1]], DB::table('embarque_agente_contato_excluido')->get()->map(fn ($r) => [(int) $r->embarque_id, (int) $r->agente_contato_id])->all());
+        $this->assertStringContainsString('Joe (joe@agent.com) do agente AGENT CO', DB::table('rastreamento')->where('ref_embarque', $booking->getKey())->value('historico'));
+        Livewire::test(TrackingRelationManager::class, ['ownerRecord' => $other, 'pageClass' => ViewEmbarque::class])
+            ->assertActionVisible(TestAction::make('removerContatoAgente')->table());
+    }
+
     public function test_fills_the_phrase_markers_with_the_booking_data_and_keeps_the_missing_ones(): void
     {
         DB::table('navio')->insert(['navio_id' => 5, 'nome' => 'MSC ANNA']);
