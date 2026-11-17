@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Embarques;
 use App\Filament\Resources\Embarques\Pages\ListEmbarques;
 use App\Filament\Resources\Embarques\Pages\ViewEmbarque;
 use App\Filament\Resources\Embarques\RelationManagers\ArrivalConfirmationsRelationManager;
+use App\Filament\Resources\Embarques\RelationManagers\BlsRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\CommissionsRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\CreditNotesRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\DebitNotesRelationManager;
@@ -84,6 +85,7 @@ class EmbarqueResource extends Resource
             FreightInvoicesRelationManager::class,
             DemurrageRelationManager::class,
             DetentionRelationManager::class,
+            BlsRelationManager::class,
             TrackingRelationManager::class,
             RemarksRelationManager::class,
             LogsRelationManager::class,
