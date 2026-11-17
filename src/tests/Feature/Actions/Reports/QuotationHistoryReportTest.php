@@ -100,6 +100,21 @@ class QuotationHistoryReportTest extends TestCase
         $this->assertSame(5, $both->getSheetByName('Listagem')->getHighestRow());
     }
 
+    public function test_excel_never_turns_database_text_into_formulas(): void
+    {
+        $this->quotations();
+        DB::table('pessoa')->where('pessoa_id', 1)->update(['nome' => '=HYPERLINK("http://x","y")', 'cnpj' => null]);
+        DB::table('cotacao_impo')->update(['referencia' => '=1+1']);
+        $report = app(QuotationHistoryReport::class)(self::FILTERS + ['agrupamento' => ['equipamento']]);
+
+        $list = app(ExportQuotationHistoryReport::class)->build($report, true)->getSheetByName('Listagem');
+
+        $this->assertSame('s', $list->getCell('D2')->getDataType());
+        $this->assertSame('=HYPERLINK("http://x","y")', $list->getCell('D2')->getValue());
+        $this->assertSame('s', $list->getCell('A2')->getDataType());
+        $this->assertSame('n', $list->getCell('J2')->getDataType());
+    }
+
     public function test_chart_regroups_the_summary_with_a_weighted_average_and_the_group_min_and_max(): void
     {
         $this->quotations();

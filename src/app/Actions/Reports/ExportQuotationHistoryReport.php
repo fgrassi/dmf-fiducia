@@ -3,6 +3,7 @@
 namespace App\Actions\Reports;
 
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Cell\StringValueBinder;
 use PhpOffice\PhpSpreadsheet\Chart\Chart;
 use PhpOffice\PhpSpreadsheet\Chart\DataSeries;
 use PhpOffice\PhpSpreadsheet\Chart\DataSeriesValues;
@@ -47,6 +48,7 @@ class ExportQuotationHistoryReport
         $groupHeaders = array_map(fn (string $field) => QuotationHistoryReport::DIMENSIONS[$field], $report['agrupamento']);
 
         $book = new Spreadsheet;
+        $book->setValueBinder((new StringValueBinder)->setNumericConversion(false)->setNullConversion(false)); // texto do banco nunca vira fórmula (=, +, -, @); números continuam números
         $summary = $book->getActiveSheet()->setTitle('Resumo');
         $summary->fromArray([
             [...$groupHeaders, 'Moeda', 'Quantidade', 'Minimo', 'Maximo', 'Media'],
