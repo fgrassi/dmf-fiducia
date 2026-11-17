@@ -437,3 +437,4 @@ CREATE UNIQUE INDEX "sf_guard_permission_name" ON "sf_guard_permission" ("name")
 CREATE UNIQUE INDEX "sf_guard_user_email_address" ON "sf_guard_user" ("email_address");
 CREATE UNIQUE INDEX "sf_guard_user_username" ON "sf_guard_user" ("username");
 CREATE UNIQUE INDEX "users_users_email_unique" ON "users" ("email");
+CREATE TABLE "embarque_agente_contato_excluido" ("embarque_id" INTEGER NOT NULL, "agente_contato_id" INTEGER NOT NULL, "created_at" TEXT, PRIMARY KEY ("embarque_id", "agente_contato_id"));

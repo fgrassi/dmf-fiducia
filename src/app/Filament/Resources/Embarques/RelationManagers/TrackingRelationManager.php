@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Embarques\RelationManagers;
 use App\Actions\Booking\Tracking\DuplicateTracking;
 use App\Actions\Booking\Tracking\FillTrackingPhrase;
 use App\Actions\Booking\Tracking\SaveTracking;
+use App\Actions\Booking\Tracking\TrackingRecipients;
 use App\Filament\Support\ReportFields;
 use App\Models\Embarque;
 use App\Models\FraseTransborda;
@@ -16,16 +17,20 @@ use Filament\Actions\EditAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Components\Text;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\HtmlString;
 
 /**
  * Rastreamento da reserva (booking/listRastreamento do legado): as mensagens de tracking, com a frase pronta, o ETA e o
- * navio de destino. Fica de fora o envio por e-mail ao cliente (e o "Enviar histórico"), a lista de contatos e o Portal Integrador.
+ * navio de destino; cada mensagem salva ou duplicada sai por e-mail aos contatos da reserva. Fica de fora o "Enviar histórico", o
+ * cadastro de contatos da reserva e o Portal Integrador.
  */
 class TrackingRelationManager extends RelationManager
 {
@@ -65,6 +70,8 @@ class TrackingRelationManager extends RelationManager
                     ->default($booking->chegada_prevista),
                 ReportFields::ship('navio_id_destino', 'Navio de destino')
                     ->default($booking->navio_id_destino),
+                Text::make(fn () => new HtmlString('A mensagem será enviada para: '.$this->recipientsList()))
+                    ->visibleOn('create'),
                 Select::make('other_bookings')
                     ->label('Aplicar também a outros bookings')
                     ->multiple()
@@ -96,23 +103,53 @@ class TrackingRelationManager extends RelationManager
             ->headerActions([
                 CreateAction::make()
                     ->label('Adicionar mensagem')
-                    ->using(fn (array $data) => app(SaveTracking::class)($this->getOwnerRecord(), $data, auth()->id())),
+                    ->using(fn (array $data) => $this->save($data)),
             ])
             ->recordActions([
                 EditAction::make()
                     ->visible(fn (Transborda $record) => ! $record->isSystemGenerated())
                     ->mutateRecordDataUsing(fn (array $data) => $data + ['eta' => $this->getOwnerRecord()->chegada_prevista, 'navio_id_destino' => $this->getOwnerRecord()->navio_id_destino])
-                    ->using(fn (Transborda $record, array $data) => app(SaveTracking::class)($this->getOwnerRecord(), $data, auth()->id(), $record)),
+                    ->using(fn (Transborda $record, array $data) => $this->save($data, $record)),
                 Action::make('duplicar')
                     ->label('Duplicar')
                     ->icon('heroicon-o-document-duplicate')
                     ->requiresConfirmation()
                     ->modalHeading('Duplicar esta mensagem?')
+                    ->modalDescription('A cópia leva a data de hoje e é enviada por e-mail aos contatos.')
                     ->visible(fn (Transborda $record) => ! $record->isSystemGenerated())
-                    ->action(fn (Transborda $record) => app(DuplicateTracking::class)($record, auth()->id())),
+                    ->action(fn (Transborda $record) => $this->warnIfUnsent(app(DuplicateTracking::class)($record, auth()->id()) ? [] : [$record->embarque_id])),
                 DeleteAction::make()
                     ->visible(fn (Transborda $record) => ! $record->isSystemGenerated()),
             ]);
+    }
+
+    private function recipientsList(): string
+    {
+        $contacts = app(TrackingRecipients::class)($this->getOwnerRecord());
+
+        return $contacts === []
+            ? '<em>nenhum contato</em>'
+            : '<ul>'.collect($contacts)->map(fn (array $c) => '<li>'.e("{$c['nome']} ({$c['email']}) [{$c['tipo']}]").'</li>')->implode('').'</ul>';
+    }
+
+    private function save(array $data, ?Transborda $record = null): Transborda
+    {
+        $save = app(SaveTracking::class);
+        $tracking = $save($this->getOwnerRecord(), $data, auth()->id(), $record);
+        $this->warnIfUnsent($save->unsent);
+
+        return $tracking;
+    }
+
+    /** @param list<int|string> $unsent */
+    private function warnIfUnsent(array $unsent): void
+    {
+        if ($unsent !== []) {
+            Notification::make()
+                ->title('Atenção! Um ou mais contatos não possuíam e-mail válido ou o envio falhou.')
+                ->warning()
+                ->send();
+        }
     }
 
     /**
