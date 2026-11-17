@@ -14,6 +14,7 @@ use App\Filament\Resources\Embarques\RelationManagers\DetentionRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\ExpensesRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\FreightInvoicesRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\RemarksRelationManager;
+use App\Filament\Resources\Embarques\RelationManagers\TrackingRelationManager;
 use App\Filament\Resources\Embarques\Schemas\EmbarqueInfolist;
 use App\Filament\Resources\Embarques\Tables\EmbarquesTable;
 use App\Models\Embarque;
@@ -82,6 +83,7 @@ class EmbarqueResource extends Resource
             FreightInvoicesRelationManager::class,
             DemurrageRelationManager::class,
             DetentionRelationManager::class,
+            TrackingRelationManager::class,
             RemarksRelationManager::class,
         ];
     }
