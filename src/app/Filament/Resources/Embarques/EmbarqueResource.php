@@ -34,13 +34,17 @@ class EmbarqueResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Reservas';
 
+    protected static ?string $navigationLabel = 'Lista de Bookings';
+
     protected static ?string $slug = 'booking/reservas';
 
     protected static ?string $recordTitleAttribute = 'booking';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCube;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Booking';
+    protected static string|UnitEnum|null $navigationGroup = 'Reserva';
+
+    protected static ?string $navigationParentItem = 'Booking';
 
     protected static ?int $navigationSort = 10;
 

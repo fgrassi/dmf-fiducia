@@ -48,7 +48,7 @@ class AdminPanelProvider extends PanelProvider
             ->maxContentWidth(Width::Full)
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->navigationGroups([
-                'Booking',
+                'Reserva',
                 'Cadastros',
                 'Config IT',
                 'Configurações',
@@ -56,6 +56,10 @@ class AdminPanelProvider extends PanelProvider
                 'Relatórios',
             ])
             ->navigationItems([
+                NavigationItem::make('Booking')
+                    ->group('Reserva')
+                    ->icon('heroicon-o-cube')
+                    ->sort(10),
                 NavigationItem::make('Cadastros')
                     ->group('Financeiro')
                     ->icon('heroicon-o-folder')

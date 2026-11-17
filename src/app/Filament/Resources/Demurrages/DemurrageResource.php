@@ -35,7 +35,9 @@ class DemurrageResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArchiveBoxArrowDown;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Booking';
+    protected static string|UnitEnum|null $navigationGroup = 'Reserva';
+
+    protected static ?string $navigationParentItem = 'Booking';
 
     protected static ?int $navigationSort = 60;
 
