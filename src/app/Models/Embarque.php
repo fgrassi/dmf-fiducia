@@ -160,6 +160,12 @@ class Embarque extends Model
         return $this->hasMany(Transborda::class, 'embarque_id', 'embarque_id')->orderByDesc('data_reg')->orderByDesc('transborda_id');
     }
 
+    /** Rastreabilidade (log) da reserva, a mais recente primeiro. */
+    public function logs(): HasMany
+    {
+        return $this->hasMany(Rastreamento::class, 'ref_embarque', 'embarque_id')->orderByDesc('id');
+    }
+
     /** Há pendência de liberação do embarque (`liberacao_embarque` com status 0)? */
     public function hasPendingRelease(): bool
     {
