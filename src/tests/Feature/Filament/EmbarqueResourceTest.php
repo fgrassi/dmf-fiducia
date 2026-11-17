@@ -217,6 +217,43 @@ class EmbarqueResourceTest extends TestCase
             ->assertSee('Security deposit');
     }
 
+    public function test_view_page_shows_the_parties_of_each_operation_in_the_legacy_order(): void
+    {
+        $this->actingAs($this->user('booking'));
+        $client = DB::table('pessoa')->insertGetId(['nome' => 'CLIENTE SA']);
+        $broker = DB::table('despachante')->insertGetId(['nome' => 'DESPACHO LTDA']);
+        $dmfBroker = DB::table('despachante')->insertGetId(['nome' => 'DMF BROKER LTDA']);
+        $trading = DB::table('trading')->insertGetId(['nome' => 'TRADING SA', 'dtecadastro' => '2026-01-01']);
+        $assessoria = DB::table('assessoria')->insertGetId(['nome' => 'ASSESSORIA SA', 'dtecadastro' => '2026-01-01']);
+        $notify = DB::table('pessoa')->insertGetId(['nome' => 'NOTIFY SA']);
+        $contact = DB::table('despachante_contato')->insertGetId(['ref_despachante' => $broker, 'name' => 'Bia Despachante', 'email' => 'bia@d.com', 'status' => 1, 'impor_expor' => 'i']);
+        DB::table('pessoa_contato_despachante')->insert(['pessoa_id' => $client, 'despachante_id' => $broker, 'despachante_contato_id' => $contact]);
+        $active = DB::table('usuario')->insertGetId(['nome' => 'Zeca Ativo', 'email' => 'zeca@c.com', 'status' => 1]);
+        $inactive = DB::table('usuario')->insertGetId(['nome' => 'Inativo', 'email' => 'off@c.com', 'status' => 0]);
+
+        $import = $this->booking([
+            'impor_expor' => 'i', 'tipo_embarque' => 'm', 'cliente_id' => $client, 'pessoa_id_notify' => $notify, 'despachante_id' => $broker,
+            'despachante_dmf_id' => $dmfBroker, 'trading_id' => $trading, 'assessoria_id' => $assessoria, 'conta_cliente' => 'Conta 123',
+        ]);
+        foreach ([$active, $inactive] as $user) {
+            DB::table('embarque_contato_cliente')->insert(['embarque_id' => $import->getKey(), 'usuario_id' => $user]);
+        }
+
+        Livewire::test(ViewEmbarque::class, ['record' => $import->getKey()])
+            ->assertSeeInOrder(['Dados do cliente', 'CLIENTE SA', 'Zeca Ativo (zeca@c.com)', 'Assessoria', 'ASSESSORIA SA', 'Trading', 'TRADING SA', 'Conta Cliente', 'Conta 123', 'Despachante Cliente', 'DESPACHO LTDA', 'Bia Despachante (bia@d.com)', 'Despachante DMF', 'DMF BROKER LTDA', 'Dados do CNEE', 'Dados do notify', 'NOTIFY SA', 'Dados do shipper'])
+            ->assertDontSee('Inativo');
+
+        $export = $this->booking(['impor_expor' => 'e', 'tipo_embarque' => 'm', 'cliente_id' => $client, 'despachante_id' => $broker, 'despachante_dmf_id' => $dmfBroker, 'pessoa_id_notify' => $notify]);
+        Livewire::test(ViewEmbarque::class, ['record' => $export->getKey()])
+            ->assertSeeInOrder(['Dados do cliente', 'Nenhum contato vinculado', 'Dados do exportador', 'Dados do importador'])
+            ->assertDontSee(['Despachante DMF', 'Dados do notify', 'Dados do CNEE']);
+
+        $air = $this->booking(['impor_expor' => 'i', 'tipo_embarque' => 'a', 'cliente_id' => $client, 'despachante_id' => $broker, 'despachante_dmf_id' => $dmfBroker, 'conta_cliente' => 'Conta 123']);
+        Livewire::test(ViewEmbarque::class, ['record' => $air->getKey()])
+            ->assertSeeInOrder(['Customer Broker', 'DESPACHO LTDA', 'DMF Broker', 'DMF BROKER LTDA', 'Dados do importador', 'Dados do notify', 'Dados do exportador'])
+            ->assertDontSee(['Conta Cliente', 'Despachante Cliente']);
+    }
+
     public function test_view_page_shows_the_general_information_only_on_maritime_exports(): void
     {
         $this->actingAs($this->user('booking'));

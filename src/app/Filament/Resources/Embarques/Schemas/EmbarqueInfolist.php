@@ -183,17 +183,8 @@ class EmbarqueInfolist
                     ->columnSpanFull()
                     ->columns(4)
                     ->schema(fn (Embarque $record) => self::shipment($record)),
-                Section::make('Dados do cliente')
-                    ->columnSpanFull()
-                    ->columns(2)
-                    ->schema([
-                        TextEntry::make('cliente.nome')
-                            ->label('Nome')
-                            ->placeholder('Não informado'),
-                        self::contacts('clientContacts'),
-                    ]),
-                self::party('Dados do importador', 'importador', 'importerContacts'),
-                self::party('Dados do exportador', 'exportador', 'shipperContacts'),
+                Group::make(fn (Embarque $record) => self::parties($record))
+                    ->columnSpanFull(),
                 Section::make('Mercadoria')
                     ->columnSpanFull()
                     ->schema([
@@ -476,24 +467,106 @@ class EmbarqueInfolist
             ->schema(array_map(fn (string $field) => $entries[$field], $fields));
     }
 
-    private static function party(string $title, string $relation, string $contacts): Section
+    /**
+     * Dados das partes, na ordem de cada modal do legado: exportação (cliente, exportador, importador),
+     * importação marítima (cliente, CNEE, notify, shipper) e aéreo (cliente, importador, notify, exportador).
+     *
+     * @return list<Section>
+     */
+    private static function parties(Embarque $record): array
     {
-        return Section::make($title)
-            ->columns(1)
+        $air = $record->tipo_embarque === 'a';
+        $contacts = fn (string $role) => $air ? 'Contatos' : "Contatos do {$role}";
+        $client = self::client($record, $air);
+        $importer = self::party('Dados do importador', 'Importador', 'importador', 'importerContacts', $contacts('Importador'));
+        $notify = self::party('Dados do notify', 'Notify', 'notify', 'notifyContacts', $contacts('Notify'));
+        $exporter = self::party('Dados do exportador', 'Exportador', 'exportador', 'shipperContacts', $contacts('Exportador'));
+
+        return match (true) {
+            $air => [$client, $importer, $notify, $exporter],
+            $record->impor_expor === 'e' => [$client, $exporter, $importer],
+            default => [
+                $client,
+                self::party('Dados do CNEE', 'CNEE', 'importador', 'importerContacts', 'Contatos do Cnee'),
+                $notify,
+                self::party('Dados do shipper', 'Shipper', 'exportador', 'shipperContacts', 'Contatos do Shipper'),
+            ],
+        };
+    }
+
+    /** Dados do cliente: à direita assessoria, trading e despachantes (no aéreo, só os brokers; no marítimo, conta e contatos). */
+    private static function client(Embarque $record, bool $air): Section
+    {
+        $import = ! $air && $record->impor_expor !== 'e';
+        $name = fn (string $label, string $key, string $table, string $primary) => TextEntry::make($key)
+            ->label($label)
+            ->state(fn (Embarque $record) => $record->{$key} ? DB::table($table)->where($primary, $record->{$key})->value('nome') : null)
+            ->placeholder('-');
+
+        return Section::make('Dados do cliente')
+            ->columnSpanFull()
+            ->columns(2)
             ->schema([
-                TextEntry::make("{$relation}.nome")
-                    ->label('Nome')
-                    ->placeholder('Não informado'),
-                self::contacts($contacts),
+                Group::make([
+                    TextEntry::make('cliente.nome')
+                        ->label('Cliente')
+                        ->placeholder('Não informado'),
+                    self::contacts('clientContacts', $air ? 'Contatos' : 'Contatos do Cliente'),
+                ]),
+                Group::make([
+                    $name('Assessoria', 'assessoria_id', 'assessoria', 'assessoria_id'),
+                    $name('Trading', 'trading_id', 'trading', 'trading_id'),
+                    ...($air ? [] : [self::multiline('conta_cliente', 'Conta Cliente')]),
+                    $name($air ? 'Customer Broker' : 'Despachante Cliente', 'despachante_id', 'despachante', 'despachante_id'),
+                    ...($air ? [] : [self::brokerContacts()]),
+                    ...($air || $import ? [$name($air ? 'DMF Broker' : 'Despachante DMF', 'despachante_dmf_id', 'despachante', 'despachante_id')] : []),
+                ]),
             ]);
     }
 
-    /** "Nome (e-mail)" por contato da reserva, um por linha. */
-    private static function contacts(string $relation): TextEntry
+    /** Contatos do despachante do cliente: ativos, desta operação e ligados ao cliente da reserva. */
+    private static function brokerContacts(): TextEntry
+    {
+        return TextEntry::make('despachante_contatos')
+            ->label('Contatos Despachante Cliente')
+            ->state(fn (Embarque $record) => $record->despachante_id
+                ? DB::table('despachante_contato as c')
+                    ->join('pessoa_contato_despachante as p', 'p.despachante_contato_id', '=', 'c.id')
+                    ->where('c.ref_despachante', $record->despachante_id)
+                    ->where('p.pessoa_id', $record->cliente_id)
+                    ->where('c.status', 1)
+                    ->where('c.impor_expor', $record->impor_expor)
+                    ->get(['c.name', 'c.email'])
+                    ->map(fn ($contact) => "{$contact->name} ({$contact->email})")
+                    ->all()
+                : [])
+            ->listWithLineBreaks()
+            ->placeholder('Nenhum contato vinculado');
+    }
+
+    private static function party(string $title, string $label, string $relation, string $contacts, string $contactsLabel): Section
+    {
+        return Section::make($title)
+            ->columns(2)
+            ->schema([
+                TextEntry::make("{$relation}.nome")
+                    ->label($label)
+                    ->placeholder('Não informado'),
+                self::contacts($contacts, $contactsLabel),
+            ]);
+    }
+
+    /** "Nome (e-mail)" por contato ativo da reserva, em ordem alfabética, um por linha. */
+    private static function contacts(string $relation, string $label): TextEntry
     {
         return TextEntry::make($relation)
-            ->label('Contatos:')
-            ->state(fn (Embarque $record) => $record->{$relation}->map(fn ($u) => trim("{$u->nome} ({$u->email})"))->all())
+            ->label($label)
+            ->state(fn (Embarque $record) => $record->{$relation}()
+                ->where('usuario.status', 1)
+                ->orderBy('usuario.nome')
+                ->get()
+                ->map(fn ($u) => trim("{$u->nome} ({$u->email})"))
+                ->all())
             ->listWithLineBreaks()
             ->placeholder('Não informado');
     }

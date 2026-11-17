@@ -64,6 +64,12 @@ class Embarque extends Model
         return $this->belongsTo(Pessoa::class, 'pessoa_id_importador', 'pessoa_id');
     }
 
+    /** Notify: pessoa_id_notify no legado. */
+    public function notify(): BelongsTo
+    {
+        return $this->belongsTo(Pessoa::class, 'pessoa_id_notify', 'pessoa_id');
+    }
+
     /** Contatos da reserva por parte (tabelas embarque_contato_*, ligadas a usuario). */
     public function clientContacts(): BelongsToMany
     {
@@ -73,6 +79,11 @@ class Embarque extends Model
     public function importerContacts(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'embarque_contato_importador', 'embarque_id', 'usuario_id');
+    }
+
+    public function notifyContacts(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'embarque_contato_notify', 'embarque_id', 'usuario_id');
     }
 
     public function shipperContacts(): BelongsToMany
