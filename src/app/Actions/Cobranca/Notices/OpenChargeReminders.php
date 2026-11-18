@@ -2,6 +2,7 @@
 
 namespace App\Actions\Cobranca\Notices;
 
+use App\Actions\Notices\BookingTags;
 use App\Actions\Notices\RenderNoticeEmail;
 use App\Actions\Notices\SendNoticeMail;
 use App\Enums\Cobranca\ChargeStatus;
@@ -86,7 +87,7 @@ class OpenChargeReminders
                 .'<p>Estamos ao seu dispor caso necessite maiores detalhes e agradecemos pelo entendimento e suporte.</p><p>Atenciosamente,<br />Departamento Financeiro</p>'
             : '';
 
-        [$subject, $html] = app(RenderNoticeEmail::class)(Notice::OpenCharges, ['reserva' => $e->booking, 'prazo' => $days, 'lista' => $list, 'taxa_atraso' => $lateFee]);
+        [$subject, $html] = app(RenderNoticeEmail::class)(Notice::OpenCharges, [...app(BookingTags::class)($e->getKey()), 'prazo' => $days, 'lista' => $list, 'taxa_atraso' => $lateFee]);
         $to = collect($this->details->contacts($charges->first()))->pluck('email')->filter()->unique()->values()->all();
 
         app(SendNoticeMail::class)(

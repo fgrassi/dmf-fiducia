@@ -2,6 +2,7 @@
 
 namespace App\Actions\Cobranca\Notices;
 
+use App\Actions\Notices\BookingTags;
 use App\Actions\Notices\RenderNoticeEmail;
 use App\Actions\Notices\SendNoticeMail;
 use App\Enums\Notice;
@@ -58,6 +59,7 @@ class MblReleaseNotice
                 ->all();
 
             [$subject, $html] = app(RenderNoticeEmail::class)(Notice::MblRelease, [
+                ...app(BookingTags::class)($b->embarque_id),
                 'reserva' => $b->booking,
                 'mbl' => $b->master_bl,
                 'hbl' => $b->house_bl,

@@ -102,6 +102,10 @@ class NoticeTexts
             Notice::ConfirmedWithoutInvoice => self::controlePa('PREPAID ABROAD - Embarques Confirmados', 'As reservas abaixo tiveram seu embarque confirmado e não tem Freigth Invoice'),
         };
 
+        if (in_array($notice, [Notice::OpenCharges, Notice::MblRelease], true)) {
+            $tags = [...self::bookingTags(), ...$tags];
+        }
+
         return compact('subject', 'body', 'tags');
     }
 
@@ -112,6 +116,12 @@ class NoticeTexts
     public static function editorBody(Notice $notice): string
     {
         return preg_replace('/\{\{(\w+)\}\}/', '<span data-type="mergeTag" data-id="$1"></span>', self::for($notice)['body']);
+    }
+
+    /** @return array<string, array{label: string, sample: string, html: bool}> variáveis prontas da reserva (BookingTags) */
+    private static function bookingTags(): array
+    {
+        return array_map(fn (array $tag) => self::tag($tag[0], $tag[1]), BookingTags::TAGS);
     }
 
     /** @return array{label: string, sample: string, html: bool} */
