@@ -5,10 +5,13 @@ namespace Tests\Feature\Console;
 use App\Actions\PaymentOrders\Other\GenerateOtherPaymentOrders;
 use DomainException;
 use Illuminate\Console\Scheduling\Schedule;
+use Tests\Concerns\LegacySchema;
 use Tests\TestCase;
 
 class GenerateOtherPaymentOrdersCommandTest extends TestCase
 {
+    use LegacySchema;
+
     public function test_reports_how_many_orders_were_generated_and_fails_when_the_lock_is_busy(): void
     {
         $mock = $this->mock(GenerateOtherPaymentOrders::class);

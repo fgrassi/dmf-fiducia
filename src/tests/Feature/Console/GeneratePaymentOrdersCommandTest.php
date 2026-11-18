@@ -5,10 +5,13 @@ namespace Tests\Feature\Console;
 use App\Actions\PaymentOrders\Generation\GeneratePaymentOrders;
 use DomainException;
 use Illuminate\Console\Scheduling\Schedule;
+use Tests\Concerns\LegacySchema;
 use Tests\TestCase;
 
 class GeneratePaymentOrdersCommandTest extends TestCase
 {
+    use LegacySchema;
+
     public function test_reports_how_many_orders_were_generated(): void
     {
         $this->mock(GeneratePaymentOrders::class)->shouldReceive('all')->once()->andReturn(2);

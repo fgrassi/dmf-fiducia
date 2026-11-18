@@ -21,4 +21,24 @@ abstract class TestCase extends BaseTestCase
             ->map(fn (SentMessage $m) => $m->getOriginalMessage()->getSubject())
             ->values();
     }
+
+    /** Corpo HTML de todos os e-mails enviados pelo mailer array, um depois do outro. */
+    protected function sentHtml(): string
+    {
+        return Mail::mailer('array')->getSymfonyTransport()->messages()
+            ->map(fn (SentMessage $m) => $m->getOriginalMessage()->getHtmlBody())
+            ->implode('');
+    }
+
+    /**
+     * Destinatários do primeiro e-mail enviado pelo mailer array: Para ('to'), Cópia ('cc') ou Responder para ('replyTo').
+     *
+     * @return list<string>
+     */
+    protected function sentRecipients(string $header = 'to'): array
+    {
+        $message = Mail::mailer('array')->getSymfonyTransport()->messages()->first()->getOriginalMessage();
+
+        return array_map(fn ($address) => $address->getAddress(), $message->{'get'.ucfirst($header)}());
+    }
 }

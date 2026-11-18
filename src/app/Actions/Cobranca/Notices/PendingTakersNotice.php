@@ -3,6 +3,7 @@
 namespace App\Actions\Cobranca\Notices;
 
 use App\Actions\Cobranca\Nfse\PendingTakers;
+use App\Enums\Notice;
 use App\Filament\Pages\TakerCheck;
 use Illuminate\Support\Facades\Mail;
 
@@ -17,6 +18,10 @@ class PendingTakersNotice
     /** @return int tomadores listados */
     public function __invoke(): int
     {
+        if (! Notice::PendingTakers->enabled()) {
+            return 0;
+        }
+
         $from = today()->toDateString();
         $to = today()->addDays(5)->toDateString();
         $rows = ($this->pending)($from, $to);
@@ -36,7 +41,7 @@ class PendingTakersNotice
             .'<td><font face="Arial" color="white">CNPJ</font></td><td><font face="Arial" color="white">Pendências</font></td></tr>'
             .$lines.'</table>';
 
-        Mail::html($html, fn ($mail) => $mail->to('it@dmflog.com.br', 'TI')->subject('DMF Logistics: tomadores com pendência de cadastro - '.today()->format('d/m/Y')));
+        Mail::html($html, fn ($mail) => $mail->to(Notice::PendingTakers->recipients())->subject('DMF Logistics: tomadores com pendência de cadastro - '.today()->format('d/m/Y')));
 
         return $count;
     }

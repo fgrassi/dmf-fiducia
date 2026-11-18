@@ -3,6 +3,7 @@
 namespace App\Actions\Cobranca\Notices;
 
 use App\Enums\Cobranca\ChargeStatus;
+use App\Enums\Notice;
 use App\Models\FinCharges;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -20,6 +21,10 @@ class ReleaseList
     /** @return int linhas da relação */
     public function __invoke(): int
     {
+        if (! Notice::ReleaseList->enabled()) {
+            return 0;
+        }
+
         $rows = [];
 
         $charges = FinCharges::with('embarque', 'bl')
@@ -66,8 +71,8 @@ class ReleaseList
             ."<tr><td>{$body}</td></tr></table>";
 
         Mail::html($html, fn ($mail) => $mail
-            ->to(['financeiro@dmflog.com.br', 'diego@dmflog.com.br', 'docexp@dmflog.com.br'])
-            ->cc('it@dmflog.com.br')
+            ->to(Notice::ReleaseList->recipients())
+            ->cc(Notice::ReleaseList->copies())
             ->subject('Relação de embarques para liberação '.today()->format('d-m-Y')));
 
         return count($rows);

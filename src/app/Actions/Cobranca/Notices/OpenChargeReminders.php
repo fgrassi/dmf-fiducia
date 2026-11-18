@@ -3,6 +3,7 @@
 namespace App\Actions\Cobranca\Notices;
 
 use App\Enums\Cobranca\ChargeStatus;
+use App\Enums\Notice;
 use App\Models\Armador;
 use App\Models\FinCharges;
 use App\Services\Cobranca\ChargeDetails;
@@ -30,6 +31,10 @@ class OpenChargeReminders
     /** @return int e-mails enviados */
     public function __invoke(): int
     {
+        if (! Notice::OpenCharges->enabled()) {
+            return 0;
+        }
+
         $limit = today()->subDays(7);
         $excludedClients = [...self::EXCLUDED_CLIENTS, ...DB::table('fin_clients_boleto')->whereNotNull('ref_client')->pluck('ref_client')->all()];
         $sent = 0;
@@ -90,7 +95,7 @@ class OpenChargeReminders
         Mail::html($html, fn ($mail) => $mail
             ->from('financeiro@dmflog.com.br')
             ->to($to)
-            ->bcc('cobranca@dmflog.com.br', 'Cobrança DMF')
+            ->bcc(Notice::OpenCharges->copies())
             ->subject("[Aviso] Reserva {$e->booking} está com cobrança(s) {$days} em aberto"));
     }
 }

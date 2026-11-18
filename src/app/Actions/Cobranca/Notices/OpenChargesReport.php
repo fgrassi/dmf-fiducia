@@ -3,6 +3,7 @@
 namespace App\Actions\Cobranca\Notices;
 
 use App\Enums\Cobranca\ChargeStatus;
+use App\Enums\Notice;
 use App\Models\FinCharges;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,10 @@ class OpenChargesReport
     /** @return int ICs no relatório */
     public function __invoke(): int
     {
+        if (! Notice::OpenChargesReport->enabled()) {
+            return 0;
+        }
+
         $charges = FinCharges::with('embarque', 'bl', 'type')
             ->where('status', ChargeStatus::Open)
             ->whereDate('created_at', '<=', today()->subDays(7))
@@ -50,7 +55,7 @@ class OpenChargesReport
             ."<th>Booking</th><th>HBL</th><th>Data da Cobrança</th><th>Saída/Chegada Efetiva</th><th>Diferença Navio</th><th>Diferença Cobrança</th></tr>{$rows}</table>";
 
         Mail::html($html, fn ($mail) => $mail
-            ->to(['cobranca@dmflog.com.br', 'chamado@dmflog.com.br'])
+            ->to(Notice::OpenChargesReport->recipients())
             ->subject('[RELATÓRIO] Cobranças em aberto 7 dias+'));
 
         return $charges->count();

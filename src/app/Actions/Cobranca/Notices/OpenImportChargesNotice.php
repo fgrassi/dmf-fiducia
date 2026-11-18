@@ -3,6 +3,7 @@
 namespace App\Actions\Cobranca\Notices;
 
 use App\Enums\Cobranca\ChargeStatus;
+use App\Enums\Notice;
 use App\Models\FinCharges;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -16,6 +17,10 @@ class OpenImportChargesNotice
     /** @return int ICs listadas */
     public function __invoke(): int
     {
+        if (! Notice::OpenImportCharges->enabled()) {
+            return 0;
+        }
+
         $charges = FinCharges::with('embarque')
             ->where('status', ChargeStatus::Open)
             ->whereDate('created_at', today()->subDays(7))
@@ -39,7 +44,7 @@ class OpenImportChargesNotice
             .'<tr><td><p>As cobranças abaixo foram geradas ha 7 dias e ainda não foram pagas</p>'
             ."<table><tr><th>Reserva</th><th>Cliente</th><th>Data</th><th>Armador</th></tr>{$rows}</table></td></tr></table>";
 
-        Mail::html($html, fn ($mail) => $mail->to('financeiro@dmflog.com.br', 'Financeiro')->subject('Cobranças há 7 dias sem pagamento'));
+        Mail::html($html, fn ($mail) => $mail->to(Notice::OpenImportCharges->recipients())->subject('Cobranças há 7 dias sem pagamento'));
 
         return $charges->count();
     }

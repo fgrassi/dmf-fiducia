@@ -2,6 +2,7 @@
 
 namespace App\Actions\Expenses;
 
+use App\Enums\Notice;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 
@@ -17,6 +18,10 @@ class ExpenseDueNotice
     /** @return int vencimentos avisados */
     public function __invoke(): int
     {
+        if (! Notice::ExpenseDue->enabled()) {
+            return 0;
+        }
+
         $target = today()->addDays(3);
         $day = $target->day;
         $lastDay = $target->daysInMonth;
@@ -66,7 +71,7 @@ class ExpenseDueNotice
             ."<tr><td><br/><h3>Despesas Cadastradas/Pendentes</h3><hr/>{$details}</td></tr></table>";
 
         Mail::html($html, fn ($mail) => $mail
-            ->to(['financeiro@dmflog.com.br', 'it@dmflog.com.br'])
+            ->to(Notice::ExpenseDue->recipients())
             ->subject("[Aviso] Vencimento de despesas em 3 dias ({$due})"));
 
         return $items->count();

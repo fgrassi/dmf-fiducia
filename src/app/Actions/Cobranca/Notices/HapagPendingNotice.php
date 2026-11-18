@@ -2,6 +2,7 @@
 
 namespace App\Actions\Cobranca\Notices;
 
+use App\Enums\Notice;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 
@@ -16,6 +17,10 @@ class HapagPendingNotice
     /** @return int reservas pendentes avisadas */
     public function __invoke(): int
     {
+        if (! Notice::HapagPending->enabled()) {
+            return 0;
+        }
+
         $pending = fn () => DB::table('embarque as e')
             ->where('e.impor_expor', 'e')
             ->where('e.ctr_desp', 1)
@@ -49,7 +54,7 @@ class HapagPendingNotice
             .$bookings->map(fn ($b) => '<ul><li>'.e("{$b->booking} - {$b->nome}").'</li></ul>')->implode('');
 
         Mail::html($html, fn ($mail) => $mail
-            ->to(['financeiro@dmflog.com.br', 'it@dmflog.com.br'])
+            ->to(Notice::HapagPending->recipients())
             ->subject('[FINANCEIRO] Reservas da Hapag pendentes de cobrança - EXPO'));
 
         return $bookings->count();
