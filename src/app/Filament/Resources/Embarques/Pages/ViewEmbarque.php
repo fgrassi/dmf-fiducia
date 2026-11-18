@@ -8,6 +8,7 @@ use App\Actions\Booking\Documents\ExpenseStatement;
 use App\Actions\Booking\Documents\ExpenseStatementPdf;
 use App\Actions\Booking\ReleaseShipment;
 use App\Actions\Booking\UpdateEtd;
+use App\Actions\Seguro\AllowInsuranceCharge;
 use App\Filament\Resources\Embarques\EmbarqueResource;
 use App\Models\Embarque;
 use Carbon\Carbon;
@@ -90,6 +91,7 @@ class ViewEmbarque extends ViewRecord
                     ->visible(fn (Embarque $record) => $record->finalizado !== ChangeStatus::CANCELLED),
                 $this->etdAction(),
                 $this->releaseAction(),
+                $this->allowInsuranceChargeAction(),
             ])
                 ->label('Reserva')
                 ->icon(Heroicon::OutlinedCog6Tooth)
@@ -158,6 +160,21 @@ class ViewEmbarque extends ViewRecord
                 app(ReleaseShipment::class)($record->getKey(), auth()->id());
 
                 Notification::make()->title('Embarque liberado')->success()->send();
+            });
+    }
+
+    /** seguro/confirmaFinanceiro (legado): habilita o seguro para a geração da cobrança. Some depois de habilitado. */
+    private function allowInsuranceChargeAction(): Action
+    {
+        return Action::make('permitirCobranca')
+            ->label('Permitir cobrança')
+            ->icon(Heroicon::OutlinedCheckCircle)
+            ->requiresConfirmation()
+            ->visible(fn (Embarque $record) => $record->tipo_embarque === 's' && $record->insuranceConfirmation && ! $record->insuranceConfirmation->isChargeAllowed())
+            ->action(function (Embarque $record) {
+                app(AllowInsuranceCharge::class)($record);
+
+                Notification::make()->title('Seguro habilitado para cobrança com sucesso.')->success()->send();
             });
     }
 

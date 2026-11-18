@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Embarques;
 
 use App\Filament\Resources\Embarques\Pages\ListEmbarques;
+use App\Filament\Resources\Embarques\Pages\ListSeguros;
 use App\Filament\Resources\Embarques\Pages\ViewEmbarque;
 use App\Filament\Resources\Embarques\RelationManagers\ArrivalConfirmationsRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\BlsRelationManager;
@@ -25,6 +26,7 @@ use App\Filament\Resources\Embarques\Schemas\EmbarqueInfolist;
 use App\Filament\Resources\Embarques\Tables\EmbarquesTable;
 use App\Models\Embarque;
 use BackedEnum;
+use Filament\Navigation\NavigationItem;
 use Filament\Resources\RelationManagers\RelationGroup;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -59,6 +61,22 @@ class EmbarqueResource extends Resource
     public static function canAccess(): bool
     {
         return (bool) auth()->user()?->hasLegacyCredential('booking');
+    }
+
+    /** "Lista de Seguros" (seguro/list do legado): lista própria das reservas de seguro, no menu Booking. */
+    public static function getNavigationItems(): array
+    {
+        return [
+            ...parent::getNavigationItems(),
+            NavigationItem::make('Lista de Seguros')
+                ->group('Reserva')
+                ->parentItem('Booking')
+                ->icon(Heroicon::OutlinedShieldCheck)
+                ->sort(11)
+                ->url(static::getUrl('seguros'))
+                ->isActiveWhen(fn () => request()->routeIs(static::getRouteBaseName().'.seguros'))
+                ->visible(static::canAccess()),
+        ];
     }
 
     public static function infolist(Schema $schema): Schema
@@ -104,6 +122,7 @@ class EmbarqueResource extends Resource
     {
         return [
             'index' => ListEmbarques::route('/'),
+            'seguros' => ListSeguros::route('/seguros'),
             'view' => ViewEmbarque::route('/{record}'),
         ];
     }

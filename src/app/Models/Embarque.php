@@ -235,6 +235,12 @@ class Embarque extends Model
         return $this->hasMany(EmbarqueRota::class, 'embarque_id', 'embarque_id')->orderByDesc('rota_id');
     }
 
+    /** Dados do seguro da reserva de seguro (tipo 's'). */
+    public function insuranceConfirmation(): HasOne
+    {
+        return $this->hasOne(InsuranceConfirmation::class, 'ref_embarque', 'embarque_id')->orderBy('id');
+    }
+
     /** Controle do IMO (importação): um registro por reserva. */
     public function imos(): HasMany
     {

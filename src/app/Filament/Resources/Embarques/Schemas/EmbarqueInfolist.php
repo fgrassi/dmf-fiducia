@@ -179,6 +179,7 @@ class EmbarqueInfolist
                             ->columnSpan(1)
                             ->visible(fn (Embarque $record) => $record->impor_expor === 'e' && $record->tipo_embarque !== 'a'),
                     ]),
+                self::insurance(),
                 Section::make('Embarque')
                     ->columnSpanFull()
                     ->columns(4)
@@ -492,6 +493,38 @@ class EmbarqueInfolist
                 self::party('Dados do shipper', 'Shipper', 'exportador', 'shipperContacts', 'Contatos do Shipper'),
             ],
         };
+    }
+
+    /** Seguro (seguro/show do legado): seguradora, valores da cotação e se a cobrança já foi habilitada. Só nas reservas de seguro. */
+    private static function insurance(): Section
+    {
+        $amount = fn (string $key, string $currency, string $label) => TextEntry::make("insurance_{$key}")
+            ->label($label)
+            ->state(function (Embarque $record) use ($key, $currency) {
+                $insurance = $record->insuranceConfirmation;
+
+                return $insurance ? trim("{$insurance->{$currency}?->symbol} ".number_format((float) $insurance->{$key}, 2, ',', '.')) : null;
+            })
+            ->placeholder('-');
+
+        return Section::make('Seguro')
+            ->columnSpanFull()
+            ->columns(4)
+            ->visible(fn (Embarque $record) => $record->tipo_embarque === 's')
+            ->schema([
+                TextEntry::make('insurance_company')
+                    ->label('Cia Seguro')
+                    ->state(fn (Embarque $record) => $record->insuranceConfirmation?->ciaSeguro?->name)
+                    ->placeholder('-'),
+                $amount('valor_fatura', 'invoiceCurrency', 'Valor da Fatura'),
+                $amount('valor_frete', 'freightCurrency', 'Valor do Frete'),
+                $amount('despesas', 'expensesCurrency', 'Despesas (10%)'),
+                TextEntry::make('insurance_charge')
+                    ->label('Cobrança')
+                    ->badge()
+                    ->state(fn (Embarque $record) => $record->insuranceConfirmation?->isChargeAllowed() ? 'Habilitada' : 'Aguardando habilitação')
+                    ->color(fn (string $state) => $state === 'Habilitada' ? 'success' : 'warning'),
+            ]);
     }
 
     /** Dados do cliente: à direita assessoria, trading e despachantes (no aéreo, só os brokers; no marítimo, conta e contatos). */
