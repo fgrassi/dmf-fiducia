@@ -10,6 +10,7 @@ use App\Enums\Routine;
 use App\Models\NoticeSetting;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Filament\Forms\Components\Select;
@@ -116,7 +117,7 @@ class NoticeSettings extends Page implements HasTable
                     ->label('Editar')
                     ->icon(Heroicon::PencilSquare)
                     ->modalHeading(fn (array $record): string => $record['label'])
-                    ->fillForm(fn (array $record): array => ['enabled' => $record['enabled'], 'time' => $record['time'], 'recipients' => $record['to'], 'cc' => $record['cc'], 'subject' => $record['subject'], 'body' => $record['body']])
+                    ->fillForm(fn (array $record): array => ['enabled' => $record['enabled'], 'time' => $record['time'], 'weekdays' => $record['weekdays'], 'recipients' => $record['to'], 'cc' => $record['cc'], 'subject' => $record['subject'], 'body' => $record['body']])
                     ->modalWidth('4xl')
                     ->schema(fn (array $record): array => [
                         Toggle::make('enabled')
@@ -126,6 +127,13 @@ class NoticeSettings extends Page implements HasTable
                             ->seconds(false)
                             ->visible($record['time'] !== null)
                             ->required($record['time'] !== null),
+                        CheckboxList::make('weekdays')
+                            ->label('Dias da semana')
+                            ->options([0 => 'Dom', 1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'Sáb'])
+                            ->columns(7)
+                            ->visible($record['weekdays'] !== null)
+                            ->required($record['weekdays'] !== null)
+                            ->minItems(1),
                         TagsInput::make('recipients')
                             ->label('Para')
                             ->visible($record['to'] !== [])
@@ -151,6 +159,7 @@ class NoticeSettings extends Page implements HasTable
                         $changes = array_filter([
                             'enabled' => (bool) $data['enabled'],
                             'time' => $record['time'] !== null ? substr($data['time'], 0, 5) : null,
+                            'weekdays' => $record['weekdays'] !== null ? collect($data['weekdays'])->map(fn ($day) => (int) $day)->unique()->sort()->values()->all() : null,
                             'recipients' => $record['to'] !== [] ? $data['recipients'] : null,
                             'cc' => $record['routine'] ? null : ($data['cc'] ?? []),
                         ], fn ($value) => $value !== null);
@@ -181,6 +190,7 @@ class NoticeSettings extends Page implements HasTable
                 'label' => $case->label(),
                 'days' => $case->days(),
                 'time' => $case->time(),
+                'weekdays' => $case->weekdays(),
                 'enabled' => $case->enabled(),
                 'to' => $case instanceof Notice && $case->hasFixedRecipients() ? $case->recipients() : [],
                 'cc' => $case instanceof Notice ? $case->copies() : [],

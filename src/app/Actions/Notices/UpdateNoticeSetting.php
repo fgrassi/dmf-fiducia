@@ -10,7 +10,7 @@ use App\Models\NoticeSetting;
 class UpdateNoticeSetting
 {
     /**
-     * @param  array{enabled?: bool, time?: string, subject?: string|null, body?: string|null, recipients?: list<string>, cc?: list<string>}  $changes
+     * @param  array{enabled?: bool, time?: string, weekdays?: list<int>, subject?: string|null, body?: string|null, recipients?: list<string>, cc?: list<string>}  $changes
      */
     public function __invoke(Notice|Routine $notice, array $changes): NoticeSetting
     {

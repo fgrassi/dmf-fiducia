@@ -41,6 +41,6 @@ class NoticeSetting extends Model
 
     protected function casts(): array
     {
-        return ['enabled' => 'boolean', 'recipients' => 'array', 'cc' => 'array'];
+        return ['enabled' => 'boolean', 'recipients' => 'array', 'cc' => 'array', 'weekdays' => 'array'];
     }
 }

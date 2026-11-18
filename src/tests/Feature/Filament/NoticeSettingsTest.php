@@ -70,6 +70,35 @@ class NoticeSettingsTest extends TestCase
         $this->assertStringNotContainsString('Lembrete', $custom);
     }
 
+    public function test_edit_changes_the_weekdays_and_requires_at_least_one(): void
+    {
+        $this->actingAs($this->user('financial'));
+        $edit = ['enabled' => true, 'time' => '08:00', 'recipients' => ['a@dmflog.com.br'], 'cc' => []];
+
+        Livewire::test(NoticeSettings::class)
+            ->callAction(TestAction::make('edit')->table(Notice::HapagPending->value), [...$edit, 'weekdays' => ['1', '3', '5']])
+            ->assertHasNoActionErrors();
+
+        $this->assertSame([1, 3, 5], Notice::HapagPending->weekdays());
+        $this->assertSame('Seg, Qua, Sex', Notice::HapagPending->days());
+
+        Livewire::test(NoticeSettings::class)
+            ->callAction(TestAction::make('edit')->table(Notice::HapagPending->value), [...$edit, 'weekdays' => []])
+            ->assertHasActionErrors(['weekdays']);
+    }
+
+    public function test_the_monthly_report_has_a_fixed_day_and_does_not_ask_for_weekdays(): void
+    {
+        $this->actingAs($this->user('financial'));
+
+        Livewire::test(NoticeSettings::class)
+            ->callAction(TestAction::make('edit')->table(Notice::NotesMonthlyReport->value), ['enabled' => true, 'time' => '09:00', 'recipients' => ['a@dmflog.com.br'], 'cc' => []])
+            ->assertHasNoActionErrors();
+
+        $this->assertSame('Dia 1º', Notice::NotesMonthlyReport->days());
+        $this->assertSame('09:00', Notice::NotesMonthlyReport->time());
+    }
+
     public function test_search_filters_the_list_by_description_and_recipient(): void
     {
         $this->actingAs($this->user('financial'));

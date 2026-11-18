@@ -34,6 +34,9 @@ enum Notice: string
     case PendingPayment = 'controle-pa:aviso-pendencia-pagamento';
     case ConfirmedWithoutInvoice = 'controle-pa:aviso-embarques-confirmados';
 
+    /** Dias da semana de 0 (domingo) a 6 (sábado). */
+    private const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
+
     private const FINANCE = 'financeiro@dmflog.com.br';
 
     private const IT = 'it@dmflog.com.br';
@@ -42,10 +45,10 @@ enum Notice: string
 
     private const MARCIA = 'marcia@dmflog.com.br';
 
-    /** @return array{label: string, days: string, time: string, to: list<string>|null, cc: list<string>} to null: contatos da própria reserva */
+    /** @return array{label: string, weekdays: list<int>|null, fixed_days?: string, time: string, to: list<string>|null, cc: list<string>} to null: contatos da própria reserva; weekdays null: dia fixo (fixed_days) */
     private function definition(): array
     {
-        $daily = ['days' => 'Diário', 'time' => '08:00'];
+        $daily = ['weekdays' => self::EVERY_DAY, 'time' => '08:00'];
         $controlePa = [...$daily, 'to' => [self::FINANCE], 'cc' => []];
 
         return match ($this) {
@@ -53,18 +56,18 @@ enum Notice: string
             self::OpenImportCharges => ['label' => 'Cobranças de importação em aberto há 7 dias', ...$daily, 'to' => [self::FINANCE], 'cc' => []],
             self::HapagPending => ['label' => 'Exportações Hapag pendentes de cobrança', ...$daily, 'to' => [self::FINANCE, self::IT], 'cc' => []],
             self::OpenChargesReport => ['label' => 'Relatório interno das cobranças em aberto', ...$daily, 'to' => [self::BILLING, 'chamado@dmflog.com.br'], 'cc' => []],
-            self::ReleaseList => ['label' => 'Reservas autorizadas para liberação de BL', 'days' => 'Diário', 'time' => '18:00', 'to' => [self::FINANCE, 'diego@dmflog.com.br', 'docexp@dmflog.com.br'], 'cc' => [self::IT]],
-            self::PendingTakers => ['label' => 'Tomadores com pendência de cadastro', 'days' => 'Dias úteis', 'time' => '08:00', 'to' => [self::IT], 'cc' => []],
+            self::ReleaseList => ['label' => 'Reservas autorizadas para liberação de BL', 'weekdays' => self::EVERY_DAY, 'time' => '18:00', 'to' => [self::FINANCE, 'diego@dmflog.com.br', 'docexp@dmflog.com.br'], 'cc' => [self::IT]],
+            self::PendingTakers => ['label' => 'Tomadores com pendência de cadastro', 'weekdays' => [1, 2, 3, 4, 5], 'time' => '08:00', 'to' => [self::IT], 'cc' => []],
             self::ExpenseDue => ['label' => 'Vencimento de despesas em 3 dias', ...$daily, 'to' => [self::FINANCE, self::IT], 'cc' => []],
-            self::ExpenseReviewImport => ['label' => 'Revisão das despesas lançadas hoje (importação)', 'days' => 'Diário', 'time' => '18:00', 'to' => [self::BILLING, 'imp2@dmflog.com.br', 'imp3@dmflog.com.br', 'imp4@dmflog.com.br', 'imp5@dmflog.com.br'], 'cc' => []],
-            self::ExpenseReviewExport => ['label' => 'Revisão das despesas lançadas hoje (exportação)', 'days' => 'Diário', 'time' => '18:00', 'to' => [self::BILLING, 'douglas@dmflog.com.br'], 'cc' => []],
+            self::ExpenseReviewImport => ['label' => 'Revisão das despesas lançadas hoje (importação)', 'weekdays' => self::EVERY_DAY, 'time' => '18:00', 'to' => [self::BILLING, 'imp2@dmflog.com.br', 'imp3@dmflog.com.br', 'imp4@dmflog.com.br', 'imp5@dmflog.com.br'], 'cc' => []],
+            self::ExpenseReviewExport => ['label' => 'Revisão das despesas lançadas hoje (exportação)', 'weekdays' => self::EVERY_DAY, 'time' => '18:00', 'to' => [self::BILLING, 'douglas@dmflog.com.br'], 'cc' => []],
             self::MblRelease => ['label' => 'Agentes: frete a receber e chegada em até 5 dias (Para: contatos da reserva)', ...$daily, 'to' => null, 'cc' => [self::FINANCE]],
             self::ExchangeDeadline => ['label' => 'Prazo de envio de câmbio dos agentes', ...$daily, 'to' => [self::FINANCE], 'cc' => []],
             self::PriorityArrivals => ['label' => 'Embarques prioritários com chegada próxima', ...$daily, 'to' => [self::FINANCE], 'cc' => []],
-            self::Provisioning => ['label' => 'Provisionamento semanal de receitas e despesas', 'days' => 'Segunda', 'time' => '08:00', 'to' => [self::MARCIA, self::IT], 'cc' => []],
+            self::Provisioning => ['label' => 'Provisionamento semanal de receitas e despesas', 'weekdays' => [1], 'time' => '08:00', 'to' => [self::MARCIA, self::IT], 'cc' => []],
             self::OpenCommissions => ['label' => 'Comissões de embarque em aberto', ...$daily, 'to' => ['financeiro5@dmflog.com.br', self::MARCIA], 'cc' => []],
             self::OverdueNotes => ['label' => 'Notas de agentes emitidas há mais de 30 dias', ...$daily, 'to' => [self::MARCIA, self::FINANCE, 'chamado@dmflog.com.br'], 'cc' => []],
-            self::NotesMonthlyReport => ['label' => 'Relatório mensal do controle de notas', 'days' => 'Dia 1º', 'time' => '08:00', 'to' => [self::MARCIA], 'cc' => []],
+            self::NotesMonthlyReport => ['label' => 'Relatório mensal do controle de notas', 'weekdays' => null, 'fixed_days' => 'Dia 1º', 'time' => '08:00', 'to' => [self::MARCIA], 'cc' => []],
             self::ReadyToSendToAgent => ['label' => 'Freight Invoices prontas para envio ao agente', ...$controlePa],
             self::ReadyToSendToCarrier => ['label' => 'Freight Invoices prontas para envio ao armador', ...$controlePa],
             self::PendingReceipt => ['label' => 'Pagamentos ao armador sem recibo', ...$controlePa],
@@ -78,10 +81,17 @@ enum Notice: string
         return $this->definition()['label'];
     }
 
-    /** Dias em que o aviso roda; o horário é o de time(). */
+    /** Dias em que o aviso roda ("Diário", "Dias úteis", "Seg, Qua"...); o horário é o de time(). */
     public function days(): string
     {
-        return $this->definition()['days'];
+        $weekdays = $this->weekdays();
+
+        return $weekdays === null ? $this->definition()['fixed_days'] : self::weekdaysLabel($weekdays);
+    }
+
+    protected function defaultWeekdays(): ?array
+    {
+        return $this->definition()['weekdays'];
     }
 
     protected function defaultTime(): string

@@ -50,7 +50,7 @@ Artisan::command('cobranca:gerar', function () {
 Schedule::command('cobranca:gerar')
     ->hourly()
     ->withoutOverlapping()
-    ->when(fn () => (bool) config('services.cobranca.automatic_generation') && Routine::GenerateCharges->enabled());
+    ->when(fn () => (bool) config('services.cobranca.automatic_generation') && Routine::GenerateCharges->enabled() && Routine::GenerateCharges->runsToday());
 
 // rotinas do módulo cron do legado: [comando, Action, descrição, método]; o horário vem de App\Enums\Notice::time() (tela Avisos por e-mail)
 $notices = [
@@ -86,26 +86,25 @@ foreach ($notices as $row) {
 
     //  horários chutados (o crontab do tracking não está no repo); confirmar com produção antes de ligar
     // desligado até o cron do tracking parar de chamar cron/<rotina> (COBRANCA_ROTINAS_AUTOMATICAS=true)
-    // avisoPendenciaTomador rodava só em dias úteis (0 8 * * 1-5)
-    // roda a cada minuto e só passa no horário gravado na tela Avisos por e-mail
+    // avisoPendenciaTomador rodava só em dias úteis (0 8 * * 1-5): é o dia da semana padrão dele no enum Notice
+    // roda a cada minuto e só passa no horário e nos dias da semana gravados na tela Avisos por e-mail
     Schedule::command($command)
         ->everyMinute()
         ->withoutOverlapping()
         ->when(fn () => (bool) config('services.cobranca.automatic_notices')
             && now()->format('H:i') === Notice::from($command)->time()
-            && ($command !== 'cobranca:aviso-pendencia-tomador' || ! now()->isWeekend()));
+            && Notice::from($command)->runsToday());
 }
 
-// cron/provisionamento (legado): o assunto leva o número da semana, então roda uma vez por semana (dia chutado; hora editável na tela Avisos por e-mail; confirmar com o crontab de produção).
+// cron/provisionamento (legado): o assunto leva o número da semana, então roda uma vez por semana (segunda por padrão; dia e hora editáveis na tela Avisos por e-mail; confirmar com o crontab de produção).
 Artisan::command('financeiro:provisionamento-semanal', function () {
     $this->info(app(ProvisioningNotice::class)().' reserva(s) listada(s).');
 })->purpose('Provisionamento de receitas e despesas da semana daqui a 2 semanas, exportação e importação (provisionamento)');
 
 Schedule::command('financeiro:provisionamento-semanal')
-    ->mondays()
     ->everyMinute()
     ->withoutOverlapping()
-    ->when(fn () => (bool) config('services.cobranca.automatic_notices') && now()->format('H:i') === Notice::Provisioning->time());
+    ->when(fn () => (bool) config('services.cobranca.automatic_notices') && now()->format('H:i') === Notice::Provisioning->time() && Notice::Provisioning->runsToday());
 
 // ordemPagamento/geraOrdemPagamento (legado): gera as ordens de pagamento ao armador das reservas com pagamento pendente.
 Artisan::command('ordens-pagamento:gerar', function () {
@@ -127,7 +126,7 @@ Artisan::command('ordens-pagamento:gerar', function () {
 Schedule::command('ordens-pagamento:gerar')
     ->hourly()
     ->withoutOverlapping()
-    ->when(fn () => (bool) config('services.ordem_pagamento.automatic_generation') && Routine::GeneratePaymentOrders->enabled());
+    ->when(fn () => (bool) config('services.ordem_pagamento.automatic_generation') && Routine::GeneratePaymentOrders->enabled() && Routine::GeneratePaymentOrders->runsToday());
 
 // ordemPagamentoOutros/geraOrdemPagamento (legado): gera as ordens de pagamento a despachante, cia aérea e seguro.
 Artisan::command('ordens-pagamento-outros:gerar', function () {
@@ -149,7 +148,7 @@ Artisan::command('ordens-pagamento-outros:gerar', function () {
 Schedule::command('ordens-pagamento-outros:gerar')
     ->hourly()
     ->withoutOverlapping()
-    ->when(fn () => (bool) config('services.ordem_pagamento_outros.automatic_generation') && Routine::GenerateOtherPaymentOrders->enabled());
+    ->when(fn () => (bool) config('services.ordem_pagamento_outros.automatic_generation') && Routine::GenerateOtherPaymentOrders->enabled() && Routine::GenerateOtherPaymentOrders->runsToday());
 
 // cron/manutencao (legado), capas normais: gera o resumo_resultado das capas arquivadas e avisa quem favoritou a reserva.
 Artisan::command('capas:resumo-gerar', function () {
@@ -164,6 +163,7 @@ Schedule::command('capas:resumo-gerar')
     ->withoutOverlapping()
     ->when(fn () => (bool) config('services.capas.automatic_routines')
         && Routine::GenerateCoverSummaries->enabled()
+        && Routine::GenerateCoverSummaries->runsToday()
         && now()->format('H:i') === Routine::GenerateCoverSummaries->time());
 
 // capasContabilidade/atualizarResumoResultado (legado): recalcula rs e resultado dos resumos; só sob demanda.

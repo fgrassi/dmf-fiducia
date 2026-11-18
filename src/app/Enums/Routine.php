@@ -26,7 +26,18 @@ enum Routine: string
 
     public function days(): string
     {
-        return $this->defaultTime() === null ? 'A cada hora' : 'Diário';
+        $days = self::weekdaysLabel($this->weekdays());
+
+        return match (true) {
+            $this->defaultTime() !== null => $days,
+            $days === 'Diário' => 'A cada hora',
+            default => "A cada hora · {$days}",
+        };
+    }
+
+    protected function defaultWeekdays(): array
+    {
+        return [0, 1, 2, 3, 4, 5, 6];
     }
 
     protected function defaultTime(): ?string
