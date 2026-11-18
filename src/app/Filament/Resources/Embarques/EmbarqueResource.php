@@ -14,8 +14,12 @@ use App\Filament\Resources\Embarques\RelationManagers\DepartureConfirmationsRela
 use App\Filament\Resources\Embarques\RelationManagers\DetentionRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\ExpensesRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\FreightInvoicesRelationManager;
+use App\Filament\Resources\Embarques\RelationManagers\ImoRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\LogsRelationManager;
+use App\Filament\Resources\Embarques\RelationManagers\MailingsRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\RemarksRelationManager;
+use App\Filament\Resources\Embarques\RelationManagers\RouteRelationManager;
+use App\Filament\Resources\Embarques\RelationManagers\ScheduleRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\TrackingRelationManager;
 use App\Filament\Resources\Embarques\Schemas\EmbarqueInfolist;
 use App\Filament\Resources\Embarques\Tables\EmbarquesTable;
@@ -87,6 +91,10 @@ class EmbarqueResource extends Resource
             DetentionRelationManager::class,
             BlsRelationManager::class,
             TrackingRelationManager::class,
+            ScheduleRelationManager::class,
+            ImoRelationManager::class,
+            RouteRelationManager::class,
+            MailingsRelationManager::class,
             RemarksRelationManager::class,
             LogsRelationManager::class,
         ];

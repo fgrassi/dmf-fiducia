@@ -229,6 +229,24 @@ class Embarque extends Model
         return $this->hasMany(Transborda::class, 'embarque_id', 'embarque_id')->orderByDesc('data_reg')->orderByDesc('transborda_id');
     }
 
+    /** Alterações de rota do navio, a mais recente primeiro. */
+    public function routes(): HasMany
+    {
+        return $this->hasMany(EmbarqueRota::class, 'embarque_id', 'embarque_id')->orderByDesc('rota_id');
+    }
+
+    /** Controle do IMO (importação): um registro por reserva. */
+    public function imos(): HasMany
+    {
+        return $this->hasMany(ControleImoCi::class, 'embarque_id', 'embarque_id');
+    }
+
+    /** Envios pelo Correio que levam documentos desta reserva, o mais recente primeiro. */
+    public function mailings(): BelongsToMany
+    {
+        return $this->belongsToMany(ControleCorreio::class, 'ctr_correio_embarque', 'embarque_id', 'controle_correio_id')->orderByDesc('data_envio');
+    }
+
     /** Rastreabilidade (log) da reserva, a mais recente primeiro. */
     public function logs(): HasMany
     {
