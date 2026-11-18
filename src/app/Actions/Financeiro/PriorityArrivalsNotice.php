@@ -2,6 +2,8 @@
 
 namespace App\Actions\Financeiro;
 
+use App\Actions\Notices\RenderNoticeEmail;
+use App\Actions\Notices\SendNoticeMail;
 use App\Enums\Notice;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -45,15 +47,15 @@ class PriorityArrivalsNotice
             ->get(['m.embarque_id', 'm.quantidade', 't.nome as tipo'])
             ->groupBy('embarque_id');
 
-        $html = "<h3>Os seguintes embarques prioritários chegam em {$days} dias: </h3>"
-            .'<table border="1"><tr><th>Reserva</th><th>Cliente</th><th>ETA</th><th>Equipamento</th></tr>'
+        $list = '<table border="1"><tr><th>Reserva</th><th>Cliente</th><th>ETA</th><th>Equipamento</th></tr>'
             .$bookings->map(fn ($b) => '<tr><td>'.e($b->booking).'</td>'
                 .'<td>'.e($b->nome ? "{$b->nome} ({$b->cnpj})" : '').'</td>'
                 .'<td>'.date('d/m/Y', strtotime($b->chegada_prevista)).'</td>'
                 .'<td><ul>'.$equipment->get($b->embarque_id, collect())->map(fn ($m) => '<li>'.e("{$m->quantidade}x{$m->tipo}").'</li>')->implode('').'</ul></td></tr>')->implode('')
             .'</table>';
 
-        Mail::html($html, fn ($mail) => $mail->to(Notice::PriorityArrivals->recipients())->subject("[Aviso] Embarques Prioritários ETA próximo (+{$days} dias)"));
+        [$subject, $html] = app(RenderNoticeEmail::class)(Notice::PriorityArrivals, ['dias' => $days, 'lista' => $list]);
+        app(SendNoticeMail::class)($subject, $html, Notice::PriorityArrivals->recipients());
 
         return $bookings->count();
     }

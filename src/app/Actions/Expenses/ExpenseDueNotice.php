@@ -2,9 +2,10 @@
 
 namespace App\Actions\Expenses;
 
+use App\Actions\Notices\RenderNoticeEmail;
+use App\Actions\Notices\SendNoticeMail;
 use App\Enums\Notice;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * cron/avisoVencimentoDespesa (legado): lembrete ao financeiro dos vencimentos fixos (despesa_vencimento) que caem daqui a
@@ -65,14 +66,9 @@ class ExpenseDueNotice
                     .'</table>';
         }
 
-        $html = "<table width='1024px' border=0><tr bgcolor='#7e0001'><td></td></tr>"
-            ."<tr><td><font face='Arial' color='black'><h3>Lembrete: os vencimentos abaixo ocorrem em 3 dias ({$due})</h3></font></td></tr>"
-            ."<tr><td>{$table}</table></td></tr>"
-            ."<tr><td><br/><h3>Despesas Cadastradas/Pendentes</h3><hr/>{$details}</td></tr></table>";
+        [$subject, $html] = app(RenderNoticeEmail::class)(Notice::ExpenseDue, ['vencimento' => $due, 'lista' => $table.'</table>', 'detalhes' => $details]);
 
-        Mail::html($html, fn ($mail) => $mail
-            ->to(Notice::ExpenseDue->recipients())
-            ->subject("[Aviso] Vencimento de despesas em 3 dias ({$due})"));
+        app(SendNoticeMail::class)($subject, $html, Notice::ExpenseDue->recipients());
 
         return $items->count();
     }

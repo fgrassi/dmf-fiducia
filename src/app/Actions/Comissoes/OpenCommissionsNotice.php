@@ -2,6 +2,8 @@
 
 namespace App\Actions\Comissoes;
 
+use App\Actions\Notices\RenderNoticeEmail;
+use App\Actions\Notices\SendNoticeMail;
 use App\Enums\Notice;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -44,7 +46,7 @@ class OpenCommissionsNotice
             ->selectRaw('bl.embarque_id, count(*) as total')
             ->pluck('total', 'embarque_id');
 
-        $html = '<p>Comissões em aberto:</p><table border=1 cellpadding=4 cellspacing=0>'
+        $list = '<table border=1 cellpadding=4 cellspacing=0>'
             .'<tr><th>Comissionado</th><th>Booking</th><th>Tipo de Comissão</th><th>Nº de Containers</th><th>tipo</th><th>Moeda</th><th>Valor Unitário</th></tr>'
             .$commissions->map(fn ($c) => '<tr>'
                 .'<td>'.e($c->responsavel).'</td>'
@@ -57,7 +59,8 @@ class OpenCommissionsNotice
                 .'</tr>')->implode('')
             .'</table>';
 
-        Mail::html($html, fn ($mail) => $mail->to(Notice::OpenCommissions->recipients())->subject('Comissões em aberto - '.today()->format('d/m/Y')));
+        [$subject, $html] = app(RenderNoticeEmail::class)(Notice::OpenCommissions, ['data' => today()->format('d/m/Y'), 'lista' => $list]);
+        app(SendNoticeMail::class)($subject, $html, Notice::OpenCommissions->recipients());
 
         return $commissions->count();
     }

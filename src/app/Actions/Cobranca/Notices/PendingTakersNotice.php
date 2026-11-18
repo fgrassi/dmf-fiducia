@@ -3,9 +3,10 @@
 namespace App\Actions\Cobranca\Notices;
 
 use App\Actions\Cobranca\Nfse\PendingTakers;
+use App\Actions\Notices\RenderNoticeEmail;
+use App\Actions\Notices\SendNoticeMail;
 use App\Enums\Notice;
 use App\Filament\Pages\TakerCheck;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * cron/avisoPendenciaTomador (legado): avisa o TI dos tomadores com pendência de cadastro nos BLs dos próximos 5 dias
@@ -34,14 +35,21 @@ class PendingTakersNotice
         $lines = collect($rows)->map(fn (array $r) => '<tr><td>'.e($r['nome']).'</td><td>'.e($r['cnpj']).'</td><td>'
             .collect($r['pendencias'])->map(fn ($p) => e($p))->implode('<br>').'</td></tr>')->implode('');
 
-        $html = "<p>Há <strong>{$count}</strong> ".($count === 1 ? 'tomador' : 'tomadores').' com pendência de cadastro entre '
-            .today()->format('d/m/Y').' e '.today()->addDays(5)->format('d/m/Y').'.</p>'
-            .'<p><a href="'.e(TakerCheck::getUrl(['data_inicio' => $from, 'data_fim' => $to])).'">Abrir a lista de tomadores</a></p>'
-            .'<table border="1" cellpadding="6" cellspacing="0"><tr bgcolor="#7e0001"><td><font face="Arial" color="white">Nome</font></td>'
+        $list = '<table border="1" cellpadding="6" cellspacing="0"><tr bgcolor="#7e0001"><td><font face="Arial" color="white">Nome</font></td>'
             .'<td><font face="Arial" color="white">CNPJ</font></td><td><font face="Arial" color="white">Pendências</font></td></tr>'
             .$lines.'</table>';
 
-        Mail::html($html, fn ($mail) => $mail->to(Notice::PendingTakers->recipients())->subject('DMF Logistics: tomadores com pendência de cadastro - '.today()->format('d/m/Y')));
+        [$subject, $html] = app(RenderNoticeEmail::class)(Notice::PendingTakers, [
+            'data' => today()->format('d/m/Y'),
+            'total' => $count,
+            'tomadores' => $count === 1 ? 'tomador' : 'tomadores',
+            'de' => today()->format('d/m/Y'),
+            'ate' => today()->addDays(5)->format('d/m/Y'),
+            'link' => TakerCheck::getUrl(['data_inicio' => $from, 'data_fim' => $to]),
+            'lista' => $list,
+        ]);
+
+        app(SendNoticeMail::class)($subject, $html, Notice::PendingTakers->recipients());
 
         return $count;
     }

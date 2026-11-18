@@ -2,6 +2,8 @@
 
 namespace App\Actions\Cobranca\Notices;
 
+use App\Actions\Notices\RenderNoticeEmail;
+use App\Actions\Notices\SendNoticeMail;
 use App\Enums\Notice;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -55,16 +57,22 @@ class MblReleaseNotice
                 ->pluck('name', 'email')
                 ->all();
 
-            $html = '<p>Dear all</p>'
-                .'<p>We would like to inform that DMF didn’t receive local charges payment for booking '.e($b->booking).' . Please note that MBL release will be made by SS Line once payment is confirmed.</p>'
-                .'<ul><li>MBL: '.e($b->master_bl).'</li><li>HBL: '.e($b->house_bl).'</li><li>ETD: '.$b->chegada_prevista.'</li>'
-                .'<li>POD: '.e($b->porto ? "{$b->porto} ({$b->pais})" : '').'</li></ul>';
+            [$subject, $html] = app(RenderNoticeEmail::class)(Notice::MblRelease, [
+                'reserva' => $b->booking,
+                'mbl' => $b->master_bl,
+                'hbl' => $b->house_bl,
+                'etd' => $b->chegada_prevista,
+                'pod' => $b->porto ? "{$b->porto} ({$b->pais})" : '',
+                'importador' => $b->importador,
+            ]);
 
-            Mail::html($html, fn ($mail) => $mail
-                ->to($contacts)
-                ->cc(Notice::MblRelease->copies())
-                ->replyTo(self::FINANCE)
-                ->subject("[IMPORTANT] MBL Release Information: {$b->booking} - MBL: {$b->master_bl} - Cnee: {$b->importador}"));
+            app(SendNoticeMail::class)(
+                $subject,
+                $html,
+                $contacts,
+                cc: Notice::MblRelease->copies(),
+                replyTo: self::FINANCE,
+            );
 
             $sent++;
         }

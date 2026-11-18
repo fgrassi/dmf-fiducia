@@ -2,11 +2,12 @@
 
 namespace App\Actions\Cobranca\Notices;
 
+use App\Actions\Notices\RenderNoticeEmail;
+use App\Actions\Notices\SendNoticeMail;
 use App\Enums\Cobranca\ChargeStatus;
 use App\Enums\Notice;
 use App\Models\FinCharges;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * cron/avisoCobrancaAbertaImpo (legado): ao financeiro, as ICs de importação geradas há exatamente 7 dias e ainda em aberto
@@ -40,11 +41,11 @@ class OpenImportChargesNotice
             .'<td>'.$c->created_at->format('d/m/Y').'</td>'
             .'<td>'.e(DB::table('armador')->where('armador_id', $c->embarque->armador_id)->value('nome')).'</td></tr>')->implode('');
 
-        $html = "<table width='926px' border=0><tr><td><font face='Arial' color='black'><h3>Aviso: Cobranças em Aberto</h3></font></td></tr>"
-            .'<tr><td><p>As cobranças abaixo foram geradas ha 7 dias e ainda não foram pagas</p>'
-            ."<table><tr><th>Reserva</th><th>Cliente</th><th>Data</th><th>Armador</th></tr>{$rows}</table></td></tr></table>";
+        [$subject, $html] = app(RenderNoticeEmail::class)(Notice::OpenImportCharges, [
+            'lista' => "<table><tr><th>Reserva</th><th>Cliente</th><th>Data</th><th>Armador</th></tr>{$rows}</table>",
+        ]);
 
-        Mail::html($html, fn ($mail) => $mail->to(Notice::OpenImportCharges->recipients())->subject('Cobranças há 7 dias sem pagamento'));
+        app(SendNoticeMail::class)($subject, $html, Notice::OpenImportCharges->recipients());
 
         return $charges->count();
     }

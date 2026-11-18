@@ -25,6 +25,6 @@ trait StoresNoticeSetting
 
     private function setting(): ?NoticeSetting
     {
-        return NoticeSetting::firstWhere('notice', $this->value);
+        return NoticeSetting::for($this->value);
     }
 }

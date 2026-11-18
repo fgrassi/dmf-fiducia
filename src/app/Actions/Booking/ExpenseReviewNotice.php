@@ -2,6 +2,8 @@
 
 namespace App\Actions\Booking;
 
+use App\Actions\Notices\RenderNoticeEmail;
+use App\Actions\Notices\SendNoticeMail;
 use App\Enums\Notice;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -18,8 +20,6 @@ use Illuminate\Support\Facades\Mail;
 class ExpenseReviewNotice
 {
     private const REAL = 1;
-
-    private const LABELS = ['i' => 'IMPO', 'e' => 'EXPO'];
 
     private const BILLING = ['a' => 'PA', 'c' => 'CC', 'p' => 'PP', 's' => 'SEG', 'f' => 'FI'];
 
@@ -64,13 +64,19 @@ class ExpenseReviewNotice
             return 0;
         }
 
-        $html = $this->section('Gentileza notar que as despesas abaixo possuem o S/R inferior ao B/R', $below)
-            .$this->section('Gentileza notar que as despesas abaixo possuem moeda de compra e venda diferentes e não há cotação para uma das moedas.', $withoutRate);
+        [$subject, $html] = app(RenderNoticeEmail::class)($notice, [
+            'data' => today()->format('d/m/Y'),
+            'venda_menor' => $this->section('Gentileza notar que as despesas abaixo possuem o S/R inferior ao B/R', $below),
+            'sem_cotacao' => $this->section('Gentileza notar que as despesas abaixo possuem moeda de compra e venda diferentes e não há cotação para uma das moedas.', $withoutRate),
+        ]);
 
-        Mail::html($html, fn ($mail) => $mail
-            ->from('financeiro@dmflog.com.br', 'DMF Logistics do Brasil')
-            ->to($notice->recipients())
-            ->subject('[DMF] Revisão de despesas - '.today()->format('d/m/Y').' - '.self::LABELS[$operation]));
+        app(SendNoticeMail::class)(
+            $subject,
+            $html,
+            $notice->recipients(),
+            from: 'financeiro@dmflog.com.br',
+            fromName: 'DMF Logistics do Brasil',
+        );
 
         return $below->count() + $withoutRate->count();
     }

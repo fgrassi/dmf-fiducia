@@ -2,18 +2,27 @@
 
 namespace App\Filament\Pages;
 
+use App\Actions\Notices\NoticeTexts;
+use App\Actions\Notices\RenderNoticeEmail;
 use App\Actions\Notices\UpdateNoticeSetting;
 use App\Enums\Notice;
 use App\Enums\Routine;
+use App\Models\NoticeSetting;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\RichEditor\RichContentRenderer;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\Toggle;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -21,6 +30,7 @@ use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
+use Illuminate\Support\HtmlString;
 use UnitEnum;
 
 /**
@@ -106,7 +116,8 @@ class NoticeSettings extends Page implements HasTable
                     ->label('Editar')
                     ->icon(Heroicon::PencilSquare)
                     ->modalHeading(fn (array $record): string => $record['label'])
-                    ->fillForm(fn (array $record): array => ['enabled' => $record['enabled'], 'time' => $record['time'], 'recipients' => $record['to'], 'cc' => $record['cc']])
+                    ->fillForm(fn (array $record): array => ['enabled' => $record['enabled'], 'time' => $record['time'], 'recipients' => $record['to'], 'cc' => $record['cc'], 'subject' => $record['subject'], 'body' => $record['body']])
+                    ->modalWidth('4xl')
                     ->schema(fn (array $record): array => [
                         Toggle::make('enabled')
                             ->label('Envio ligado'),
@@ -124,14 +135,33 @@ class NoticeSettings extends Page implements HasTable
                             ->label($record['copy_label'])
                             ->visible(! $record['routine'])
                             ->nestedRecursiveRules(['email']),
+                        ...$this->textFields($record),
+                    ])
+                    ->extraModalFooterActions(fn (array $record): array => $record['tags'] === [] ? [] : [
+                        Action::make('previewEmail')
+                            ->label('Pré-visualizar o e-mail')
+                            ->icon(Heroicon::Eye)
+                            ->color('gray')
+                            ->modalHeading('Pré-visualização (dados de exemplo)')
+                            ->modalSubmitAction(false)
+                            ->modalCancelActionLabel('Fechar')
+                            ->modalContent(fn (array $record, array $mountedActions): HtmlString => $this->preview($record, $mountedActions[0]->getRawData())),
                     ])
                     ->action(function (array $data, array $record): void {
-                        app(UpdateNoticeSetting::class)($this->setting($record), array_filter([
+                        $changes = array_filter([
                             'enabled' => (bool) $data['enabled'],
                             'time' => $record['time'] !== null ? substr($data['time'], 0, 5) : null,
                             'recipients' => $record['to'] !== [] ? $data['recipients'] : null,
                             'cc' => $record['routine'] ? null : ($data['cc'] ?? []),
-                        ], fn ($value) => $value !== null));
+                        ], fn ($value) => $value !== null);
+
+                        if ($record['tags'] !== []) {
+                            // em branco vale o texto padrão
+                            $changes['subject'] = filled($data['subject'] ?? null) ? $data['subject'] : null;
+                            $changes['body'] = filled(trim(strip_tags((string) ($data['body'] ?? '')))) ? $data['body'] : null;
+                        }
+
+                        app(UpdateNoticeSetting::class)($this->setting($record), $changes);
                     }),
             ])
             ->paginated(false);
@@ -141,6 +171,7 @@ class NoticeSettings extends Page implements HasTable
     private function records(?string $search): array
     {
         $cases = $this->activeTab === 'rotinas' ? Routine::cases() : Notice::cases();
+        $settings = NoticeSetting::all()->keyBy('notice');
 
         return collect($cases)
             ->map(fn (Notice|Routine $case): array => [
@@ -153,12 +184,86 @@ class NoticeSettings extends Page implements HasTable
                 'enabled' => $case->enabled(),
                 'to' => $case instanceof Notice && $case->hasFixedRecipients() ? $case->recipients() : [],
                 'cc' => $case instanceof Notice ? $case->copies() : [],
+                'subject' => $case instanceof Notice ? $settings->get($case->value)?->subject : null,
+                'body' => $case instanceof Notice ? $settings->get($case->value)?->body : null,
+                'tags' => $case instanceof Notice ? array_map(fn (array $tag): string => $tag['label'], NoticeTexts::for($case)['tags']) : [],
                 'copy_label' => $case instanceof Notice && $case->copiesAreBlind() ? 'Cópia oculta' : 'Cópia',
             ])
             ->filter(fn (array $record): bool => blank($search)
                 || str_contains(mb_strtolower(implode(' ', [$record['label'], $record['days'], $record['time'], ...$record['to'], ...$record['cc']])), mb_strtolower(trim($search))))
             ->values()
             ->all();
+    }
+
+    /**
+     * Assunto e corpo do e-mail com as variáveis do aviso; em branco vale o texto padrão (que o botão carrega para editar).
+     *
+     * @param  array<string, mixed>  $record
+     * @return list<mixed>
+     */
+    private function textFields(array $record): array
+    {
+        if ($record['tags'] === []) {
+            return [];
+        }
+
+        $default = NoticeTexts::for(Notice::from($record['notice']));
+
+        return [
+            TextInput::make('subject')
+                ->label('Assunto')
+                ->placeholder($default['subject'])
+                ->helperText('Em branco vale o assunto padrão. Variáveis no formato {{variavel}}.')
+                ->maxLength(255)
+                ->columnSpanFull(),
+            Select::make('insert_subject_tag')
+                ->label('Inserir variável no assunto')
+                ->options($record['tags'])
+                ->searchable()
+                ->live()
+                ->dehydrated(false)
+                ->afterStateUpdated(function (?string $state, Get $get, Set $set): void {
+                    if (blank($state)) {
+                        return;
+                    }
+
+                    $set('subject', trim($get('subject').' {{'.$state.'}}'));
+                    $set('insert_subject_tag', null);
+                })
+                ->columnSpanFull(),
+            RichEditor::make('body')
+                ->label('Texto do e-mail')
+                ->helperText('Em branco vale o texto padrão. Para inserir uma variável use o botão de variáveis da barra (digitar "{{" também abre a busca); a variável "Lista" é a tabela que a rotina calcula.')
+                ->mergeTags($record['tags'])
+                ->saveRelationshipsUsing(null)
+                ->toolbarButtons([
+                    ['bold', 'italic', 'underline', 'strike', 'link', 'textColor'],
+                    ['h2', 'h3', 'alignStart', 'alignCenter', 'alignEnd'],
+                    ['bulletList', 'orderedList'],
+                    ['mergeTags'],
+                    ['undo', 'redo'],
+                ])
+                ->hintAction(Action::make('loadDefaultText')
+                    ->label('Carregar o texto padrão')
+                    ->action(fn (Set $set) => $set('body', NoticeTexts::editorBody(Notice::from($record['notice'])))))
+                ->columnSpanFull(),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $record
+     * @param  array<string, mixed>  $data
+     */
+    private function preview(array $record, array $data): HtmlString
+    {
+        $notice = Notice::from($record['notice']);
+        $body = $data['body'] ?? null;
+        $body = is_array($body) ? RichContentRenderer::make($body)->toHtml() : $body;
+        $samples = array_map(fn (array $tag): string => $tag['sample'], NoticeTexts::for($notice)['tags']);
+
+        [$subject, $html] = app(RenderNoticeEmail::class)->render($notice, $data['subject'] ?? null, $body, $samples);
+
+        return new HtmlString('<p class="mb-2 font-semibold">'.e($subject).'</p><iframe class="w-full rounded border border-gray-300" style="height: 28rem; background: #fff" srcdoc="'.e('<body style="font-family: sans-serif; font-size: 14px">'.$html.'</body>').'"></iframe>');
     }
 
     /** @param  array<string, mixed>  $record */

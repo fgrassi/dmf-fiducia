@@ -2,6 +2,8 @@
 
 namespace App\Actions\Cobranca\Notices;
 
+use App\Actions\Notices\RenderNoticeEmail;
+use App\Actions\Notices\SendNoticeMail;
 use App\Enums\Cobranca\ChargeStatus;
 use App\Enums\Notice;
 use App\Models\Armador;
@@ -74,28 +76,25 @@ class OpenChargeReminders
             .'<td align="center">'.$c->created_at->format('d/m/Y').'</td>'
             .'<td align="right">R$'.number_format((float) $c->total_value, 2, ',', '.').'</td></tr>')->implode('');
 
-        $html = "<table width='960px' border=0><tr bgcolor='#7e0001'><td></td></tr>"
-            ."<tr><td><font face='Arial' color='black'><h3>Cobrança(s) {$days} em aberto:</h3></font></td></tr><tr><td>"
-            .'<p>Prezados, bom dia!</p><p>Até a presente data não constam em nossos registros o recebimento das taxas compreendidas no(s) BL(s) mencionado(s) abaixo:</p>'
-            ."<table width='960px' border=1><tr><th>Reserva</th><th>Cliente</th><th>Detalhes da Cobrança</th></tr>"
+        $list = "<table width='960px' border=1><tr><th>Reserva</th><th>Cliente</th><th>Detalhes da Cobrança</th></tr>"
             .'<tr><td align=center>'.e($e->booking).'</td><td align=center>'.e($client ? "{$client->nome} ({$client->cnpj})" : '').'</td>'
-            ."<td><table><tr><th>HBL</th><th>Data da Cobrança</th><th>Valor</th></tr>{$rows}</table></td></table>"
-            .'<p>Caso já tenha sido efetuado o pagamento do débito apontado, favor encaminhar o comprovante de pagamento para o seguinte endereço: financeiro@dmflog.com.br para que possamos regularizar a situação.</p>'
-            .'<p>Caso o pagamento não tenha sido efetuado, gentileza confirmar a taxa na data do pagamento.</p>';
+            ."<td><table><tr><th>HBL</th><th>Data da Cobrança</th><th>Valor</th></tr>{$rows}</table></td></table>";
 
-        if (filled($armador?->late_payment)) {
-            $html .= '<p><u>NOTAR ABAIXO OS VALORES REFERENTE A TAXA A SER APLICADA PARA ATRASO NOS PAGAMENTOS DE IMPORTAÇÃO / EXPORTAÇÃO:</u></p>'
+        $lateFee = filled($armador?->late_payment)
+            ? '<p><u>NOTAR ABAIXO OS VALORES REFERENTE A TAXA A SER APLICADA PARA ATRASO NOS PAGAMENTOS DE IMPORTAÇÃO / EXPORTAÇÃO:</u></p>'
                 .'<p>'.e($armador->nome).'</p>'.$armador->late_payment
-                .'<p>Estamos ao seu dispor caso necessite maiores detalhes e agradecemos pelo entendimento e suporte.</p><p>Atenciosamente,<br />Departamento Financeiro</p>';
-        }
+                .'<p>Estamos ao seu dispor caso necessite maiores detalhes e agradecemos pelo entendimento e suporte.</p><p>Atenciosamente,<br />Departamento Financeiro</p>'
+            : '';
 
-        $html .= '</td></tr></table>';
+        [$subject, $html] = app(RenderNoticeEmail::class)(Notice::OpenCharges, ['reserva' => $e->booking, 'prazo' => $days, 'lista' => $list, 'taxa_atraso' => $lateFee]);
         $to = collect($this->details->contacts($charges->first()))->pluck('email')->filter()->unique()->values()->all();
 
-        Mail::html($html, fn ($mail) => $mail
-            ->from('financeiro@dmflog.com.br')
-            ->to($to)
-            ->bcc(Notice::OpenCharges->copies())
-            ->subject("[Aviso] Reserva {$e->booking} está com cobrança(s) {$days} em aberto"));
+        app(SendNoticeMail::class)(
+            $subject,
+            $html,
+            $to,
+            bcc: Notice::OpenCharges->copies(),
+            from: 'financeiro@dmflog.com.br',
+        );
     }
 }

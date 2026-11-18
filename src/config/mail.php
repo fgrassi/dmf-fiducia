@@ -115,4 +115,19 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Global "To" Address
+    |--------------------------------------------------------------------------
+    |
+    | Quando preenchido, TODO e-mail do sistema vai só para este endereço (Para, Cc e Cco originais são descartados).
+    | Use em homologação/desenvolvimento com o dump de produção, para nunca escrever a cliente ou agente de verdade.
+    |
+    */
+
+    'to' => [
+        'address' => env('MAIL_TO_ADDRESS'),
+        'name' => env('MAIL_TO_NAME'),
+    ],
+
 ];

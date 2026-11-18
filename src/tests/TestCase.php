@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use App\Models\NoticeSetting;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Mail;
@@ -9,6 +10,13 @@ use Symfony\Component\Mailer\SentMessage;
 
 abstract class TestCase extends BaseTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        NoticeSetting::flush();
+    }
+
     /**
      * Assuntos dos e-mails enviados pelo mailer array (MAIL_MAILER do phpunit.xml).
      * Os avisos ao financeiro usam Mail::html, que o Mail::fake() não intercepta.

@@ -31,6 +31,45 @@ class NoticeSettingsTest extends TestCase
         $this->assertSame('09:30', Notice::HapagPending->time());
     }
 
+    public function test_edit_saves_the_email_text_and_blank_goes_back_to_the_default(): void
+    {
+        $this->actingAs($this->user('financial'));
+        $edit = ['enabled' => true, 'time' => '08:00', 'recipients' => ['a@dmflog.com.br'], 'cc' => []];
+
+        Livewire::test(NoticeSettings::class)
+            ->callAction(TestAction::make('edit')->table(Notice::OpenCommissions->value), [...$edit, 'subject' => 'Comissões de {{data}}', 'body' => '<p>Segue:</p>{{lista}}'])
+            ->assertHasNoActionErrors();
+
+        $setting = NoticeSetting::firstWhere('notice', Notice::OpenCommissions->value);
+        $this->assertSame('Comissões de {{data}}', $setting->subject);
+        $this->assertSame('<p>Segue:</p>{{lista}}', $setting->body);
+
+        Livewire::test(NoticeSettings::class)
+            ->callAction(TestAction::make('edit')->table(Notice::OpenCommissions->value), [...$edit, 'subject' => '', 'body' => null])
+            ->assertHasNoActionErrors();
+
+        $setting->refresh();
+        $this->assertNull($setting->subject);
+        $this->assertNull($setting->body);
+    }
+
+    public function test_preview_renders_the_unsaved_text_with_sample_values(): void
+    {
+        $this->actingAs($this->user('financial'));
+        $page = Livewire::test(NoticeSettings::class)->instance();
+        $preview = fn (array $data): string => (string) (new \ReflectionMethod($page, 'preview'))->invoke($page, ['notice' => Notice::ExpenseDue->value], $data);
+
+        $default = html_entity_decode($preview(['subject' => 'Vence {{vencimento}}', 'body' => null]));
+        $this->assertStringContainsString('Vence 21/11/2026', $default);
+        $this->assertStringContainsString('Lembrete: os vencimentos abaixo ocorrem em 3 dias (21/11/2026)', $default);
+
+        $document = ['type' => 'doc', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Texto novo para '], ['type' => 'mergeTag', 'attrs' => ['id' => 'vencimento']]]]]];
+        $custom = html_entity_decode($preview(['subject' => null, 'body' => $document]));
+        $this->assertStringContainsString('Texto novo para', $custom);
+        $this->assertStringContainsString('21/11/2026', $custom);
+        $this->assertStringNotContainsString('Lembrete', $custom);
+    }
+
     public function test_search_filters_the_list_by_description_and_recipient(): void
     {
         $this->actingAs($this->user('financial'));

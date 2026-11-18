@@ -2,6 +2,8 @@
 
 namespace App\Actions\Financeiro;
 
+use App\Actions\Notices\RenderNoticeEmail;
+use App\Actions\Notices\SendNoticeMail;
 use App\Enums\Notice;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -29,12 +31,12 @@ class ExchangeDeadlineNotice
             return 0;
         }
 
-        $html = '<h3>Gentileza observar o prazo para envio de Câmbio dos Agentes abaixo nos próximos 5 dias</h3>'
-            .'<table border="1"><tr><th>Agente</th><th>Data Limite</th></tr>'
+        $list = '<table border="1"><tr><th>Agente</th><th>Data Limite</th></tr>'
             .$agents->map(fn ($a) => '<tr><td>'.e($a->nome).'</td><td>'.date('d/m/Y', strtotime($a->data_limite_cambio)).'</td></tr>')->implode('')
             .'</table>';
 
-        Mail::html($html, fn ($mail) => $mail->to(Notice::ExchangeDeadline->recipients())->subject('[Aviso] Data de Limite para Envio de Câmbios'));
+        [$subject, $html] = app(RenderNoticeEmail::class)(Notice::ExchangeDeadline, ['lista' => $list]);
+        app(SendNoticeMail::class)($subject, $html, Notice::ExchangeDeadline->recipients());
 
         return $agents->count();
     }

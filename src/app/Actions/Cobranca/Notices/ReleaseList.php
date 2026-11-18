@@ -2,11 +2,12 @@
 
 namespace App\Actions\Cobranca\Notices;
 
+use App\Actions\Notices\RenderNoticeEmail;
+use App\Actions\Notices\SendNoticeMail;
 use App\Enums\Cobranca\ChargeStatus;
 use App\Enums\Notice;
 use App\Models\FinCharges;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * cron/relacaoCobrancaReservaExpo (legado): relação diária de reservas liberadas para BL. Entram as ICs pagas ainda não
@@ -60,20 +61,20 @@ class ReleaseList
             $rows[] = [$e->booking, $e->house_bl, $originals, $this->client($e->cliente_id), $this->armador($e->armador_id)];
         }
 
-        $body = $rows === []
+        $list = $rows === []
             ? 'Não há nenhuma reserva para ser liberada.'
             : '<table border=1><tr><th>Booking</th><th>BL</th><th>Originais</th><th>Cliente</th><th>Armador</th></tr>'
                 .collect($rows)->map(fn (array $r) => '<tr>'.collect($r)->map(fn ($v) => '<td>'.e($v).'</td>')->implode('').'</tr>')->implode('')
                 .'</table>';
 
-        $html = "<table width='100%' border=0><tr bgcolor='#7e0001'><td></td></tr>"
-            ."<tr><td><font face='Arial' color='black'><h4>Segue abaixo a relação de reservas autorizadas para liberação de BL.</h4></font></td></tr>"
-            ."<tr><td>{$body}</td></tr></table>";
+        [$subject, $html] = app(RenderNoticeEmail::class)(Notice::ReleaseList, ['data' => today()->format('d-m-Y'), 'lista' => $list]);
 
-        Mail::html($html, fn ($mail) => $mail
-            ->to(Notice::ReleaseList->recipients())
-            ->cc(Notice::ReleaseList->copies())
-            ->subject('Relação de embarques para liberação '.today()->format('d-m-Y')));
+        app(SendNoticeMail::class)(
+            $subject,
+            $html,
+            Notice::ReleaseList->recipients(),
+            cc: Notice::ReleaseList->copies(),
+        );
 
         return count($rows);
     }

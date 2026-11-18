@@ -2,12 +2,13 @@
 
 namespace App\Actions\Cobranca\Notices;
 
+use App\Actions\Notices\RenderNoticeEmail;
+use App\Actions\Notices\SendNoticeMail;
 use App\Enums\Cobranca\ChargeStatus;
 use App\Enums\Notice;
 use App\Models\FinCharges;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * cron/relatorioCobrancaAberta (legado): relatório interno das ICs marítimas/aéreas em aberto há 7 dias ou mais, com os dias
@@ -51,12 +52,11 @@ class OpenChargesReport
                 .'<td>'.(int) $c->created_at->diffInDays(today()).'</td></tr>';
         })->implode('');
 
-        $html = '<p>Segue abaixo a relação de Cobranças em aberto a 7 dias+</p><table border=1><tr><th>Tipo</th><th>Cliente</th><th>Armador</th>'
+        $list = '<table border=1><tr><th>Tipo</th><th>Cliente</th><th>Armador</th>'
             ."<th>Booking</th><th>HBL</th><th>Data da Cobrança</th><th>Saída/Chegada Efetiva</th><th>Diferença Navio</th><th>Diferença Cobrança</th></tr>{$rows}</table>";
 
-        Mail::html($html, fn ($mail) => $mail
-            ->to(Notice::OpenChargesReport->recipients())
-            ->subject('[RELATÓRIO] Cobranças em aberto 7 dias+'));
+        [$subject, $html] = app(RenderNoticeEmail::class)(Notice::OpenChargesReport, ['lista' => $list]);
+        app(SendNoticeMail::class)($subject, $html, Notice::OpenChargesReport->recipients());
 
         return $charges->count();
     }

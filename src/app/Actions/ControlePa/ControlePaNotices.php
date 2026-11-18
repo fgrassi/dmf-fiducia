@@ -2,13 +2,14 @@
 
 namespace App\Actions\ControlePa;
 
+use App\Actions\Notices\RenderNoticeEmail;
+use App\Actions\Notices\SendNoticeMail;
 use App\Enums\Notice;
 use App\Models\ControlePa;
 use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * cron/controlePaAviso* (legado): cinco e-mails ao financeiro com as reservas prepaid abroad paradas em cada etapa da Freight
@@ -26,8 +27,6 @@ class ControlePaNotices
     {
         return $this->send(
             Notice::ReadyToSendToAgent,
-            'PREPAID ABROAD - Freight Invoices disponíveis para envio ao agente',
-            'As reservas abaixo possuem Freight Invoice disponíveis para envio ao agente',
             $this->controls()
                 ->whereExists(fn (Builder $q) => $q->from('departure_confirmation as dc')->whereColumn('dc.ref_embarque', 'e.embarque_id'))
                 ->where('cp.flag_fi_dmf', '>=', 0)
@@ -43,8 +42,6 @@ class ControlePaNotices
     {
         return $this->send(
             Notice::ReadyToSendToCarrier,
-            'PREPAID ABROAD - Freight Invoices disponíveis para envio ao Armador',
-            'As reservas abaixo possuem Freight Invoice disponíveis para envio ao Armador',
             $this->controls()
                 ->where('cp.flag_fi_dmf', '>', 0)
                 ->whereNotNull('cp.data_envio_fi_agente')
@@ -59,8 +56,6 @@ class ControlePaNotices
     {
         return $this->send(
             Notice::PendingReceipt,
-            'PREPAID ABROAD - Pendências de Confirmação da Liberação',
-            'As reservas abaixo possuem Pendências de Confirmação da Liberação',
             $this->controls()
                 ->where('cp.flag_fi_dmf', '>', 0)
                 ->whereNotNull('cp.data_envio_fi_agente')
@@ -77,8 +72,6 @@ class ControlePaNotices
     {
         return $this->send(
             Notice::PendingPayment,
-            'PREPAID ABROAD - Pendências de Pagamento de Frete',
-            'As reservas abaixo possuem Pendência de Pagamento de Frete ao Armador',
             $this->controls()
                 ->where('cp.flag_fi_dmf', '>', 0)
                 ->whereNotNull('cp.data_envio_fi_agente')
@@ -100,8 +93,6 @@ class ControlePaNotices
 
         return $this->send(
             Notice::ConfirmedWithoutInvoice,
-            'PREPAID ABROAD - Embarques Confirmados',
-            'As reservas abaixo tiveram seu embarque confirmado e não tem Freigth Invoice',
             $bookings,
             ['Saida Efetiva', 'Chegada Prevista', 'Importador', 'Exportador', 'Agente', 'Armador'],
             fn ($r) => [$this->date($r->saida_efetiva), $this->date($r->chegada_prevista), $r->importador, $r->exportador, $r->agente, $r->armador],
@@ -132,7 +123,7 @@ class ControlePaNotices
      * @param  list<string>  $headers  colunas depois de "Reserva"
      * @param  callable(object): list<mixed>  $cells
      */
-    private function send(Notice $notice, string $subject, string $intro, Builder $query, array $headers, callable $cells): int
+    private function send(Notice $notice, Builder $query, array $headers, callable $cells): int
     {
         if (! $notice->enabled()) {
             return 0;
@@ -145,11 +136,17 @@ class ControlePaNotices
             return 0;
         }
 
-        $html = $intro.'<table border="1"><tr><th>Reserva</th>'.collect($headers)->map(fn ($h) => "<th>{$h}</th>")->implode('').'</tr>'
+        $list = '<table border="1"><tr><th>Reserva</th>'.collect($headers)->map(fn ($h) => "<th>{$h}</th>")->implode('').'</tr>'
             .$rows->map(fn ($r) => '<tr><td>'.e($r->booking).'</td>'.collect($cells($r))->map(fn ($c) => '<td>'.e($c).'</td>')->implode('').'</tr>')->implode('')
             .'</table>';
 
-        Mail::html($html, fn ($mail) => $mail->from(self::FROM)->to($notice->recipients())->subject($subject));
+        [$subject, $html] = app(RenderNoticeEmail::class)($notice, ['lista' => $list]);
+        app(SendNoticeMail::class)(
+            $subject,
+            $html,
+            $notice->recipients(),
+            from: self::FROM,
+        );
 
         return $rows->count();
     }

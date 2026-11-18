@@ -2,11 +2,12 @@
 
 namespace App\Actions\Financeiro;
 
+use App\Actions\Notices\RenderNoticeEmail;
+use App\Actions\Notices\SendNoticeMail;
 use App\Enums\Notice;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * cron/provisionamento (legado): dois e-mails à Marcia e ao TI com a previsão de receita e despesa por armador, cliente e reserva
@@ -48,9 +49,17 @@ class ProvisioningNotice
             'e' => ['EXPORTAÇÕES', 'ETD', 'saida_prevista'],
             'i' => ['IMPORTAÇÕES', 'ETA', 'chegada_prevista'],
         ] as $operation => [$title, $dateLabel, $dateColumn]) {
-            [$html, $count] = $this->report($operation, $dateLabel, $dateColumn, $from, $to, $rates);
+            [$list, $count] = $this->report($operation, $dateLabel, $dateColumn, $from, $to, $rates);
 
-            Mail::html($html, fn ($mail) => $mail->to(Notice::Provisioning->recipients())->subject("Provisionamento {$title} - Semana {$week} de {$year}"));
+            [$subject, $html] = app(RenderNoticeEmail::class)(Notice::Provisioning, [
+                'titulo' => $title,
+                'semana' => $week,
+                'ano' => $year,
+                'periodo' => date('d/m/Y', strtotime($from)).' a '.date('d/m/Y', strtotime($to)),
+                'lista' => $list,
+            ]);
+
+            app(SendNoticeMail::class)($subject, $html, Notice::Provisioning->recipients());
 
             $listed += $count;
         }
@@ -89,7 +98,7 @@ class ProvisioningNotice
         $listed = $bookings->filter(fn ($b) => ($forecasts[$b->embarque_id] ?? []) !== [])->values();
         $boletos = DB::table('fin_clients_boleto')->whereIn('ref_client', $listed->pluck('cliente_id')->all())->orderBy('id')->get()->unique('ref_client')->keyBy('ref_client');
 
-        $html = '<h1>Provisionamento</h1><h2>Semana: '.date('d/m/Y', strtotime($from)).' a '.date('d/m/Y', strtotime($to)).'</h2><table border=1>';
+        $html = '<table border=1>';
 
         // armador > cliente > reservas, na ordem em que aparecem
         foreach ($listed->groupBy(fn ($b) => (string) $b->armador) as $carrier => $carrierBookings) {

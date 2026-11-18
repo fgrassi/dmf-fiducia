@@ -2,10 +2,11 @@
 
 namespace App\Actions\AgentNotes;
 
+use App\Actions\Notices\RenderNoticeEmail;
+use App\Actions\Notices\SendNoticeMail;
 use App\Enums\Notice;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * cron/debitNotesAtrasadas (legado): notas de débito e crédito de exportação em aberto emitidas há 30 dias ou mais, agrupadas
@@ -30,12 +31,14 @@ class OverdueNotesNotice
 
         $notes = $this->notes();
 
-        $html = $notes->isEmpty() ? 'Nenhuma nota encontrada' : $this->table($notes);
+        [$subject, $html] = app(RenderNoticeEmail::class)(Notice::OverdueNotes, ['lista' => $notes->isEmpty() ? 'Nenhuma nota encontrada' : $this->table($notes)]);
 
-        Mail::html($html, fn ($mail) => $mail
-            ->to(Notice::OverdueNotes->recipients())
-            ->replyTo('chamado@dmflog.com.br')
-            ->subject('[FINANCEIRO] Relação de Notas de Debito/Crédito emitidas +30 dias'));
+        app(SendNoticeMail::class)(
+            $subject,
+            $html,
+            Notice::OverdueNotes->recipients(),
+            replyTo: 'chamado@dmflog.com.br',
+        );
 
         return $notes->count();
     }

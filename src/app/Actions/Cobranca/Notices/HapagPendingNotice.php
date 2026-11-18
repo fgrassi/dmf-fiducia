@@ -2,6 +2,8 @@
 
 namespace App\Actions\Cobranca\Notices;
 
+use App\Actions\Notices\RenderNoticeEmail;
+use App\Actions\Notices\SendNoticeMail;
 use App\Enums\Notice;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -50,12 +52,11 @@ class HapagPendingNotice
             return 0;
         }
 
-        $html = '<p>As seguintes reservas estão pendentes para serem geradas as cobranças</p>'
-            .$bookings->map(fn ($b) => '<ul><li>'.e("{$b->booking} - {$b->nome}").'</li></ul>')->implode('');
+        [$subject, $html] = app(RenderNoticeEmail::class)(Notice::HapagPending, [
+            'lista' => $bookings->map(fn ($b) => '<ul><li>'.e("{$b->booking} - {$b->nome}").'</li></ul>')->implode(''),
+        ]);
 
-        Mail::html($html, fn ($mail) => $mail
-            ->to(Notice::HapagPending->recipients())
-            ->subject('[FINANCEIRO] Reservas da Hapag pendentes de cobrança - EXPO'));
+        app(SendNoticeMail::class)($subject, $html, Notice::HapagPending->recipients());
 
         return $bookings->count();
     }

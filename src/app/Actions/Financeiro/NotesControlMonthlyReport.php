@@ -2,6 +2,8 @@
 
 namespace App\Actions\Financeiro;
 
+use App\Actions\Notices\RenderNoticeEmail;
+use App\Actions\Notices\SendNoticeMail;
 use App\Enums\Notice;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -40,7 +42,7 @@ class NotesControlMonthlyReport
             ->get(['booking', 'controle_credit', 'controle_debit']);
 
         $period = $from->format('d/m/Y').' a '.$to->format('d/m/Y');
-        $body = $bookings->isEmpty()
+        $list = $bookings->isEmpty()
             ? 'Nenhuma alteração realizada.'
             : "<p>Relatório de reservas que NÃO necessitam de notas e tiveram seu status alterado no período de {$period}.</p>"
                 .'<table border=1><tr><th>Reserva</th><th>Data da Alteração</th></tr>'
@@ -52,7 +54,8 @@ class NotesControlMonthlyReport
 
         $month = mb_strtoupper($from->copy()->locale('pt_BR')->translatedFormat('F'));
 
-        Mail::html($body, fn ($mail) => $mail->to(Notice::NotesMonthlyReport->recipients())->subject("Relatório Controle de Notas -  {$month}/{$from->year}"));
+        [$subject, $html] = app(RenderNoticeEmail::class)(Notice::NotesMonthlyReport, ['mes' => $month, 'ano' => $from->year, 'lista' => $list]);
+        app(SendNoticeMail::class)($subject, $html, Notice::NotesMonthlyReport->recipients());
 
         return $bookings->count();
     }
