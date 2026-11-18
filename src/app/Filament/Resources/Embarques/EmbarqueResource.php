@@ -105,16 +105,23 @@ class EmbarqueResource extends Resource
                 ArrivalConfirmationsRelationManager::class,
             ]),
             FreightInvoicesRelationManager::class,
-            DemurrageRelationManager::class,
-            DetentionRelationManager::class,
+            RelationGroup::make('Demurrage e Detention', [
+                DemurrageRelationManager::class,
+                DetentionRelationManager::class,
+            ]),
             BlsRelationManager::class,
-            TrackingRelationManager::class,
-            ScheduleRelationManager::class,
-            ImoRelationManager::class,
-            RouteRelationManager::class,
-            MailingsRelationManager::class,
-            RemarksRelationManager::class,
-            LogsRelationManager::class,
+            RelationGroup::make('Programação', [
+                ScheduleRelationManager::class,
+                ImoRelationManager::class,
+                RouteRelationManager::class,
+                MailingsRelationManager::class,
+            ]),
+            RelationGroup::make('Histórico', [
+                TrackingRelationManager::class,
+                RemarksRelationManager::class,
+                LogsRelationManager::class,
+            ])
+                ->badge(fn (Embarque $ownerRecord): ?string => RemarksRelationManager::getBadge($ownerRecord, ViewEmbarque::class)),
         ];
     }
 

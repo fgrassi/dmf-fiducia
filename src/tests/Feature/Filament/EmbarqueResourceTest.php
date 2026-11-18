@@ -19,6 +19,7 @@ use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\Testing\TestAction;
+use Filament\Resources\RelationManagers\RelationGroup;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\Concerns\LegacySchema;
@@ -646,6 +647,17 @@ class EmbarqueResourceTest extends TestCase
         $remark = $booking->remarks()->first();
         $component->callAction(TestAction::make(DeleteAction::class)->table($remark));
         $this->assertSame(0, $booking->remarks()->count());
+    }
+
+    public function test_history_group_tab_shows_the_remarks_badge(): void
+    {
+        $this->actingAs($this->user('booking'));
+        $booking = $this->booking(['embarque_obs' => 'Carga frágil']);
+
+        $group = collect(EmbarqueResource::getRelations())->first(fn ($relation) => $relation instanceof RelationGroup && $relation->getLabel() === 'Histórico');
+        $group->ownerRecord($booking)->pageClass(ViewEmbarque::class);
+
+        $this->assertSame('1', $group->getBadge());
     }
 
     /** @param  array<string, mixed>  $attributes */
