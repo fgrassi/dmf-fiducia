@@ -56,6 +56,22 @@ class MergeRecords
                 'transit_time' => ['armador_id'],
             ],
         ],
+        'broker' => [
+            'table' => 'despachante',
+            'key' => 'despachante_id',
+            'references' => [
+                'despachante_contato' => ['ref_despachante'],
+                'despachante_pessoa' => ['despachante_id'],
+                'despachante_porto' => ['id_despachante'],
+                'embarque' => ['despachante_id', 'despachante_dmf_id'],
+                'hist_despachante' => ['despachante_id'],
+                'pessoa_contato_despachante' => ['despachante_id'],
+                'pessoa_despachante' => ['despachante_id'],
+                'porto' => ['despachante_id'],
+                'trading_contato_despachante' => ['despachante_id'],
+                'trading_despachante' => ['despachante_id'],
+            ],
+        ],
         'company' => [
             'table' => 'pessoa',
             'key' => 'pessoa_id',

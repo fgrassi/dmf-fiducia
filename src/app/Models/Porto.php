@@ -51,6 +51,11 @@ class Porto extends Model
         return $this->belongsTo(Pais::class, 'ref_pais', 'paises_id');
     }
 
+    public function city(): BelongsTo
+    {
+        return $this->belongsTo(Cidade::class, 'cidades_id', 'cidades_id');
+    }
+
     /** Porto::__toString (legado): nome (país)(uncode). */
     protected function label(): Attribute
     {
