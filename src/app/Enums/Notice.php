@@ -33,6 +33,12 @@ enum Notice: string
     case PendingReceipt = 'controle-pa:aviso-pendencia-confirmacao';
     case PendingPayment = 'controle-pa:aviso-pendencia-pagamento';
     case ConfirmedWithoutInvoice = 'controle-pa:aviso-embarques-confirmados';
+    case AmsMissingUs = 'ams:aviso-eua';
+    case AmsMissingMexico = 'ams:aviso-mexico';
+    case AmsPendingAfrica = 'ams:aviso-africa';
+    case AmsPendingUae = 'ams:aviso-uae';
+    case AmsReminderAfrica = 'ams:lembrete-africa';
+    case AmsReminderUae = 'ams:lembrete-uae';
 
     /** Dias da semana de 0 (domingo) a 6 (sábado). */
     private const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
@@ -42,6 +48,8 @@ enum Notice: string
     private const IT = 'it@dmflog.com.br';
 
     private const BILLING = 'cobranca@dmflog.com.br';
+
+    private const DRAFT = 'draft@dmflog.com.br';
 
     private const MARCIA = 'marcia@dmflog.com.br';
 
@@ -73,6 +81,12 @@ enum Notice: string
             self::PendingReceipt => ['label' => 'Pagamentos ao armador sem recibo', ...$controlePa],
             self::PendingPayment => ['label' => 'Freight Invoices do armador sem pagamento', ...$controlePa],
             self::ConfirmedWithoutInvoice => ['label' => 'Embarques confirmados sem Freight Invoice', ...$controlePa],
+            self::AmsMissingUs => ['label' => 'avisoAms', ...$daily, 'to' => [self::DRAFT], 'cc' => []],
+            self::AmsMissingMexico => ['label' => 'avisoAmsMexico', ...$daily, 'to' => [self::DRAFT], 'cc' => []],
+            self::AmsPendingAfrica => ['label' => 'avisoAmsAfrica', ...$daily, 'to' => [self::DRAFT], 'cc' => []],
+            self::AmsPendingUae => ['label' => 'avisoAmsUae', ...$daily, 'to' => [self::DRAFT], 'cc' => []],
+            self::AmsReminderAfrica => ['label' => 'enviaReminderAmsAfrica', ...$daily, 'to' => null, 'cc' => [self::DRAFT]],
+            self::AmsReminderUae => ['label' => 'enviaReminderAmsUae', ...$daily, 'to' => null, 'cc' => [self::DRAFT]],
         };
     }
 

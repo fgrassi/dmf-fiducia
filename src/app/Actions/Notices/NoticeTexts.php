@@ -2,6 +2,7 @@
 
 namespace App\Actions\Notices;
 
+use App\Actions\Booking\Ams\SendAms;
 use App\Enums\Notice;
 
 /**
@@ -100,9 +101,15 @@ class NoticeTexts
             Notice::PendingReceipt => self::controlePa('PREPAID ABROAD - Pendências de Confirmação da Liberação', 'As reservas abaixo possuem Pendências de Confirmação da Liberação'),
             Notice::PendingPayment => self::controlePa('PREPAID ABROAD - Pendências de Pagamento de Frete', 'As reservas abaixo possuem Pendência de Pagamento de Frete ao Armador'),
             Notice::ConfirmedWithoutInvoice => self::controlePa('PREPAID ABROAD - Embarques Confirmados', 'As reservas abaixo tiveram seu embarque confirmado e não tem Freigth Invoice'),
+            Notice::AmsMissingUs => self::amsMissing('[Aviso] Embarques sem AMS Enviado', 'Os seguintes embarques ainda não tem AMS enviado:'),
+            Notice::AmsMissingMexico => self::amsMissing('[Aviso] Embarques sem AMS Enviado [México]', 'Os seguintes embarques ainda não tem AMS enviado [México]:'),
+            Notice::AmsPendingAfrica => self::amsMissing('[Aviso] Embarques para África do Sul sem documentos enviados', 'As informações ainda não foram enviadas para as seguintes reservas:'),
+            Notice::AmsPendingUae => self::amsMissing('[Aviso] Embarques para os Emirados Arabes Unidos sem documentos enviados', 'As informações ainda não foram enviadas para as seguintes reservas:'),
+            Notice::AmsReminderAfrica => self::amsReminder('South Africa'),
+            Notice::AmsReminderUae => self::amsReminder('United Arab Emirates'),
         };
 
-        if (in_array($notice, [Notice::OpenCharges, Notice::MblRelease], true)) {
+        if (in_array($notice, [Notice::OpenCharges, Notice::MblRelease, Notice::AmsReminderAfrica, Notice::AmsReminderUae], true)) {
             $tags = [...self::bookingTags(), ...$tags];
         }
 
@@ -134,5 +141,21 @@ class NoticeTexts
     private static function controlePa(string $subject, string $intro): array
     {
         return [$subject, $intro.'{{lista}}', ['lista' => self::tag('Tabela de reservas calculada pela rotina', '<table border="1"><tr><th>Reserva</th></tr><tr><td>BKG123</td></tr></table>', true)]];
+    }
+
+    /** @return array{0: string, 1: string, 2: array<string, array{label: string, sample: string, html: bool}>} */
+    private static function amsMissing(string $subject, string $intro): array
+    {
+        return [$subject, '<h3>'.$intro.'</h3>{{lista}}', ['lista' => self::tag('Tabela de reservas calculada pela rotina', '<table border="1"><tr><th>Reserva</th><th>Cliente</th><th>ETD</th></tr><tr><td>BKG123</td><td>Cliente Exemplo</td><td>20/11/2026</td></tr></table>', true)]];
+    }
+
+    /** @return array{0: string, 1: string, 2: array<string, array{label: string, sample: string, html: bool}>} */
+    private static function amsReminder(string $destination): array
+    {
+        return [
+            "DMF Brazil - Shipment Registration to {$destination}: {{reserva}} - {{hbl}} -  [Reminder #{{dias}}]",
+            SendAms::INTRO.'{{dados}}',
+            ['dias' => self::tag('Dias desde o envio do registro', '3'), 'dados' => self::tag('Tabela com os dados do embarque e os containers', '<table><tr><th align="left">Booking</th><td>BKG123</td></tr></table>', true)],
+        ];
     }
 }

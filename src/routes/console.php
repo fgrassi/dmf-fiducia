@@ -3,6 +3,7 @@
 use App\Actions\AccountingCovers\GenerateCoverSummaries;
 use App\Actions\AccountingCovers\RefreshCoverSummaries;
 use App\Actions\AgentNotes\OverdueNotesNotice;
+use App\Actions\Booking\Ams\AmsNotices;
 use App\Actions\Booking\ExpenseReviewNotice;
 use App\Actions\Cobranca\Generation\GenerateAllCharges;
 use App\Actions\Cobranca\Notices\HapagPendingNotice;
@@ -74,6 +75,12 @@ $notices = [
     ['controle-pa:aviso-pendencia-confirmacao', ControlePaNotices::class, 'Pagamentos ao armador sem recibo (controlePaAvisoPendenciaConfirmacao)', 'pendingReceipt'],
     ['controle-pa:aviso-pendencia-pagamento', ControlePaNotices::class, 'Freight Invoices do armador sem pagamento (controlePaAvisoPendenciaPagamento)', 'pendingPayment'],
     ['controle-pa:aviso-embarques-confirmados', ControlePaNotices::class, 'Embarques confirmados sem Freight Invoice (controlePaAvisoReservasConfirmadas)', 'confirmedWithoutInvoice'],
+    ['ams:aviso-eua', AmsNotices::class, 'Embarques para os EUA sem AMS enviado, ETD em até 7 dias (avisoAms)', 'missingUs'],
+    ['ams:aviso-mexico', AmsNotices::class, 'Embarques para o México sem AMS enviado, ETD em até 7 dias (avisoAmsMexico)', 'missingMexico'],
+    ['ams:aviso-africa', AmsNotices::class, 'Embarques para a África do Sul sem documentos enviados, ETD em até 5 dias (avisoAmsAfrica)', 'pendingAfrica'],
+    ['ams:aviso-uae', AmsNotices::class, 'Embarques para os Emirados Árabes sem documentos enviados, ETD em até 5 dias (avisoAmsUae)', 'pendingUae'],
+    ['ams:lembrete-africa', AmsNotices::class, 'Lembrete ao agente da África do Sul do registro ainda não confirmado (enviaReminderAmsAfrica)', 'reminderAfrica'],
+    ['ams:lembrete-uae', AmsNotices::class, 'Lembrete ao agente dos Emirados Árabes do registro ainda não confirmado (enviaReminderAmsUae)', 'reminderUae'],
 ];
 
 foreach ($notices as $row) {
