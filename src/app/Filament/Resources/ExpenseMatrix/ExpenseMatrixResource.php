@@ -155,6 +155,15 @@ class ExpenseMatrixResource extends Resource
             ]);
     }
 
+    /**
+     * @param  array<string, string>  $labels
+     * @return list<string>
+     */
+    private static function keysMatching(array $labels, string $search): array
+    {
+        return array_keys(array_filter($labels, fn (string $label) => str_contains(mb_strtolower($label), mb_strtolower($search))));
+    }
+
     public static function table(Table $table): Table
     {
         return $table
@@ -173,33 +182,56 @@ class ExpenseMatrixResource extends Resource
             ])
             ->columns([
                 TextColumn::make('expense.label')
+                    ->sortable(query: fn (Builder $query, string $direction) => $query
+                        ->orderBy(FinExpenses::select('name')->whereColumn('fin_expenses.id', 'fin_expenses_matrix.ref_expense'), $direction))
+                    ->searchable(['name'])
                     ->label('Despesa'),
                 TextColumn::make('equipment.nome')
+                    ->sortable()
+                    ->searchable()
                     ->label('Equipamento'),
                 TextColumn::make('currency.symbol')
+                    ->sortable()
+                    ->searchable()
                     ->label('Moeda'),
                 TextColumn::make('expense_value')
+                    ->sortable()
+                    ->searchable()
                     ->label('Valor')
                     ->formatStateUsing(fn ($state) => number_format((float) $state, 2, ',', '.')),
                 TextColumn::make('imo_value')
+                    ->sortable()
+                    ->searchable()
                     ->label('Valor IMO')
                     ->formatStateUsing(fn ($state) => number_format((float) $state, 2, ',', '.')),
                 TextColumn::make('compra_minimo')
+                    ->sortable()
+                    ->searchable()
                     ->label('Custo Min')
                     ->formatStateUsing(fn ($state) => number_format((float) $state, 2, ',', '.')),
                 TextColumn::make('venda_minimo')
+                    ->sortable()
+                    ->searchable()
                     ->label('Venda Min')
                     ->formatStateUsing(fn ($state) => number_format((float) $state, 2, ',', '.')),
                 TextColumn::make('type')
+                    ->sortable()
+                    ->searchable(query: fn (Builder $query, string $search) => $query->whereIn('type', self::keysMatching(['b' => 'Import/Export', ...self::TYPES], $search)))
                     ->label('Tipo de Reserva')
                     ->formatStateUsing(fn (?string $state) => ['b' => 'Import/Export', ...self::TYPES][$state] ?? null),
                 TextColumn::make('due_from')
+                    ->sortable()
+                    ->searchable()
                     ->label('Validade (de)')
                     ->date('d/m/Y'),
                 TextColumn::make('due_to')
+                    ->sortable()
+                    ->searchable()
                     ->label('Validade (até)')
                     ->date('d/m/Y'),
                 TextColumn::make('billing')
+                    ->sortable()
+                    ->searchable(query: fn (Builder $query, string $search) => $query->whereIn('billing', self::keysMatching(self::BILLINGS, $search)))
                     ->label('Tipo de Cobrança')
                     ->formatStateUsing(fn (?string $state) => self::BILLINGS[$state] ?? null),
             ])

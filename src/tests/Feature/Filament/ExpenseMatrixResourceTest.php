@@ -61,6 +61,28 @@ class ExpenseMatrixResourceTest extends TestCase
             ->assertCanSeeTableRecords([$active, $future, $expired]);
     }
 
+    public function test_searches_by_expense_name_and_by_type_label_and_sorts_by_value(): void
+    {
+        $this->actingAs($this->user('auxiliares'));
+        $thc = $this->row(['expense_value' => 300]);
+        $bl = $this->row([
+            'ref_expense' => DB::table('fin_expenses')->insertGetId(['name' => 'BL Fee']),
+            'type' => 'e',
+            'expense_value' => 50,
+        ]);
+
+        $this->page()
+            ->searchTable('BL Fee')
+            ->assertCanSeeTableRecords([$bl])
+            ->assertCanNotSeeTableRecords([$thc])
+            ->searchTable('Export')
+            ->assertCanSeeTableRecords([$bl])
+            ->assertCanNotSeeTableRecords([$thc])
+            ->searchTable(null)
+            ->sortTable('expense_value')
+            ->assertCanSeeTableRecords([$bl, $thc], inOrder: true);
+    }
+
     public function test_user_with_only_export_credential_sees_export_and_both_types(): void
     {
         $this->actingAs($this->user('auxiliares,export'));
