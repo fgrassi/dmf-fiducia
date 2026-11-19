@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Ships;
 
 use App\Filament\Actions\MergeRecordsAction;
+use App\Filament\Clusters\Ships;
 use App\Filament\Resources\Ships\Pages\ManageShips;
 use App\Models\Navio;
 use BackedEnum;
@@ -14,7 +15,6 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use UnitEnum;
 
 /** navio (legado): navios usados nos embarques. */
 class ShipResource extends Resource
@@ -27,13 +27,13 @@ class ShipResource extends Resource
 
     protected static ?string $navigationLabel = 'Navios';
 
-    protected static ?string $slug = 'cadastros/navios';
+    protected static ?string $slug = 'navios';
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-lifebuoy';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Cadastros';
+    protected static ?string $cluster = Ships::class;
 
-    protected static ?int $navigationSort = 100;
+    protected static ?int $navigationSort = 1;
 
     /** security.yml do módulo (legado): credencial auxiliares. */
     public static function canAccess(): bool

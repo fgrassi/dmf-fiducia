@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Actions\ShipCover\ShipCoverPdf;
+use App\Filament\Clusters\Ships;
 use App\Filament\Support\ReportFields;
 use App\Models\Embarque;
 use App\Models\Navio;
@@ -22,7 +23,6 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use UnitEnum;
 
 /**
  * capaNavio (legado), "Capas de Navio (Impo)": as reservas em aberto do navio entre dois portos (cadastradas nos últimos
@@ -36,13 +36,13 @@ class ShipCovers extends Page implements HasTable
 
     protected static ?string $navigationLabel = 'Capas de Navio (Impo)';
 
-    protected static ?string $slug = 'cadastros/capas-navio';
+    protected static ?string $slug = 'capas';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Cadastros';
+    protected static ?string $cluster = Ships::class;
 
-    protected static ?int $navigationSort = 160;
+    protected static ?int $navigationSort = 3;
 
     public function content(Schema $schema): Schema
     {

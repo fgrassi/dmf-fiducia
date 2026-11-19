@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ShipSchedules;
 
+use App\Filament\Clusters\Ships;
 use App\Filament\Resources\ShipSchedules\Pages\ManageShipSchedules;
 use App\Filament\Support\ReportFields;
 use App\Models\ProgramacaoNavio;
@@ -15,7 +16,6 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use UnitEnum;
 
 /** programacaoNavio (legado): programação de saídas dos navios entre portos, em ordem de ETD. */
 class ShipScheduleResource extends Resource
@@ -28,13 +28,13 @@ class ShipScheduleResource extends Resource
 
     protected static ?string $navigationLabel = 'Programação de Navios';
 
-    protected static ?string $slug = 'cadastros/programacao-navios';
+    protected static ?string $slug = 'programacao';
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-calendar-days';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Cadastros';
+    protected static ?string $cluster = Ships::class;
 
-    protected static ?int $navigationSort = 150;
+    protected static ?int $navigationSort = 2;
 
     public static function form(Schema $schema): Schema
     {
