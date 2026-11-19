@@ -24,6 +24,7 @@ use App\Filament\Resources\Embarques\RelationManagers\OriginDocsRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\RemarksRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\RouteRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\ScheduleRelationManager;
+use App\Filament\Resources\Embarques\RelationManagers\ShippingInstructionRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\TrackingRelationManager;
 use App\Filament\Resources\Embarques\Schemas\EmbarqueInfolist;
 use App\Filament\Resources\Embarques\Tables\EmbarquesTable;
@@ -119,6 +120,7 @@ class EmbarqueResource extends Resource
                 RouteRelationManager::class,
                 MailingsRelationManager::class,
             ]),
+            ShippingInstructionRelationManager::class,
             OriginDocsRelationManager::class,
             RelationGroup::make('AMS', [
                 AmsAfricaRelationManager::class,

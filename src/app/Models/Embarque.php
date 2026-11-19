@@ -172,6 +172,12 @@ class Embarque extends Model
         return $this->hasMany(Bl::class, 'embarque_id', 'embarque_id');
     }
 
+    /** Arquivos da instrução de embarque ao agente (ctr_instr = 1). */
+    public function instructionFiles(): HasMany
+    {
+        return $this->hasMany(EmbEmbarqueFile::class, 'ref_embarque', 'embarque_id')->where('ctr_instr', 1)->orderBy('id');
+    }
+
     public function goods(): HasMany
     {
         return $this->hasMany(Mercadoria::class, 'embarque_id', 'embarque_id')->orderBy('nome');
