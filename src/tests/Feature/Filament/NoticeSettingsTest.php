@@ -140,6 +140,20 @@ class NoticeSettingsTest extends TestCase
             ->assertCanNotSeeTableRecords([Notice::ExpenseReviewImport->value]);
     }
 
+    public function test_the_list_sorts_by_description_in_both_directions(): void
+    {
+        $this->actingAs($this->user('financial'));
+        $keys = fn (bool $descending): array => collect(Notice::cases())
+            ->sortBy(fn (Notice $notice) => mb_strtolower($notice->label()), SORT_NATURAL, $descending)
+            ->map->value->values()->all();
+
+        Livewire::test(NoticeSettings::class)
+            ->sortTable('label')
+            ->assertCanSeeTableRecords($keys(false), inOrder: true)
+            ->sortTable('label', 'desc')
+            ->assertCanSeeTableRecords($keys(true), inOrder: true);
+    }
+
     public function test_routines_tab_lists_the_generation_crons_and_edits_the_daily_time_and_switch(): void
     {
         $this->actingAs($this->user('financial'));

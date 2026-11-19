@@ -82,18 +82,22 @@ class NoticeSettings extends Page implements HasTable
     public function table(Table $table): Table
     {
         return $table
-            ->records(fn (?string $search): array => $this->records($search))
+            ->records(fn (?string $search, ?string $sortColumn, ?string $sortDirection): array => $this->records($search, $sortColumn, $sortDirection))
             ->columns([
                 TextColumn::make('label')
+                    ->sortable()
                     ->label('Descrição')
                     ->searchable()
                     ->wrap(),
                 TextColumn::make('days')
+                    ->sortable()
                     ->label('Dias'),
                 TextColumn::make('time')
+                    ->sortable()
                     ->label('Horário')
                     ->placeholder('—'),
                 ToggleColumn::make('enabled')
+                    ->sortable()
                     ->label('Envio')
                     ->updateStateUsing(function (array $record, mixed $state): bool {
                         app(UpdateNoticeSetting::class)($this->setting($record), ['enabled' => (bool) $state]);
@@ -177,7 +181,7 @@ class NoticeSettings extends Page implements HasTable
     }
 
     /** @return list<array<string, mixed>> */
-    private function records(?string $search): array
+    private function records(?string $search, ?string $sortColumn = null, ?string $sortDirection = null): array
     {
         $cases = $this->activeTab === 'rotinas' ? Routine::cases() : Notice::cases();
         $settings = NoticeSetting::all()->keyBy('notice');
@@ -203,6 +207,7 @@ class NoticeSettings extends Page implements HasTable
             ])
             ->filter(fn (array $record): bool => blank($search)
                 || str_contains(mb_strtolower(implode(' ', [$record['label'], $record['days'], $record['time'], ...$record['to'], ...$record['cc']])), mb_strtolower(trim($search))))
+            ->when(in_array($sortColumn, ['label', 'days', 'time', 'enabled'], true), fn ($records) => $records->sortBy(fn (array $record) => mb_strtolower((string) $record[$sortColumn]), SORT_NATURAL, $sortDirection === 'desc'))
             ->values()
             ->all();
     }
