@@ -82,6 +82,7 @@ class TrackingRecipients
             ->join('despachante_contato as c', 'c.id', '=', 'l.despachante_contato_id')
             ->where("l.{$ownerColumn}", $owner)
             ->where('l.despachante_id', $brokerId)
+            ->whereColumn('c.ref_despachante', 'l.despachante_id')
             ->where('c.status', 1)
             ->whereIn('l.tipo', ['t', 'a']);
     }

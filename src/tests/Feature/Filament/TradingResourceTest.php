@@ -117,6 +117,11 @@ class TradingResourceTest extends TestCase
         $component->callAction(TestAction::make('contacts')->table($link), ['contacts' => [['contact_id' => $ana, 'linked' => false, 'tipo' => 'f', 'relatorio' => '1']]]);
         $this->assertSame(0, DB::table('trading_contato_despachante')->count());
 
+        $otherBroker = DB::table('despachante')->insertGetId(['nome' => 'Outro']);
+        $foreign = DB::table('despachante_contato')->insertGetId(['ref_despachante' => $otherBroker, 'name' => 'Alheio', 'email' => 'a@o.com', 'status' => 1]);
+        $component->callAction(TestAction::make('contacts')->table($link), ['contacts' => [['contact_id' => $foreign, 'linked' => true, 'tipo' => 't', 'relatorio' => '0']]]);
+        $this->assertSame(0, DB::table('trading_contato_despachante')->count());
+
         $component->callAction(TestAction::make('contacts')->table($link), ['contacts' => [['contact_id' => $ana, 'linked' => true, 'tipo' => 't', 'relatorio' => '0']]]);
         $component->callTableAction(DeleteAction::class, $link);
         $this->assertSame(0, DB::table('trading_despachante')->count() + DB::table('trading_contato_despachante')->count());
