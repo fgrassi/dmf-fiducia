@@ -43,8 +43,8 @@ class PaymentOrderResourceTest extends TestCase
         $this->actingAs($this->user('financial'));
         Filament::setCurrentPanel('admin');
 
-        $parent = collect(Filament::getNavigation())->first(fn ($group) => $group->getLabel() === 'Financeiro')
-            ->getItems()->first(fn ($item) => $item->getLabel() === 'Ordem de Pagamento');
+        $parent = collect(collect(Filament::getNavigation())->first(fn ($group) => $group->getLabel() === 'Financeiro')->getItems())
+            ->first(fn ($item) => $item->getLabel() === 'Ordem de Pagamento');
 
         $this->assertSame(['Ordem de pagamento (armadores)', 'Ordem de pagamento (outros)'], collect($parent->getChildItems())->map->getLabel()->all());
     }
