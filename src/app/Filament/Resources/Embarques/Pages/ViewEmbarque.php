@@ -41,7 +41,7 @@ class ViewEmbarque extends ViewRecord
     }
 
     /** Grupos que viram submenu (abas internas) em vez de ter os relation managers empilhados na mesma aba. */
-    private const SUBMENU_GROUPS = ['Notas', 'Confirmação', 'Demurrage e Detention', 'Programação', 'Histórico'];
+    private const SUBMENU_GROUPS = ['Notas', 'Confirmação', 'Demurrage e Detention', 'Programação', 'AMS', 'Histórico'];
 
     public function getRelationManagerTabComponent(string|int $key): ?Tab
     {

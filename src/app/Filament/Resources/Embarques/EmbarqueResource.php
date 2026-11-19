@@ -5,6 +5,8 @@ namespace App\Filament\Resources\Embarques;
 use App\Filament\Resources\Embarques\Pages\ListEmbarques;
 use App\Filament\Resources\Embarques\Pages\ListSeguros;
 use App\Filament\Resources\Embarques\Pages\ViewEmbarque;
+use App\Filament\Resources\Embarques\RelationManagers\AmsAfricaRelationManager;
+use App\Filament\Resources\Embarques\RelationManagers\AmsUaeRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\ArrivalConfirmationsRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\BlsRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\CommissionsRelationManager;
@@ -18,6 +20,7 @@ use App\Filament\Resources\Embarques\RelationManagers\FreightInvoicesRelationMan
 use App\Filament\Resources\Embarques\RelationManagers\ImoRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\LogsRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\MailingsRelationManager;
+use App\Filament\Resources\Embarques\RelationManagers\OriginDocsRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\RemarksRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\RouteRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\ScheduleRelationManager;
@@ -115,6 +118,11 @@ class EmbarqueResource extends Resource
                 ImoRelationManager::class,
                 RouteRelationManager::class,
                 MailingsRelationManager::class,
+            ]),
+            OriginDocsRelationManager::class,
+            RelationGroup::make('AMS', [
+                AmsAfricaRelationManager::class,
+                AmsUaeRelationManager::class,
             ]),
             RelationGroup::make('Histórico', [
                 TrackingRelationManager::class,

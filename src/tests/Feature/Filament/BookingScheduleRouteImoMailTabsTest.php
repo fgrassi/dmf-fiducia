@@ -5,6 +5,7 @@ namespace Tests\Feature\Filament;
 use App\Filament\Resources\Embarques\Pages\ViewEmbarque;
 use App\Filament\Resources\Embarques\RelationManagers\ImoRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\MailingsRelationManager;
+use App\Filament\Resources\Embarques\RelationManagers\OriginDocsRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\RouteRelationManager;
 use App\Filament\Resources\Embarques\RelationManagers\ScheduleRelationManager;
 use App\Models\Embarque;
@@ -120,6 +121,31 @@ class BookingScheduleRouteImoMailTabsTest extends TestCase
             ->assertCanSeeTableRecords([$mine])
             ->assertCanNotSeeTableRecords([$other])
             ->assertSee('Rio Grande do Sul');
+    }
+
+    public function test_origin_docs_creates_the_release_when_missing_and_marks_a_pending_one_as_sent(): void
+    {
+        $user = $this->user();
+        $this->actingAs($user);
+        $fresh = $this->booking();
+        $pending = $this->booking();
+        DB::table('liberacao_embarque_origem')->insert(['embarque_id' => $pending->getKey(), 'status' => 0]);
+
+        Livewire::test(OriginDocsRelationManager::class, ['ownerRecord' => $fresh, 'pageClass' => ViewEmbarque::class])
+            ->callAction(TestAction::make('create')->table(), ['data_liberacao' => '2026-11-12'])
+            ->assertHasNoActionErrors()
+            ->assertActionHidden(TestAction::make('create')->table());
+
+        Livewire::test(OriginDocsRelationManager::class, ['ownerRecord' => $pending, 'pageClass' => ViewEmbarque::class])
+            ->assertActionHidden(TestAction::make('create')->table())
+            ->callAction(TestAction::make('edit')->table(DB::table('liberacao_embarque_origem')->where('embarque_id', $pending->getKey())->value('liberacao_embarque_id')), ['data_liberacao' => '2026-11-13'])
+            ->assertHasNoActionErrors();
+
+        $rows = DB::table('liberacao_embarque_origem')->orderBy('liberacao_embarque_id')->get();
+        $this->assertSame([[1, '2026-11-13'], [1, '2026-11-12']], $rows->map(fn ($r) => [(int) $r->status, substr($r->data_liberacao, 0, 10)])->all());
+        $this->assertSame([$user->getKey()], $rows->pluck('updated_by')->unique()->map(fn ($id) => (int) $id)->all());
+        $this->assertCount(2, $rows);
+        $this->assertSame(1, DB::table('liberacao_embarque_origem')->where('embarque_id', $pending->getKey())->count());
     }
 
     /** @param  array<string, mixed>  $attributes */

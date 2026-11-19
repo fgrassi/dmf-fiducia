@@ -235,6 +235,22 @@ class Embarque extends Model
         return $this->hasMany(EmbarqueRota::class, 'embarque_id', 'embarque_id')->orderByDesc('rota_id');
     }
 
+    public function amsAfrica(): HasMany
+    {
+        return $this->hasMany(AmsAfrica::class, 'embarque_id', 'embarque_id');
+    }
+
+    public function amsUae(): HasMany
+    {
+        return $this->hasMany(AmsUae::class, 'embarque_id', 'embarque_id');
+    }
+
+    /** Envio dos documentos à origem: um registro por reserva. */
+    public function originReleases(): HasMany
+    {
+        return $this->hasMany(LiberacaoEmbarqueOrigem::class, 'embarque_id', 'embarque_id');
+    }
+
     /** Dados do seguro da reserva de seguro (tipo 's'). */
     public function insuranceConfirmation(): HasOne
     {
