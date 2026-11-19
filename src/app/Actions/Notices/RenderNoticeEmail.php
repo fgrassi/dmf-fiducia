@@ -30,7 +30,8 @@ class RenderNoticeEmail
     public function render(Notice $notice, ?string $subject, ?string $body, array $values): array
     {
         $text = NoticeTexts::for($notice);
-        $raw = array_map(fn ($value) => (string) $value, $values);
+        // variável que a rotina não preenche (ex.: {{reserva}} num aviso de lista) sai em branco, não como {{texto}}
+        $raw = [...array_fill_keys(array_keys($text['tags']), ''), ...array_map(fn ($value) => (string) $value, $values)];
         $safe = [];
         $subjectValues = [];
 

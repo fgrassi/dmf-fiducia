@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Actions\Notices\NoticeTexts;
 use App\Enums\Notice;
 use App\Enums\Routine;
 use App\Filament\Pages\NoticeSettings;
@@ -51,6 +52,33 @@ class NoticeSettingsTest extends TestCase
         $setting->refresh();
         $this->assertNull($setting->subject);
         $this->assertNull($setting->body);
+    }
+
+    public function test_edit_opens_with_the_default_text_and_an_unchanged_subject_is_not_saved(): void
+    {
+        $this->actingAs($this->user('financial'));
+        $edit = ['enabled' => true, 'time' => '08:00', 'recipients' => ['a@dmflog.com.br'], 'cc' => []];
+        $notice = Notice::OpenCommissions;
+        $default = NoticeTexts::for($notice);
+
+        Livewire::test(NoticeSettings::class)
+            ->mountAction(TestAction::make('edit')->table($notice->value))
+            ->assertSchemaStateSet(['subject' => $default['subject'], 'body' => NoticeTexts::editorBody($notice)])
+            ->callMountedAction([...$edit, 'subject' => $default['subject']])
+            ->assertHasNoActionErrors();
+
+        $this->assertNull(NoticeSetting::firstWhere('notice', $notice->value)->subject);
+    }
+
+    public function test_the_select_appends_the_variable_to_the_body(): void
+    {
+        $this->actingAs($this->user('financial'));
+        $notice = Notice::OpenCommissions;
+
+        Livewire::test(NoticeSettings::class)
+            ->mountAction(TestAction::make('edit')->table($notice->value))
+            ->fillForm(['insert_body_tag' => 'data'])
+            ->assertSchemaStateSet(['body' => NoticeTexts::editorBody($notice).'<p><span data-type="mergeTag" data-id="data"></span></p>', 'insert_body_tag' => null]);
     }
 
     public function test_preview_renders_the_unsaved_text_with_sample_values(): void

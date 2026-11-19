@@ -109,9 +109,7 @@ class NoticeTexts
             Notice::AmsReminderUae => self::amsReminder('United Arab Emirates'),
         };
 
-        if (in_array($notice, [Notice::OpenCharges, Notice::MblRelease, Notice::AmsReminderAfrica, Notice::AmsReminderUae], true)) {
-            $tags = [...self::bookingTags(), ...$tags];
-        }
+        $tags = [...self::bookingTags(), ...$tags];
 
         return compact('subject', 'body', 'tags');
     }

@@ -23,6 +23,15 @@ class RenderNoticeEmailTest extends TestCase
         $this->assertSame('<h3>Os seguintes embarques prioritários chegam em 5 dias: </h3><table><tr><td>X</td></tr></table>', $html);
     }
 
+    public function test_a_variable_the_routine_does_not_fill_comes_out_blank(): void
+    {
+        app(UpdateNoticeSetting::class)(Notice::HapagPending, ['subject' => 'Reserva {{reserva}} pendente']);
+
+        [$subject] = app(RenderNoticeEmail::class)(Notice::HapagPending, ['lista' => '']);
+
+        $this->assertSame('Reserva  pendente', $subject);
+    }
+
     public function test_values_are_escaped_except_the_variables_marked_as_html(): void
     {
         [, $html] = app(RenderNoticeEmail::class)(Notice::MblRelease, ['reserva' => '<b>BKG</b>', 'mbl' => 'M', 'hbl' => 'H', 'etd' => 'E', 'pod' => 'P', 'importador' => 'I']);

@@ -117,7 +117,7 @@ class NoticeSettings extends Page implements HasTable
                     ->label('Editar')
                     ->icon(Heroicon::PencilSquare)
                     ->modalHeading(fn (array $record): string => $record['label'])
-                    ->fillForm(fn (array $record): array => ['enabled' => $record['enabled'], 'time' => $record['time'], 'weekdays' => $record['weekdays'], 'recipients' => $record['to'], 'cc' => $record['cc'], 'subject' => $record['subject'], 'body' => $record['body']])
+                    ->fillForm(fn (array $record): array => ['enabled' => $record['enabled'], 'time' => $record['time'], 'weekdays' => $record['weekdays'], 'recipients' => $record['to'], 'cc' => $record['cc'], 'subject' => $record['subject'] ?? $record['default_subject'], 'body' => $record['body'] ?? $record['default_body']])
                     ->modalWidth('4xl')
                     ->schema(fn (array $record): array => [
                         Toggle::make('enabled')
@@ -166,7 +166,7 @@ class NoticeSettings extends Page implements HasTable
 
                         if ($record['tags'] !== []) {
                             // em branco vale o texto padrão
-                            $changes['subject'] = filled($data['subject'] ?? null) ? $data['subject'] : null;
+                            $changes['subject'] = filled($data['subject'] ?? null) && $data['subject'] !== $record['default_subject'] ? $data['subject'] : null;
                             $changes['body'] = filled(trim(strip_tags((string) ($data['body'] ?? '')))) ? $data['body'] : null;
                         }
 
@@ -196,6 +196,8 @@ class NoticeSettings extends Page implements HasTable
                 'cc' => $case instanceof Notice ? $case->copies() : [],
                 'subject' => $case instanceof Notice ? $settings->get($case->value)?->subject : null,
                 'body' => $case instanceof Notice ? $settings->get($case->value)?->body : null,
+                'default_subject' => $case instanceof Notice ? NoticeTexts::for($case)['subject'] : null,
+                'default_body' => $case instanceof Notice ? NoticeTexts::editorBody($case) : null,
                 'tags' => $case instanceof Notice ? array_map(fn (array $tag): string => $tag['label'], NoticeTexts::for($case)['tags']) : [],
                 'copy_label' => $case instanceof Notice && $case->copiesAreBlind() ? 'Cópia oculta' : 'Cópia',
             ])
@@ -223,11 +225,11 @@ class NoticeSettings extends Page implements HasTable
             TextInput::make('subject')
                 ->label('Assunto')
                 ->placeholder($default['subject'])
-                ->helperText('Em branco vale o assunto padrão. Variáveis no formato {{variavel}}.')
+                ->helperText('Já vem com o assunto padrão; apagando tudo vale o padrão. Variáveis no formato {{variavel}}.')
                 ->maxLength(255)
                 ->columnSpanFull(),
-            Select::make('insert_subject_tag')
-                ->label('Inserir variável no assunto')
+            Select::make('insert_body_tag')
+                ->label('Inserir variável no texto')
                 ->options($record['tags'])
                 ->searchable()
                 ->live()
@@ -237,13 +239,16 @@ class NoticeSettings extends Page implements HasTable
                         return;
                     }
 
-                    $set('subject', trim($get('subject').' {{'.$state.'}}'));
-                    $set('insert_subject_tag', null);
+                    $body = $get('body');
+                    $set('body', is_array($body)
+                        ? [...$body, 'content' => [...($body['content'] ?? []), ['type' => 'paragraph', 'content' => [['type' => 'mergeTag', 'attrs' => ['id' => $state]]]]]]
+                        : $body.'<p><span data-type="mergeTag" data-id="'.$state.'"></span></p>');
+                    $set('insert_body_tag', null);
                 })
                 ->columnSpanFull(),
             RichEditor::make('body')
                 ->label('Texto do e-mail')
-                ->helperText('Em branco vale o texto padrão. Para inserir uma variável use o botão de variáveis da barra (digitar "{{" também abre a busca); a variável "Lista" é a tabela que a rotina calcula.')
+                ->helperText('Já vem com o texto padrão; apagando tudo vale o padrão. Para inserir uma variável use o botão de variáveis da barra (digitar "{{" também abre a busca); a variável "Lista" é a tabela que a rotina calcula.')
                 ->mergeTags($record['tags'])
                 ->saveRelationshipsUsing(null)
                 ->toolbarButtons([

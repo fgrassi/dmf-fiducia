@@ -50,14 +50,10 @@ class BookingTagsTest extends TestCase
         $this->assertSame([''], array_values(array_unique($values)));
     }
 
-    public function test_only_the_notices_about_one_booking_offer_the_booking_variables(): void
+    public function test_every_notice_offers_the_booking_variables(): void
     {
-        foreach ([Notice::OpenCharges, Notice::MblRelease] as $notice) {
+        foreach (Notice::cases() as $notice) {
             $this->assertSame([], array_diff(array_keys(BookingTags::TAGS), array_keys(NoticeTexts::for($notice)['tags'])), $notice->value);
-        }
-
-        foreach ([Notice::ExchangeDeadline, Notice::OpenCommissions, Notice::ReleaseList] as $notice) {
-            $this->assertArrayNotHasKey('agente', NoticeTexts::for($notice)['tags'], $notice->value);
         }
     }
 
