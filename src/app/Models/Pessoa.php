@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
@@ -13,6 +14,11 @@ class Pessoa extends Model
     protected $primaryKey = 'pessoa_id';
 
     public $timestamps = false;
+
+    public function cidade(): BelongsTo
+    {
+        return $this->belongsTo(Cidade::class, 'cidades_id', 'cidades_id');
+    }
 
     /** Contatos da empresa (usuario via pessoa_usuario). */
     public function contacts(): BelongsToMany
