@@ -5,6 +5,7 @@ namespace App\Filament\Widgets;
 use App\Filament\Support\DashboardPeriod;
 use App\Models\Embarque;
 use Filament\Widgets\ChartWidget;
+use Illuminate\Support\Carbon;
 
 /** Reservas cadastradas no mês por modal (marítimo, aéreo, seguro...). */
 class BookingsByModal extends ChartWidget
@@ -18,6 +19,13 @@ class BookingsByModal extends ChartWidget
     public static function canView(): bool
     {
         return (bool) auth()->user()?->hasLegacyCredential('booking');
+    }
+
+    public function getDescription(): string
+    {
+        $from = Carbon::parse(max(today()->startOfMonth()->toDateString(), DashboardPeriod::SINCE));
+
+        return 'De '.$from->format('d/m/Y').' a '.today()->format('d/m/Y').', sem canceladas';
     }
 
     protected function getData(): array

@@ -5,6 +5,7 @@ namespace App\Filament\Widgets;
 use App\Filament\Support\DashboardPeriod;
 use App\Models\Embarque;
 use Filament\Widgets\ChartWidget;
+use Illuminate\Support\Carbon;
 
 /** Reservas cadastradas nos últimos 12 meses, importação e exportação lado a lado. */
 class BookingsPerMonth extends ChartWidget
@@ -13,13 +14,18 @@ class BookingsPerMonth extends ChartWidget
 
     protected ?string $heading = 'Reservas por mês';
 
-    protected ?string $description = 'Até 12 meses a partir de 2026, sem canceladas';
-
     protected ?string $maxHeight = '280px';
 
     public static function canView(): bool
     {
         return (bool) auth()->user()?->hasLegacyCredential('booking');
+    }
+
+    public function getDescription(): string
+    {
+        $from = max(today()->startOfMonth()->subMonthsNoOverflow(11), Carbon::parse(DashboardPeriod::SINCE)->startOfMonth());
+
+        return 'De '.$from->format('m/Y').' a '.today()->format('m/Y').' (até 12 meses), sem canceladas';
     }
 
     protected function getData(): array

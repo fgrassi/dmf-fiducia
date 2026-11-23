@@ -35,6 +35,7 @@ abstract class UpcomingBookings extends TableWidget
 
         return $table
             ->heading($this->heading())
+            ->description('A partir de '.today()->format('d/m/Y').', reservas cadastradas desde '.DashboardPeriod::sinceLabel())
             ->query(fn () => Embarque::query()
                 ->with(['cliente:pessoa_id,nome', 'armador:armador_id,nome', 'portoOrigem:porto_id,nome', 'portoDestino:porto_id,nome'])
                 ->where('dteCadastro', '>=', DashboardPeriod::SINCE)
@@ -46,7 +47,7 @@ abstract class UpcomingBookings extends TableWidget
             ->columns([
                 TextColumn::make($date)
                     ->label('Data')
-                    ->date('d/m'),
+                    ->date('d/m/Y'),
                 TextColumn::make('impor_expor')
                     ->label('Op.')
                     ->badge()

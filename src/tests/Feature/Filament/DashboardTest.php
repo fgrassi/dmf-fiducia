@@ -31,6 +31,26 @@ class DashboardTest extends TestCase
         $this->assertFalse(NextDepartures::canView());
     }
 
+    public function test_dashboard_title_carries_the_year_and_the_dates(): void
+    {
+        $this->actingAs($this->user('booking'));
+
+        $this->get('/admin')->assertOk()
+            ->assertSee('Dashboard 2026')
+            ->assertSee('Dados cadastrados desde 01/01/2026 · hoje, '.today()->format('d/m/Y'));
+    }
+
+    public function test_widgets_state_the_dates_they_cover(): void
+    {
+        $this->actingAs($this->user('booking'));
+        $today = today()->format('d/m/Y');
+
+        Livewire::test(NextDepartures::class)->assertSee("A partir de {$today}");
+        $this->assertStringContainsString('desde 01/01/2026', $this->widgetData(OperationStats::class, 'getDescription'));
+        $this->assertStringContainsString('a '.today()->format('m/Y'), $this->widgetData(BookingsPerMonth::class, 'getDescription'));
+        $this->assertStringContainsString("a {$today}", $this->widgetData(BookingsByModal::class, 'getDescription'));
+    }
+
     public function test_operation_stats_count_open_bookings_and_the_next_seven_days(): void
     {
         $this->actingAs($this->user('booking'));

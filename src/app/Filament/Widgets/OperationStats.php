@@ -21,6 +21,11 @@ class OperationStats extends StatsOverviewWidget
         return (bool) auth()->user()?->hasLegacyCredential('booking');
     }
 
+    protected function getDescription(): ?string
+    {
+        return 'Reservas cadastradas desde '.DashboardPeriod::sinceLabel().' · próximos 7 dias: '.today()->format('d/m').' a '.today()->addDays(7)->format('d/m/Y');
+    }
+
     protected function getStats(): array
     {
         $today = today()->toDateString();
