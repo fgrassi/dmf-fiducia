@@ -2,12 +2,15 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Resources\Charges\Pages\ListCharges;
 use App\Filament\Resources\Embarques\Pages\ListEmbarques;
 use App\Filament\Widgets\BookingsByModal;
 use App\Filament\Widgets\BookingsPerMonth;
+use App\Filament\Widgets\FinanceStats;
 use App\Filament\Widgets\NextArrivals;
 use App\Filament\Widgets\NextDepartures;
 use App\Filament\Widgets\OperationStats;
+use App\Filament\Widgets\OverdueCharges;
 use App\Models\Embarque;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -19,16 +22,19 @@ class DashboardTest extends TestCase
 {
     use LegacySchema;
 
-    public function test_widgets_follow_the_booking_credential(): void
+    public function test_widgets_follow_the_booking_and_financial_credentials(): void
     {
         $this->actingAs($this->user('booking'));
         $this->assertTrue(OperationStats::canView());
         $this->assertTrue(NextDepartures::canView());
-        $this->get('/admin')->assertOk()->assertSee('Widgets\\\\NextDepartures', false)->assertSee('Widgets\\\\BookingsPerMonth', false);
+        $this->assertFalse(FinanceStats::canView());
+        $this->assertFalse(OverdueCharges::canView());
+        $this->get('/admin')->assertOk()->assertSee('Widgets\\\\NextDepartures', false)->assertSee('Widgets\\\\BookingsPerMonth', false)->assertDontSee('Widgets\\\\OverdueCharges', false);
 
         $this->actingAs($this->user('financial'));
         $this->assertFalse(OperationStats::canView());
-        $this->assertFalse(NextDepartures::canView());
+        $this->assertTrue(FinanceStats::canView());
+        $this->get('/admin')->assertOk()->assertSee('Widgets\\\\OverdueCharges', false)->assertDontSee('Widgets\\\\NextDepartures', false);
     }
 
     public function test_dashboard_title_carries_the_year_and_the_dates(): void
@@ -42,11 +48,13 @@ class DashboardTest extends TestCase
 
     public function test_widgets_state_the_dates_they_cover(): void
     {
-        $this->actingAs($this->user('booking'));
+        $this->actingAs($this->user('booking', 'financial'));
         $today = today()->format('d/m/Y');
 
         Livewire::test(NextDepartures::class)->assertSee("A partir de {$today}");
+        Livewire::test(OverdueCharges::class)->assertSee("vencidas antes de {$today}");
         $this->assertStringContainsString('desde 01/01/2026', $this->widgetData(OperationStats::class, 'getDescription'));
+        $this->assertStringContainsString("antes de {$today}", $this->widgetData(FinanceStats::class, 'getDescription'));
         $this->assertStringContainsString('a '.today()->format('m/Y'), $this->widgetData(BookingsPerMonth::class, 'getDescription'));
         $this->assertStringContainsString("a {$today}", $this->widgetData(BookingsByModal::class, 'getDescription'));
     }
@@ -100,6 +108,50 @@ class DashboardTest extends TestCase
         Livewire::test(NextArrivals::class)->assertCountTableRecords(1);
     }
 
+    public function test_finance_stats_and_overdue_list_ignore_settled_charges(): void
+    {
+        $this->actingAs($this->user('financial'));
+        $this->charge(['total_value' => 1000, 'discount' => 100, 'due_date' => today()->subDays(3)->toDateString()]);
+        $this->charge(['total_value' => 500, 'received_value' => 200, 'due_date' => today()->addDays(3)->toDateString()]);
+        $this->charge(['total_value' => 800, 'status' => 1, 'received_value' => 800, 'payment_date' => today()->toDateString(), 'due_date' => today()->subDays(9)->toDateString()]);
+
+        $stats = collect($this->widgetData(FinanceStats::class, 'getStats'))->keyBy(fn ($stat) => $stat->getLabel());
+
+        $this->assertSame('R$ 1.200,00', $stats['A receber']->getValue());
+        $this->assertSame('R$ 900,00', $stats['Vencidas']->getValue());
+        $this->assertSame('R$ 800,00', $stats['Recebido no mês']->getValue());
+        Livewire::test(OverdueCharges::class)->assertCountTableRecords(1);
+    }
+
+    public function test_overdue_charges_show_the_booking_name_operation_and_type(): void
+    {
+        $this->actingAs($this->user('financial'));
+        $this->booking(['booking' => 'BK-77', 'impor_expor' => 'e', 'tipo_embarque' => 'a']);
+        $this->charge(['ref_booking' => DB::table('embarque')->value('embarque_id'), 'total_value' => 400, 'due_date' => today()->subDay()->toDateString()]);
+
+        Livewire::test(OverdueCharges::class)->assertSee('BK-77')->assertSee('Exportação')->assertSee('Aéreo');
+    }
+
+    public function test_finance_cards_and_overdue_table_open_lists_with_the_same_records(): void
+    {
+        $this->actingAs($this->user('financial'));
+        $this->charge(['total_value' => 1000, 'due_date' => today()->subDays(3)->toDateString()]);
+        $this->charge(['total_value' => 500, 'due_date' => today()->addDays(3)->toDateString()]);
+        $this->charge(['total_value' => 300, 'due_date' => '0000-00-00']);
+        $this->charge(['total_value' => 200, 'created_at' => '2025-06-01', 'due_date' => '2025-07-01']);
+        $this->charge(['total_value' => 800, 'status' => 1, 'received_value' => 800, 'payment_date' => today()->toDateString(), 'due_date' => today()->subDays(9)->toDateString()]);
+
+        $urls = collect($this->widgetData(FinanceStats::class, 'getStats'))->keyBy(fn ($stat) => $stat->getLabel())->map(fn ($stat) => $stat->getUrl());
+        $open = fn (string $label) => Livewire::withQueryParams($this->queryOf($urls[$label]))->test(ListCharges::class);
+
+        $open('A receber')->assertCountTableRecords(3);
+        $open('Vencidas')->assertCountTableRecords(1);
+        $open('Recebido no mês')->assertCountTableRecords(1);
+
+        $table = Livewire::test(OverdueCharges::class);
+        $this->assertSame($urls['Vencidas'], $table->instance()->getTable()->getHeaderActions()[0]->getUrl());
+    }
+
     public function test_stat_cards_open_the_bookings_list_with_the_same_bookings(): void
     {
         $this->actingAs($this->user('booking'));
@@ -121,21 +173,26 @@ class DashboardTest extends TestCase
             ->assertCountTableRecords(2);
     }
 
-    public function test_upcoming_lists_ignore_the_page_parameter_of_the_url(): void
+    public function test_lists_ignore_the_page_parameter_of_the_url(): void
     {
-        $this->actingAs($this->user('booking'));
+        $this->actingAs($this->user('booking', 'financial'));
         $this->booking(['saida_prevista' => today()->addDay()->toDateString()]);
+        $this->charge(['total_value' => 400, 'due_date' => today()->subDay()->toDateString()]);
 
         Livewire::withQueryParams(['page' => 45])->test(NextDepartures::class)->assertCountTableRecords(1);
+        Livewire::withQueryParams(['page' => 45])->test(OverdueCharges::class)->assertCountTableRecords(1);
     }
 
-    public function test_bookings_from_before_2026_are_ignored(): void
+    public function test_data_from_before_2026_is_ignored(): void
     {
-        $this->actingAs($this->user('booking'));
+        $this->actingAs($this->user('booking', 'financial'));
         $this->booking(['dteCadastro' => '2025-12-31 10:00:00', 'saida_prevista' => today()->addDay()->toDateString()]);
+        $this->charge(['total_value' => 400, 'created_at' => '2025-12-31', 'due_date' => '2025-12-31']);
 
         $this->assertSame('0', $this->widgetData(OperationStats::class, 'getStats')[0]->getValue());
+        $this->assertSame('R$ 0,00', $this->widgetData(FinanceStats::class, 'getStats')[0]->getValue());
         Livewire::test(NextDepartures::class)->assertCountTableRecords(0);
+        Livewire::test(OverdueCharges::class)->assertCountTableRecords(0);
     }
 
     /** @return array<string, mixed> */
@@ -155,6 +212,11 @@ class DashboardTest extends TestCase
     private function booking(array $attributes): void
     {
         DB::table('embarque')->insert($attributes + ['finalizado' => 'n', 'tipo_embarque' => 'm', 'impor_expor' => 'i', 'dteCadastro' => now()->toDateTimeString()]);
+    }
+
+    private function charge(array $attributes): void
+    {
+        DB::table('fin_charges')->insert($attributes + ['ref_type' => 1, 'ref_booking' => 1, 'status' => 0, 'created_at' => today()->toDateString()]);
     }
 
     private function user(string ...$credentials): User

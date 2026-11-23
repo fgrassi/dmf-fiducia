@@ -85,8 +85,9 @@ class ChargesTable
                                 ->label('Grupo de Empresa')
                                 ->options(fn () => DB::table('grupo_empresa')->orderBy('nome')->pluck('nome', 'grupo_empresa_id')),
                         ]),
-                        Fieldset::make('Datas')->columns(5)->schema([
+                        Fieldset::make('Datas')->columns(6)->schema([
                             DatePicker::make('created_at')->label('Criação'),
+                            DatePicker::make('criacao_ini')->label('Criadas a partir de'),
                             DatePicker::make('data_ini')->label('Baixa de'),
                             DatePicker::make('data_fim')->label('Baixa até'),
                             DatePicker::make('venc_ini')->label('Vencimento de'),

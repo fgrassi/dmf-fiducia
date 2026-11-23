@@ -31,6 +31,7 @@ class BuildChargeListQuery
 
         $query
             ->when($f['created_at'] ?? null, fn ($q, $v) => $q->whereDate('fin_charges.created_at', $v))
+            ->when($f['criacao_ini'] ?? null, fn ($q, $v) => $q->whereDate('fin_charges.created_at', '>=', $v))
             ->when($f['data_ini'] ?? null, fn ($q, $v) => $q->whereDate('fin_charges.payment_date', '>=', $v))
             ->when($f['data_fim'] ?? null, fn ($q, $v) => $q->whereDate('fin_charges.payment_date', '<=', $v))
             ->when($f['venc_ini'] ?? null, fn ($q, $v) => $q->whereDate('fin_charges.due_date', '>=', $v))
