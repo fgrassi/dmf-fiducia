@@ -34,6 +34,7 @@ class BookingsPerMonth extends ChartWidget
             ->filter(fn ($month) => $month->toDateString() >= DashboardPeriod::SINCE)
             ->values();
         $counts = Embarque::query()
+            ->ofUserOperation()
             ->where('dteCadastro', '>=', $months->first()->toDateString())
             ->where('finalizado', '<>', 'c')
             ->whereIn('impor_expor', ['i', 'e'])
@@ -42,10 +43,10 @@ class BookingsPerMonth extends ChartWidget
         $series = fn (string $operation) => $months->map(fn ($month) => $counts->get($operation.$month->format('Y-m'), 0))->all();
 
         return [
-            'datasets' => [
-                ['label' => 'Importação', 'data' => $series('i'), 'backgroundColor' => '#3b82f6'],
-                ['label' => 'Exportação', 'data' => $series('e'), 'backgroundColor' => '#22c55e'],
-            ],
+            'datasets' => collect([
+                'i' => ['label' => 'Importação', 'data' => $series('i'), 'backgroundColor' => '#3b82f6'],
+                'e' => ['label' => 'Exportação', 'data' => $series('e'), 'backgroundColor' => '#22c55e'],
+            ])->only(auth()->user()->onlyOperation() ?? ['i', 'e'])->values()->all(),
             'labels' => $months->map(fn ($month) => $month->translatedFormat('M/y'))->all(),
         ];
     }

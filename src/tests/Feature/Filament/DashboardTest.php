@@ -59,6 +59,35 @@ class DashboardTest extends TestCase
         $this->assertStringContainsString("a {$today}", $this->widgetData(BookingsByModal::class, 'getDescription'));
     }
 
+    public function test_import_only_and_export_only_users_see_only_their_operation(): void
+    {
+        $this->booking(['booking' => 'IMP', 'impor_expor' => 'i', 'tipo_embarque' => 'm', 'saida_prevista' => today()->addDay()->toDateString()]);
+        $this->booking(['booking' => 'EXP', 'impor_expor' => 'e', 'tipo_embarque' => 'a', 'saida_prevista' => today()->addDay()->toDateString()]);
+
+        foreach (['import' => ['Importação', 'Exportação', 'IMP', 'impo'], 'export' => ['Exportação', 'Importação', 'EXP', 'expo']] as $credential => [$seen, $hidden, $booking, $tab]) {
+            $this->actingAs($this->user('booking', $credential));
+
+            $stats = collect($this->widgetData(OperationStats::class, 'getStats'))->keyBy(fn ($stat) => $stat->getLabel());
+            $this->assertSame('1', $stats['Reservas abertas']->getValue());
+            $this->assertStringContainsString(mb_strtolower($seen), $stats['Reservas abertas']->getDescription());
+            $this->assertStringNotContainsString(mb_strtolower($hidden), $stats['Reservas abertas']->getDescription());
+            $this->assertSame($tab, $this->queryOf($stats['Saídas em 7 dias']->getUrl())['tab']);
+
+            $this->assertSame([$seen], array_column($this->widgetData(BookingsPerMonth::class, 'getData')['datasets'], 'label'));
+            $this->assertSame(1, array_sum($this->widgetData(BookingsByModal::class, 'getData')['datasets'][0]['data']));
+            Livewire::test(NextDepartures::class)->assertCountTableRecords(1)->assertSee($booking);
+            $this->get('/admin')->assertSee('só '.mb_strtolower($seen === 'Importação' ? 'importação' : 'exportação'));
+        }
+
+        foreach ([['booking', 'import', 'export'], ['booking'], ['booking', 'admin']] as $credentials) {
+            $this->actingAs($this->user(...$credentials));
+
+            $this->assertSame('2', $this->widgetData(OperationStats::class, 'getStats')[0]->getValue());
+            $this->assertCount(2, $this->widgetData(BookingsPerMonth::class, 'getData')['datasets']);
+            $this->assertArrayNotHasKey('tab', $this->queryOf($this->widgetData(OperationStats::class, 'getStats')[2]->getUrl()));
+        }
+    }
+
     public function test_operation_stats_count_open_bookings_and_the_next_seven_days(): void
     {
         $this->actingAs($this->user('booking'));

@@ -72,6 +72,23 @@ class User extends Authenticatable implements FilamentUser, HasName
             || array_intersect((array) $credentials, $owned) !== [];
     }
 
+    /**
+     * Operação que o usuário enxerga (legado): só import ou só export vê a sua; as duas, nenhuma ou admin veem tudo.
+     *
+     * @return 'i'|'e'|null null: todas
+     */
+    public function onlyOperation(): ?string
+    {
+        $import = $this->hasLegacyCredential('import');
+        $export = $this->hasLegacyCredential('export');
+
+        return match (true) {
+            $import === $export => null,
+            $export => 'e',
+            default => 'i',
+        };
+    }
+
     /** Entrada do módulo despesa (legado): diretor, financeiro com gerente, ou o usuário 2972 (da Sâmila). */
     public function canManageCompanyExpenses(): bool
     {

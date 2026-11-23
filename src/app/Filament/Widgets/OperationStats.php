@@ -30,7 +30,7 @@ class OperationStats extends StatsOverviewWidget
     {
         $today = today()->toDateString();
         $week = today()->addDays(7)->toDateString();
-        $bookings = fn () => Embarque::query()->where('dteCadastro', '>=', DashboardPeriod::SINCE);
+        $bookings = fn () => Embarque::query()->ofUserOperation()->where('dteCadastro', '>=', DashboardPeriod::SINCE);
         $open = fn () => $bookings()->where('finalizado', 'n');
 
         $perDay = $bookings()
@@ -43,7 +43,7 @@ class OperationStats extends StatsOverviewWidget
         return [
             Stat::make('Reservas abertas', number_format($open()->count(), 0, ',', '.'))
                 ->url($this->listUrl(['finalizado' => ['values' => ['n']]]))
-                ->description($open()->where('impor_expor', 'i')->count().' importação · '.$open()->where('impor_expor', 'e')->count().' exportação')
+                ->description(collect(['i' => 'importação', 'e' => 'exportação'])->only(auth()->user()->onlyOperation() ?? ['i', 'e'])->map(fn (string $label, string $operation) => $open()->where('impor_expor', $operation)->count().' '.$label)->implode(' · '))
                 ->icon(Heroicon::OutlinedCube)
                 ->color('primary'),
             Stat::make('Cadastradas hoje', (string) $perDay->get($today, 0))
@@ -76,6 +76,8 @@ class OperationStats extends StatsOverviewWidget
         $filters += ['dteCadastro' => ['from' => DashboardPeriod::SINCE]];
         $filters['dteCadastro'] += ['from' => DashboardPeriod::SINCE];
 
-        return EmbarqueResource::getUrl('index', ['filters' => $filters]);
+        $tab = ['i' => 'impo', 'e' => 'expo'][auth()->user()->onlyOperation()] ?? null;
+
+        return EmbarqueResource::getUrl('index', array_filter(['tab' => $tab, 'filters' => $filters]));
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -36,6 +37,12 @@ class Embarque extends Model
     protected $primaryKey = 'embarque_id';
 
     public $timestamps = false;
+
+    /** Só as reservas da operação (import/export) que o usuário logado enxerga: ver User::onlyOperation. */
+    public function scopeOfUserOperation(Builder $query): Builder
+    {
+        return $query->when(auth()->user()?->onlyOperation(), fn (Builder $q, string $operation) => $q->where('impor_expor', $operation));
+    }
 
     public function cliente(): BelongsTo
     {

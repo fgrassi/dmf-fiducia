@@ -63,15 +63,9 @@ class ExpenseMatrixResource extends Resource
      */
     public static function visibleTypes(): ?array
     {
-        $user = auth()->user();
-        $import = $user->hasLegacyCredential('import');
-        $export = $user->hasLegacyCredential('export');
+        $only = auth()->user()->onlyOperation();
 
-        return match (true) {
-            $import === $export => null,
-            $export => ['e', 'b'],
-            default => ['i', 'b'],
-        };
+        return $only === null ? null : [$only, 'b'];
     }
 
     /** O usuário só enxerga e altera despesas dos tipos de reserva da sua credencial (V-C5). */

@@ -15,6 +15,8 @@ class Dashboard extends BaseDashboard
 
     public function getSubheading(): string
     {
-        return 'Dados cadastrados desde '.DashboardPeriod::sinceLabel().' · hoje, '.today()->format('d/m/Y');
+        $only = ['i' => ' · só importação', 'e' => ' · só exportação'][auth()->user()?->onlyOperation()] ?? '';
+
+        return 'Dados cadastrados desde '.DashboardPeriod::sinceLabel().' · hoje, '.today()->format('d/m/Y').$only;
     }
 }

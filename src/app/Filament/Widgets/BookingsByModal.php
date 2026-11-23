@@ -31,6 +31,7 @@ class BookingsByModal extends ChartWidget
     protected function getData(): array
     {
         $counts = Embarque::query()
+            ->ofUserOperation()
             ->where('dteCadastro', '>=', max(today()->startOfMonth()->toDateString(), DashboardPeriod::SINCE))
             ->where('finalizado', '<>', 'c')
             ->pluck('tipo_embarque')
