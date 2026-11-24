@@ -23,6 +23,8 @@ class User extends Authenticatable implements FilamentUser, HasName
 
     protected $hidden = ['senha'];
 
+    protected $casts = ['aniversario' => 'date'];
+
     public function getAuthIdentifierName(): string
     {
         return 'usuario_id';

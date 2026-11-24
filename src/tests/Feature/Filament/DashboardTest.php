@@ -4,6 +4,7 @@ namespace Tests\Feature\Filament;
 
 use App\Filament\Resources\Charges\Pages\ListCharges;
 use App\Filament\Resources\Embarques\Pages\ListEmbarques;
+use App\Filament\Widgets\Birthdays;
 use App\Filament\Widgets\BookingsByModal;
 use App\Filament\Widgets\BookingsPerMonth;
 use App\Filament\Widgets\FinanceStats;
@@ -44,6 +45,32 @@ class DashboardTest extends TestCase
         $this->get('/admin')->assertOk()
             ->assertSee('Dashboard 2026')
             ->assertSee('Dados cadastrados desde 01/01/2026 · hoje, '.today()->format('d/m/Y'));
+    }
+
+    public function test_birthdays_list_the_active_staff_of_the_year_in_month_and_day_order(): void
+    {
+        $this->actingAs($this->user('booking'));
+        $person = fn (string $name, string $birthday, array $extra = [], int $company = 2) => tap(
+            DB::table('usuario')->insertGetId($extra + ['nome' => $name, 'login' => $name, 'senha' => 'x', 'status' => 1, 'aniversario' => $birthday, 'fone' => '(51) 3717-1234']),
+            fn (int $id) => DB::table('pessoa_usuario')->insert(['usuario_id' => $id, 'pessoa_id' => $company]),
+        );
+        $this->travelTo('2026-06-15');
+        $month = '06';
+        $person('LATE PERSON', "1990-{$month}-28");
+        $person('EARLY PERSON', "1985-{$month}-01");
+        $person('JANUARY PERSON', '1990-01-31');
+        $person('DECEMBER PERSON', '1990-12-02');
+        $person('INACTIVE', "1990-{$month}-05", ['status' => 0]);
+        $person('OUTSIDER', "1990-{$month}-06", [], 99);
+
+        Livewire::test(Birthdays::class)
+            ->assertCountTableRecords(4)
+            ->assertSeeInOrder(['January Person', 'Early Person', '1234', 'Late Person', 'December Person'])
+            ->assertDontSee(['Inactive', 'Outsider'])
+            ->sortTable('aniversario', 'desc')
+            ->assertSeeInOrder(['December Person', 'Late Person', 'Early Person', 'January Person'])
+            ->sortTable('nome')
+            ->assertSeeInOrder(['December Person', 'Early Person', 'January Person', 'Late Person']);
     }
 
     public function test_widgets_state_the_dates_they_cover(): void
