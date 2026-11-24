@@ -48,6 +48,13 @@ class OtherOrderItemsTest extends TestCase
         $this->assertSame(-80.0, $value->debit($this->expense(1482), 1, -80, $booking));
     }
 
+    public function test_debit_rounds_half_cents_up_like_the_legacy_php(): void
+    {
+        $booking = $this->booking(['qtd_bl' => 5]);
+
+        $this->assertSame(83.69, app(OtherOrderItemValue::class)->debit($this->expense(10), 3.3474, 5, $booking));
+    }
+
     public function test_weight_measure_respects_the_expense_minimum_value(): void
     {
         $booking = $this->booking();

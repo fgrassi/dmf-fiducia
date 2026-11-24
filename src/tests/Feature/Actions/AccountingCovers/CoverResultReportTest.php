@@ -69,6 +69,25 @@ class CoverResultReportTest extends TestCase
         $this->assertEquals(605, collect($lines)->last()['sum']['rs']);
     }
 
+    public function test_resolves_carrier_airline_and_seller_names_by_id_like_the_summaries_the_legacy_wrote(): void
+    {
+        $this->summaries();
+        DB::table('armador')->insert(['armador_id' => 7, 'nome' => 'MSC']);
+        DB::table('cia_aerea')->insert(['id' => 4, 'name' => 'AMERICAN AIRLINES']);
+        DB::table('vendedor')->insert(['vendedor_id' => 37, 'nome' => 'Jeferson Pavinato']);
+        // o legado grava só o id do armador e da cia aérea (texto NULL) e o id do vendedor como texto
+        DB::table('resumo_resultado')->where('capa_processo_id', 1)->update(['armador' => null, 'armador_id' => 7, 'cia_aerea' => null, 'cia_aerea_id' => 4, 'vendedor' => '37', 'vendedor_id' => 37]);
+
+        $lines = app(CoverResultReport::class)(['folder_id' => 1], ['armador', 'cia_aerea', 'vendedor'])['lines'];
+        $row = collect($lines)->pluck('row')->filter()->firstWhere('capa_processo_id', 1);
+
+        $this->assertSame(['MSC', 'AMERICAN AIRLINES', 'Jeferson Pavinato'], [$row->armador, $row->cia_aerea, $row->vendedor]);
+        $this->assertContains('TOTAL MSC', collect($lines)->pluck('subtotal')->all());
+        $this->assertContains('TOTAL Jeferson Pavinato', collect($lines)->pluck('subtotal')->all());
+        // sem cadastro (a capa manual não tem) continua N/D
+        $this->assertContains('TOTAL N/D', collect($lines)->pluck('subtotal')->all());
+    }
+
     public function test_filters_by_period_and_house_bl(): void
     {
         $this->summaries();

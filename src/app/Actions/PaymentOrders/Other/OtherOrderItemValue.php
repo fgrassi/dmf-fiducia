@@ -4,6 +4,7 @@ namespace App\Actions\PaymentOrders\Other;
 
 use App\Models\Embarque;
 use App\Services\Cobranca\ChargeDetails;
+use App\Services\LegacyMath;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -41,11 +42,11 @@ class OtherOrderItemValue
         $type = DB::table('fin_expenses')->where('id', $expense->ref_expense)->first();
 
         return match ((int) $type->ref_unity) {
-            self::UNIT_BL => round($unit * $rate * (int) $booking->qtd_bl, 2),
-            self::UNIT_PROCESS => round($unit * $rate / max(1, $this->namedBls($booking)), 2),
-            self::UNIT_CONTAINER => round($unit * $rate * $this->containers($booking, $expense), 2),
+            self::UNIT_BL => LegacyMath::round($unit * $rate * (int) $booking->qtd_bl, 2),
+            self::UNIT_PROCESS => LegacyMath::round($unit * $rate / max(1, $this->namedBls($booking)), 2),
+            self::UNIT_CONTAINER => LegacyMath::round($unit * $rate * $this->containers($booking, $expense), 2),
             self::UNIT_WEIGHT_MEASURE => $this->weightMeasure($expense, $type, $rate, $unit),
-            default => round($unit * $rate, 2),
+            default => LegacyMath::round($unit * $rate, 2),
         };
     }
 

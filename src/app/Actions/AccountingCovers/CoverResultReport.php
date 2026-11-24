@@ -33,6 +33,12 @@ class CoverResultReport
         'vendedor' => 'Vendedor',
     ];
 
+    /**
+     * Armador, cia aérea e vendedor saem do cadastro pelo id: as colunas de texto do resumo ficaram vazias ou com o id nos resumos
+     * que o legado gravou.
+     */
+    private const NAME_COLUMNS = ['armador' => 'ca.nome', 'cia_aerea' => 'al.name', 'vendedor' => 'sl.nome'];
+
     /** Despesas que o relatório separa do resto: sigla => nome. DEM/DET vêm das regras 5 e 6; COU e SEG, das manuais e do seguro. */
     public const CATEGORIES = ['DEM' => 'Demurrage', 'DET' => 'Detention', 'COU' => 'Courier', 'SEG' => 'Seguro'];
 
@@ -79,6 +85,9 @@ class CoverResultReport
             ->leftJoin('capa_processo_manual as cpm', 'cpm.capa_processo_manual_id', '=', 'r.capa_processo_manual_id')
             ->leftJoin('fin_expenses as fe', 'fe.id', '=', 'cpm.ref_expense')
             ->leftJoin('sedes as s', 's.id', '=', 'r.centro_custo_id')
+            ->leftJoin('armador as ca', 'ca.armador_id', '=', 'r.armador_id')
+            ->leftJoin('cia_aerea as al', 'al.id', '=', 'r.cia_aerea_id')
+            ->leftJoin('vendedor as sl', 'sl.vendedor_id', '=', 'r.vendedor_id')
             ->leftJoin('embarque as e', 'e.embarque_id', '=', 'r.embarque_id')
             ->leftJoin('cotacao_impo as qi', 'qi.cotacao_impo_id', '=', 'e.cotacao_impo_id')
             ->leftJoin('cotacao_impo_aereo as qa', 'qa.cotacao_impo_aereo_id', '=', 'e.cotacao_impo_aereo_id')
@@ -98,6 +107,9 @@ class CoverResultReport
                 'cpm.nome_cliente as manual_client',
                 'fe.operation_type as expense_operation',
                 's.nome as office',
+                'ca.nome as carrier_name',
+                'al.name as airline_name',
+                'sl.nome as seller_name',
                 'e.de as closer',
                 'e.impor_expor as booking_operation',
                 'e.tipo_embarque as booking_type',
@@ -126,7 +138,7 @@ class CoverResultReport
             ->when($filters['until'] ?? null, fn ($q, $date) => $q->where('r.data_pagamento', '<=', $date));
 
         foreach ($groupBy as $group) {
-            $query->orderBy("r.{$group}");
+            $query->orderBy(self::NAME_COLUMNS[$group] ?? "r.{$group}");
         }
 
         $rows = $query->orderBy('cp.numero')->orderBy('r.resumo_resultado_id')->get()->map(fn (stdClass $row) => $this->withValues($row));
@@ -184,6 +196,9 @@ class CoverResultReport
         $row->result = $row->rs + $row->tx_usd + $row->tx_euro + $row->financial_cost;
         $row->client = $row->capa_processo_id ? $row->cliente : ($row->person ?: $row->manual_client);
         $row->operation = in_array($row->impo_expo, ['i', 'e'], true) ? $row->impo_expo : 'i';
+        $row->armador = $row->carrier_name;
+        $row->cia_aerea = $row->airline_name;
+        $row->vendedor = $row->seller_name;
         $row->office_name = filled($row->office) ? $row->office : (filled($row->centro_custo) ? $row->centro_custo : 'N/D');
 
         return $row;
