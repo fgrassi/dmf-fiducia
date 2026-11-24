@@ -40,7 +40,7 @@ class InsuranceBookingTest extends TestCase
             'data_topo' => '2026-11-02', 'saida_prevista' => '2026-11-10', 'chegada_prevista' => '2026-11-25', 'via' => 'MSC',
             'pessoa_id_cliente' => 1, 'pessoa_id_importador' => 2, 'pessoa_id_representante' => 3, 'porto_origem_id' => 1, 'porto_destino_id' => 2,
         ]);
-        $sea = $this->booking(['booking' => 'MAR1', 'tipo_embarque' => 'm']);
+        $sea = $this->booking(['booking' => 'MAR1', 'tipo_embarque' => 'm', 'cliente_id' => 1]);
 
         Livewire::test(ListSeguros::class)
             ->assertCanSeeTableRecords([$insurance])
@@ -130,7 +130,7 @@ class InsuranceBookingTest extends TestCase
     /** @param  array<string, mixed>  $attributes */
     private function booking(array $attributes = []): Embarque
     {
-        return Embarque::find(DB::table('embarque')->insertGetId($attributes + ['booking' => 'BKG'.random_int(1000, 9999)]));
+        return Embarque::find(DB::table('embarque')->insertGetId($attributes + ['booking' => 'BKG'.random_int(1000, 9999), 'tipo_embarque' => 'm', 'cliente_id' => 1]));
     }
 
     private function user(string $credentials): User

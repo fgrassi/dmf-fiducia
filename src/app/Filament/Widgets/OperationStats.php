@@ -9,7 +9,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
-/** Números da operação: reservas abertas, o que sai e chega nos próximos 7 dias e o ritmo de cadastro. */
+/** Números da operação: reservas abertas, o que sai e chega nos próximos 7 dias e o ritmo de solicitações. */
 class OperationStats extends StatsOverviewWidget
 {
     protected static ?int $sort = 10;
@@ -23,20 +23,20 @@ class OperationStats extends StatsOverviewWidget
 
     protected function getDescription(): ?string
     {
-        return 'Reservas cadastradas desde '.DashboardPeriod::sinceLabel().' · próximos 7 dias: '.today()->format('d/m').' a '.today()->addDays(7)->format('d/m/Y');
+        return 'Reservas solicitadas desde '.DashboardPeriod::sinceLabel().' · próximos 7 dias: '.today()->format('d/m').' a '.today()->addDays(7)->format('d/m/Y');
     }
 
     protected function getStats(): array
     {
         $today = today()->toDateString();
         $week = today()->addDays(7)->toDateString();
-        $bookings = fn () => Embarque::query()->ofUserOperation()->where('dteCadastro', '>=', DashboardPeriod::SINCE);
+        $bookings = fn () => Embarque::query()->ofUserOperation()->inBookingList()->where('data_topo', '>=', DashboardPeriod::SINCE);
         $open = fn () => $bookings()->where('finalizado', 'n');
 
         $perDay = $bookings()
-            ->where('dteCadastro', '>=', max(today()->subDays(13)->toDateString(), DashboardPeriod::SINCE))
+            ->where('data_topo', '>=', max(today()->subDays(13)->toDateString(), DashboardPeriod::SINCE))
             ->where('finalizado', '<>', 'c')
-            ->pluck('dteCadastro')
+            ->pluck('data_topo')
             ->countBy(fn (string $date) => substr($date, 0, 10));
         $trend = collect(range(13, 0))->map(fn (int $ago) => $perDay->get(today()->subDays($ago)->toDateString(), 0))->all();
 
@@ -46,8 +46,8 @@ class OperationStats extends StatsOverviewWidget
                 ->description(collect(['i' => 'importação', 'e' => 'exportação'])->only(auth()->user()->onlyOperation() ?? ['i', 'e'])->map(fn (string $label, string $operation) => $open()->where('impor_expor', $operation)->count().' '.$label)->implode(' · '))
                 ->icon(Heroicon::OutlinedCube)
                 ->color('primary'),
-            Stat::make('Cadastradas hoje', (string) $perDay->get($today, 0))
-                ->url($this->listUrl(['dteCadastro' => ['from' => $today, 'until' => $today]]))
+            Stat::make('Solicitadas hoje', (string) $perDay->get($today, 0))
+                ->url($this->listUrl(['data_topo' => ['from' => $today, 'until' => $today]]))
                 ->description(array_sum($trend).' nos últimos 14 dias')
                 ->chart($trend)
                 ->icon(Heroicon::OutlinedPlusCircle)
@@ -66,15 +66,15 @@ class OperationStats extends StatsOverviewWidget
     }
 
     /**
-     * Lista de Bookings já filtrada: o corte de 2026 do dashboard entra como filtro de cadastro, para o total da lista bater
+     * Lista de Bookings já filtrada: o corte de 2026 do dashboard entra como filtro de data de solicitação, para o total da lista bater
      * com o do cartão.
      *
      * @param  array<string, array<string, mixed>>  $filters
      */
     private function listUrl(array $filters): string
     {
-        $filters += ['dteCadastro' => ['from' => DashboardPeriod::SINCE]];
-        $filters['dteCadastro'] += ['from' => DashboardPeriod::SINCE];
+        $filters += ['data_topo' => ['from' => DashboardPeriod::SINCE]];
+        $filters['data_topo'] += ['from' => DashboardPeriod::SINCE];
 
         $tab = ['i' => 'impo', 'e' => 'expo'][auth()->user()->onlyOperation()] ?? null;
 

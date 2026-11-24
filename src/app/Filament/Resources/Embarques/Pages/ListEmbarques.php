@@ -11,6 +11,12 @@ class ListEmbarques extends ListRecords
 {
     protected static string $resource = EmbarqueResource::class;
 
+    /** Lista de bookings do legado: sem seguros (têm lista própria) e sem reservas sem tipo. */
+    protected function getTableQuery(): Builder
+    {
+        return parent::getTableQuery()->inBookingList();
+    }
+
     /** Abas por operação (impor_expor): i = Importação, e = Exportação. */
     public function getTabs(): array
     {

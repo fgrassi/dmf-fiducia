@@ -7,7 +7,7 @@ use App\Models\Embarque;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Carbon;
 
-/** Reservas cadastradas no mês por modal (marítimo, aéreo, seguro...). */
+/** Reservas solicitadas no mês por modal (marítimo, aéreo, seguro...). */
 class BookingsByModal extends ChartWidget
 {
     protected static ?int $sort = 21;
@@ -32,7 +32,8 @@ class BookingsByModal extends ChartWidget
     {
         $counts = Embarque::query()
             ->ofUserOperation()
-            ->where('dteCadastro', '>=', max(today()->startOfMonth()->toDateString(), DashboardPeriod::SINCE))
+            ->inBookingList()
+            ->where('data_topo', '>=', max(today()->startOfMonth()->toDateString(), DashboardPeriod::SINCE))
             ->where('finalizado', '<>', 'c')
             ->pluck('tipo_embarque')
             ->countBy()

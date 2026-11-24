@@ -36,6 +36,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
 
 /** Reserva (módulo booking do legado), por enquanto só para a aba de despesas (D1 de despesas-embarque.md). */
@@ -65,6 +66,12 @@ class EmbarqueResource extends Resource
     public static function canAccess(): bool
     {
         return (bool) auth()->user()?->hasLegacyCredential('booking');
+    }
+
+    /** Reserva que o legado não consegue abrir (sem tipo, ou exportação sem cliente) também não abre aqui: ver Embarque::scopeOpenableInLegacy. */
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->openableInLegacy();
     }
 
     /** "Lista de Seguros" (seguro/list do legado): lista própria das reservas de seguro, no menu Booking. */

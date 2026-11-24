@@ -55,14 +55,14 @@ class EmbarquesTable
                     ->options(OperationType::options()),
                 SelectFilter::make('tipo_embarque')
                     ->label('Modal')
-                    ->options(Embarque::TYPES),
+                    ->options(array_diff_key(Embarque::TYPES, ['s' => null])),
                 SelectFilter::make('finalizado')
                     ->label('Status')
                     ->multiple()
                     ->options(Embarque::STATUSES),
                 self::dateRange('saida_prevista', 'Saída prevista'),
                 self::dateRange('chegada_prevista', 'Chegada prevista'),
-                self::dateRange('dteCadastro', 'Cadastro'),
+                self::dateRange('data_topo', 'Solicitação'),
             ])
             ->recordActions([
                 ViewAction::make(),

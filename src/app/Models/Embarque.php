@@ -44,6 +44,25 @@ class Embarque extends Model
         return $query->when(auth()->user()?->onlyOperation(), fn (Builder $q, string $operation) => $q->where('impor_expor', $operation));
     }
 
+    /**
+     * Reservas da lista de bookings (booking/list do legado) e das contagens: `tipo_embarque <> 's'` (seguro tem lista própria; em
+     * SQL o tipo nulo também fica de fora, como no legado) e com cliente. Reserva sem cliente é cadastro incompleto: não entra.
+     */
+    public function scopeInBookingList(Builder $query): Builder
+    {
+        return $query->where($this->qualifyColumn('tipo_embarque'), '<>', 's')->whereNotNull($this->qualifyColumn('cliente_id'));
+    }
+
+    /**
+     * Reservas que o legado consegue abrir: sem tipo não há template (showSuccess não existe) e a exportação sem cliente quebra
+     * no formulário de destino final (DestinoFinalForm monta `where pessoa_id =`).
+     */
+    public function scopeOpenableInLegacy(Builder $query): Builder
+    {
+        return $query->whereNotNull($this->qualifyColumn('tipo_embarque'))
+            ->where(fn (Builder $q) => $q->where($this->qualifyColumn('impor_expor'), '<>', 'e')->orWhereNull($this->qualifyColumn('impor_expor'))->orWhereNotNull($this->qualifyColumn('cliente_id')));
+    }
+
     public function cliente(): BelongsTo
     {
         return $this->belongsTo(Pessoa::class, 'cliente_id', 'pessoa_id');

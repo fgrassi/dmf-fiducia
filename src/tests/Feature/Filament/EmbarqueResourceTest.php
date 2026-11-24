@@ -100,7 +100,7 @@ class EmbarqueResourceTest extends TestCase
             'gross_weight' => 1234.5, 'net_weight' => 1000, 'carga_perigosa' => 1, 'quimico' => 2, 'super_testado' => 1, 'free_time' => 7, 'temperatura' => -18,
         ]);
 
-        $import = $this->booking(['impor_expor' => 'i', 'tipo_embarque' => 'm']);
+        $import = $this->booking(['impor_expor' => 'i', 'tipo_embarque' => 'm', 'cliente_id' => 1]);
         $goods($import, $equipment);
         Livewire::test(ViewEmbarque::class, ['record' => $import->getKey()])
             ->assertSeeInOrder(['Peças de aço', '40HC', 'IMO', 'Sim'])
@@ -663,7 +663,7 @@ class EmbarqueResourceTest extends TestCase
     /** @param  array<string, mixed>  $attributes */
     private function booking(array $attributes = []): Embarque
     {
-        return Embarque::find(DB::table('embarque')->insertGetId($attributes + ['booking' => 'BKG'.random_int(1000, 9999)]));
+        return Embarque::find(DB::table('embarque')->insertGetId($attributes + ['booking' => 'BKG'.random_int(1000, 9999), 'tipo_embarque' => 'm', 'cliente_id' => 1]));
     }
 
     /** @param  array<string, mixed>  $attributes */

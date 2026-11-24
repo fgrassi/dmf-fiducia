@@ -2,7 +2,10 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Livewire\ReportSectionTable;
+use App\Filament\Pages\DailyMovement;
 use App\Filament\Resources\Charges\Pages\ListCharges;
+use App\Filament\Resources\Embarques\EmbarqueResource;
 use App\Filament\Resources\Embarques\Pages\ListEmbarques;
 use App\Filament\Widgets\Birthdays;
 use App\Filament\Widgets\BookingsByModal;
@@ -47,9 +50,39 @@ class DashboardTest extends TestCase
             ->assertSee('Dados cadastrados desde 01/01/2026 · hoje, '.today()->format('d/m/Y'));
     }
 
-    public function test_birthdays_list_the_active_staff_of_the_year_in_month_and_day_order(): void
+    public function test_incomplete_bookings_and_insurances_stay_out_of_the_booking_list_and_counts(): void
     {
         $this->actingAs($this->user('booking'));
+        $this->booking(['booking' => 'OK']);
+        $this->booking(['booking' => 'NOTYPE', 'tipo_embarque' => null]);
+        $this->booking(['booking' => 'NOCLIENT', 'cliente_id' => null]);
+        $this->booking(['booking' => 'INSURANCE', 'tipo_embarque' => 's']);
+
+        $stats = collect($this->widgetData(OperationStats::class, 'getStats'))->keyBy(fn ($stat) => $stat->getLabel());
+        $this->assertSame('1', $stats['Reservas abertas']->getValue());
+        $this->assertSame(1, array_sum($this->widgetData(BookingsByModal::class, 'getData')['datasets'][0]['data']));
+        Livewire::test(ListEmbarques::class)->assertCanSeeTableRecords(Embarque::where('booking', 'OK')->get())->assertCountTableRecords(1);
+    }
+
+    public function test_bookings_the_legacy_cannot_open_are_not_found(): void
+    {
+        $this->actingAs($this->user('booking'));
+        $this->booking(['booking' => 'OK']);
+        $this->booking(['booking' => 'NOTYPE', 'tipo_embarque' => null]);
+        $this->booking(['booking' => 'EXPO-NOCLIENT', 'impor_expor' => 'e', 'cliente_id' => null]);
+        $this->booking(['booking' => 'IMPO-NOCLIENT', 'cliente_id' => null]);
+        $view = fn (string $booking) => $this->get(EmbarqueResource::getUrl('view', ['record' => Embarque::where('booking', $booking)->first()]));
+
+        $view('OK')->assertOk();
+        $view('IMPO-NOCLIENT')->assertOk();
+        $view('NOTYPE')->assertNotFound();
+        $view('EXPO-NOCLIENT')->assertNotFound();
+    }
+
+    public function test_birthdays_list_the_active_staff_of_the_year_in_month_and_day_order(): void
+    {
+        $this->actingAs($viewer = $this->user('booking'));
+        DB::table('pessoa_usuario')->insert(['usuario_id' => $viewer->getKey(), 'pessoa_id' => 2]);
         $person = fn (string $name, string $birthday, array $extra = [], int $company = 2) => tap(
             DB::table('usuario')->insertGetId($extra + ['nome' => $name, 'login' => $name, 'senha' => 'x', 'status' => 1, 'aniversario' => $birthday, 'fone' => '(51) 3717-1234']),
             fn (int $id) => DB::table('pessoa_usuario')->insert(['usuario_id' => $id, 'pessoa_id' => $company]),
@@ -71,6 +104,43 @@ class DashboardTest extends TestCase
             ->assertSeeInOrder(['December Person', 'Late Person', 'Early Person', 'January Person'])
             ->sortTable('nome')
             ->assertSeeInOrder(['December Person', 'Early Person', 'January Person', 'Late Person']);
+    }
+
+    public function test_birthdays_are_visible_only_to_staff_of_the_dmf_companies(): void
+    {
+        $user = $this->user('booking');
+        $this->actingAs($user);
+        $this->assertFalse(Birthdays::canView());
+        $this->get('/admin')->assertOk()->assertDontSee('Widgets\\\\Birthdays', false);
+
+        DB::table('pessoa_usuario')->insert(['usuario_id' => $user->getKey(), 'pessoa_id' => 99]);
+        $this->assertFalse(Birthdays::canView());
+
+        DB::table('pessoa_usuario')->insert(['usuario_id' => $user->getKey(), 'pessoa_id' => 3198]);
+        $this->assertTrue(Birthdays::canView());
+        $this->get('/admin')->assertOk()->assertSee('Widgets\\\\Birthdays', false);
+    }
+
+    public function test_daily_movement_section_follows_the_report_credentials(): void
+    {
+        $this->actingAs($this->user('financial'));
+        $this->get('/admin')->assertOk()->assertDontSee('Movimento diário');
+
+        $this->actingAs($this->user('manager'));
+        $this->get('/admin')->assertOk()->assertSee('Movimento diário')->assertSee('Hoje, '.today()->format('d/m/Y'))->assertSee('Cotações')->assertDontSee('Cotações Impo Aéreo');
+    }
+
+    public function test_daily_movement_joins_the_expo_and_impo_quotes_in_one_table(): void
+    {
+        $this->actingAs($this->user('manager'));
+        DB::table('pessoa')->insert(['pessoa_id' => 1, 'nome' => 'ACME']);
+        DB::table('porto')->insert([['porto_id' => 1, 'nome' => 'Santos', 'uncode' => 'BRSSZ'], ['porto_id' => 2, 'nome' => 'Roterdã', 'uncode' => 'NLRTM']]);
+        $quote = ['pessoa_id' => 1, 'porto_origem_id' => 1, 'porto_destino_id' => 2, 'transit_time' => 1, 'armador_id' => 1, 'created_by' => 7, 'created_at' => today()->toDateTimeString()];
+        DB::table('cotacao_expo')->insert($quote + ['validade' => '2026-12-01']);
+        DB::table('cotacao_impo')->insert($quote + ['free_time' => 1, 'incoterm_id' => 1, 'validade_max' => '2026-12-01', 'referencia' => 'IMPO-REF']);
+
+        Livewire::test(ReportSectionTable::class, ['page' => DailyMovement::class, 'section' => 'quotes', 'filters' => ['data_ini' => today()->toDateString(), 'data_fim' => today()->toDateString()]])
+            ->assertSeeInOrder(['Expo', 'ACME', 'Impo', 'ACME', 'IMPO-REF']);
     }
 
     public function test_widgets_state_the_dates_they_cover(): void
@@ -128,7 +198,7 @@ class DashboardTest extends TestCase
         $this->assertSame('2', $stats['Reservas abertas']->getValue());
         $this->assertSame('1', $stats['Saídas em 7 dias']->getValue());
         $this->assertSame('1', $stats['Chegadas em 7 dias']->getValue());
-        $this->assertSame('3', $stats['Cadastradas hoje']->getValue());
+        $this->assertSame('3', $stats['Solicitadas hoje']->getValue());
     }
 
     public function test_charts_group_the_month_and_the_modal(): void
@@ -213,7 +283,7 @@ class DashboardTest extends TestCase
         $this->actingAs($this->user('booking'));
         $this->booking(['booking' => 'IN', 'saida_prevista' => today()->addDays(2)->toDateString()]);
         $this->booking(['booking' => 'FAR', 'saida_prevista' => today()->addDays(30)->toDateString()]);
-        $this->booking(['booking' => 'OLD', 'dteCadastro' => '2025-06-01 10:00:00', 'saida_prevista' => today()->addDays(2)->toDateString()]);
+        $this->booking(['booking' => 'OLD', 'data_topo' => '2025-06-01 10:00:00', 'saida_prevista' => today()->addDays(2)->toDateString()]);
         $this->booking(['booking' => 'ARR', 'finalizado' => 's', 'chegada_prevista' => today()->addDays(3)->toDateString()]);
 
         $urls = collect($this->widgetData(OperationStats::class, 'getStats'))->keyBy(fn ($stat) => $stat->getLabel())->map(fn ($stat) => $stat->getUrl());
@@ -242,13 +312,21 @@ class DashboardTest extends TestCase
     public function test_data_from_before_2026_is_ignored(): void
     {
         $this->actingAs($this->user('booking', 'financial'));
-        $this->booking(['dteCadastro' => '2025-12-31 10:00:00', 'saida_prevista' => today()->addDay()->toDateString()]);
+        $this->booking(['data_topo' => '2025-12-31 10:00:00', 'saida_prevista' => today()->addDay()->toDateString()]);
         $this->charge(['total_value' => 400, 'created_at' => '2025-12-31', 'due_date' => '2025-12-31']);
 
         $this->assertSame('0', $this->widgetData(OperationStats::class, 'getStats')[0]->getValue());
         $this->assertSame('R$ 0,00', $this->widgetData(FinanceStats::class, 'getStats')[0]->getValue());
         Livewire::test(NextDepartures::class)->assertCountTableRecords(0);
         Livewire::test(OverdueCharges::class)->assertCountTableRecords(0);
+    }
+
+    public function test_the_period_follows_the_request_date_not_the_registration_date(): void
+    {
+        $this->actingAs($this->user('booking'));
+        $this->booking(['data_topo' => '2025-12-10', 'dteCadastro' => now()->toDateTimeString()]);
+
+        $this->assertSame('0', $this->widgetData(OperationStats::class, 'getStats')[0]->getValue());
     }
 
     /** @return array<string, mixed> */
@@ -267,7 +345,7 @@ class DashboardTest extends TestCase
 
     private function booking(array $attributes): void
     {
-        DB::table('embarque')->insert($attributes + ['finalizado' => 'n', 'tipo_embarque' => 'm', 'impor_expor' => 'i', 'dteCadastro' => now()->toDateTimeString()]);
+        DB::table('embarque')->insert($attributes + ['finalizado' => 'n', 'tipo_embarque' => 'm', 'impor_expor' => 'i', 'cliente_id' => 1, 'data_topo' => now()->toDateTimeString()]);
     }
 
     private function charge(array $attributes): void

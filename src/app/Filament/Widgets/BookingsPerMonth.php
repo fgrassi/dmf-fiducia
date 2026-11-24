@@ -7,7 +7,7 @@ use App\Models\Embarque;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Carbon;
 
-/** Reservas cadastradas nos últimos 12 meses, importação e exportação lado a lado. */
+/** Reservas solicitadas nos últimos 12 meses, importação e exportação lado a lado. */
 class BookingsPerMonth extends ChartWidget
 {
     protected static ?int $sort = 20;
@@ -35,11 +35,12 @@ class BookingsPerMonth extends ChartWidget
             ->values();
         $counts = Embarque::query()
             ->ofUserOperation()
-            ->where('dteCadastro', '>=', $months->first()->toDateString())
+            ->inBookingList()
+            ->where('data_topo', '>=', $months->first()->toDateString())
             ->where('finalizado', '<>', 'c')
             ->whereIn('impor_expor', ['i', 'e'])
-            ->get(['dteCadastro', 'impor_expor'])
-            ->countBy(fn (Embarque $booking) => $booking->impor_expor.substr($booking->dteCadastro, 0, 7));
+            ->get(['data_topo', 'impor_expor'])
+            ->countBy(fn (Embarque $booking) => $booking->impor_expor.substr($booking->data_topo, 0, 7));
         $series = fn (string $operation) => $months->map(fn ($month) => $counts->get($operation.$month->format('Y-m'), 0))->all();
 
         return [

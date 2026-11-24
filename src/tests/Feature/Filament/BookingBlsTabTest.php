@@ -351,7 +351,7 @@ class BookingBlsTabTest extends TestCase
 
     private function booking(array $attributes = []): Embarque
     {
-        return Embarque::find(DB::table('embarque')->insertGetId($attributes + ['booking' => 'EXP'.random_int(1000, 9999), 'impor_expor' => 'e', 'tipo_embarque' => 'm', 'pessoa_id_representante' => 55]));
+        return Embarque::find(DB::table('embarque')->insertGetId($attributes + ['booking' => 'EXP'.random_int(1000, 9999), 'impor_expor' => 'e', 'tipo_embarque' => 'm', 'cliente_id' => 1, 'pessoa_id_representante' => 55]));
     }
 
     private function user(): User

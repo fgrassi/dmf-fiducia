@@ -21,6 +21,14 @@ class Birthdays extends TableWidget
 
     protected int|string|array $columnSpan = 'full';
 
+    /** Só quem também é colaborador (vinculado às mesmas empresas) vê nomes, aniversários e telefones dos colegas. */
+    public static function canView(): bool
+    {
+        $id = auth()->id();
+
+        return $id !== null && DB::table('pessoa_usuario')->where('usuario_id', $id)->whereIn('pessoa_id', self::COMPANIES)->exists();
+    }
+
     public function table(Table $table): Table
     {
         return $table

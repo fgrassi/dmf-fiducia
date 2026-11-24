@@ -154,6 +154,48 @@ class DailyMovement extends Page
                         ->label('Responsável')
                         ->wrap(),
                 ]),
+            // Só o dashboard usa: as três listas de cotação juntas, com o tipo na primeira coluna (a página mantém as separadas).
+            'quotes' => $table
+                ->heading('Cotações')
+                ->records(fn () => $keyed(collect(['expo' => 'Expo', 'impo' => 'Impo', 'air' => 'Impo Aéreo'])
+                    ->flatMap(fn (string $label, string $kind) => array_map(fn (array $row) => $row + ['kind' => $label], $report()['quotes'][$kind]))
+                    ->all()))
+                ->recordClasses($highlight)
+                ->emptyStateHeading('Nenhuma cotação no período')
+                ->columns([
+                    TextColumn::make('kind')
+                        ->label('Tipo')
+                        ->badge(),
+                    TextColumn::make('client')
+                        ->label('Cliente')
+                        ->wrap(),
+                    TextColumn::make('reference')
+                        ->label('Referência'),
+                    TextColumn::make('agent')
+                        ->label('Agente')
+                        ->placeholder('-')
+                        ->wrap(),
+                    TextColumn::make('carrier')
+                        ->label('Armador / Cia Aérea')
+                        ->state(fn (array $record) => $record['carrier'] ?? $record['airline'] ?? null),
+                    TextColumn::make('product')
+                        ->label('Produto')
+                        ->placeholder('-'),
+                    TextColumn::make('equipment')
+                        ->label('Equipamentos')
+                        ->placeholder('-')
+                        ->listWithLineBreaks(),
+                    TextColumn::make('origin')
+                        ->label('Origem'),
+                    TextColumn::make('destination')
+                        ->label('Destino'),
+                    TextColumn::make('transshipment')
+                        ->label('Transbordo / Rota')
+                        ->state(fn (array $record) => $record['transshipment'] ?? $record['route'] ?? null),
+                    TextColumn::make('validity')
+                        ->label('Validade')
+                        ->placeholder('-'),
+                ]),
             'expo' => $table
                 ->heading('Cotações Expo')
                 ->records(fn () => $keyed($report()['quotes']['expo']))
