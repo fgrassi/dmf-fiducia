@@ -281,13 +281,15 @@ class EmbarqueResourceTest extends TestCase
         $this->actingAs($this->user('booking'));
         $booking = $this->booking(['booking' => 'IMP1']);
         DB::table('departure_confirmation')->insert(['ref_embarque' => $booking->getKey(), 'created_by' => 1, 'created_at' => '2026-11-01 10:00:00']);
+        DB::table('frase_transborda')->insert(['id' => 82, 'valor' => 'Embarque', 'categoria_id' => 10]);
+        DB::table('transborda')->insert(['embarque_id' => $booking->getKey(), 'ref_frase_transborda' => 82, 'descr' => 'CONFIRMAÇÃO DE EMBARQUE: no navio X', 'data_reg' => '2026-11-01']);
 
         Livewire::test(ViewEmbarque::class, ['record' => $booking->getKey()])
             ->set('activeRelationManager', '2')
             ->assertSee(['Confirmação', 'Confirmação de embarque', 'Confirmação de chegada']);
 
         Livewire::test(DepartureConfirmationsRelationManager::class, ['ownerRecord' => $booking, 'pageClass' => ViewEmbarque::class])
-            ->assertSee('01/11/2026 10:00');
+            ->assertSee(['Confirmado por', 'em 01/11/2026', 'CONFIRMAÇÃO DE EMBARQUE: no navio X']);
         Livewire::test(ArrivalConfirmationsRelationManager::class, ['ownerRecord' => $booking, 'pageClass' => ViewEmbarque::class])
             ->assertSee('Chegada ainda não confirmada');
     }

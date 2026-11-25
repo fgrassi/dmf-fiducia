@@ -58,6 +58,18 @@ class TrackingMailTest extends TestCase
         $this->assertStringContainsString('10/11/2026', $html);
     }
 
+    public function test_a_contact_e_mail_with_trailing_spaces_still_receives_the_message(): void
+    {
+        DB::table('usuario')->where('usuario_id', 20)->update(['email' => 'cliente@acme.com ']);
+        $booking = $this->booking(['impor_expor' => 'i']);
+        DB::table('embarque_contato_cliente')->insert(['embarque_id' => $booking->getKey(), 'usuario_id' => 20]);
+
+        app(SaveTracking::class)($booking, self::DATA, 7);
+
+        $mail = Mail::mailer('array')->getSymfonyTransport()->messages()->first()->getOriginalMessage();
+        $this->assertSame(['cliente@acme.com'], $this->addresses($mail->getTo()));
+    }
+
     public function test_export_goes_in_one_message_per_contact_type_and_only_the_shipper_gets_the_greeting(): void
     {
         $booking = $this->booking(['impor_expor' => 'e', 'pessoa_id_representante' => 55, 'porto_destino_id' => 2]);

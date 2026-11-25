@@ -16,7 +16,8 @@ use Throwable;
  * contato, com cópia oculta para tracking@, e Consignee, Notify e Agente ficam sem a saudação. O cliente com `histtxt`
  * recebe em texto puro. Frase 78 com container NOR leva o comunicado de NOR; frases 27, 29, 78 e 80 na importação levam
  * o comunicado de divergência de peso (se o arquivo existir). Diferença do legado: sem o PDF do histórico (`histpdf`) nem
- * o comunicado da MSC na duplicação, e nenhum erro de envio interrompe a gravação.
+ * o comunicado da MSC na duplicação, e nenhum erro de envio interrompe a gravação. O e-mail do contato perde os espaços das
+ * pontas (o PHPMailer do legado aceitava, o filtro não).
  */
 class SendTracking
 {
@@ -33,10 +34,16 @@ class SendTracking
 
     public function __construct(private TrackingRecipients $recipients, private BuildTrackingMessage $message, private TrackingGreeting $greeting) {}
 
-    /** @return bool false se não havia contato ou algum envio falhou */
-    public function __invoke(Embarque $booking, Transborda $tracking, int $userId): bool
+    /**
+     * @param  list<string>  $extraAttachments  caminhos no disco `tracking_uploads`, além dos avisos de NOR e divergência
+     * @param  list<string>  $cc  cópia de todas as mensagens
+     * @return bool false se não havia contato ou algum envio falhou
+     */
+    public function __invoke(Embarque $booking, Transborda $tracking, int $userId, array $extraAttachments = [], array $cc = []): bool
     {
-        $contacts = collect(($this->recipients)($booking))->filter(fn (array $contact) => filter_var($contact['email'], FILTER_VALIDATE_EMAIL));
+        $contacts = collect(($this->recipients)($booking))
+            ->map(fn (array $contact) => ['email' => trim((string) $contact['email'])] + $contact)
+            ->filter(fn (array $contact) => filter_var($contact['email'], FILTER_VALIDATE_EMAIL));
 
         if ($contacts->isEmpty()) {
             return false;
@@ -57,6 +64,7 @@ class SendTracking
         $attachments = array_filter([
             $nor ? 'tmp/transporte_mercadoria_nor.pdf' : null,
             $import && in_array($phraseId, self::DIVERGENCE_PHRASES, true) ? 'mensagens/IMPORTANTE_COMUNICADO_SOBRE_DIVERGENCIA_DE_PESO_NO_BL.pdf' : null,
+            ...$extraAttachments,
         ], fn (?string $path) => $path && Storage::disk('tracking_uploads')->exists($path));
 
         $groups = $import ? ['' => $contacts] : $contacts->groupBy('tipo');
@@ -66,7 +74,7 @@ class SendTracking
             $greeting = $plain || (! $import && in_array($type, self::WITHOUT_GREETING, true)) ? '' : ($this->greeting)($userId);
 
             try {
-                $this->deliver($booking, $group->pluck('email')->unique()->all(), $message, $greeting, $attachments);
+                $this->deliver($booking, $group->pluck('email')->unique()->all(), $message, $greeting, $attachments, $cc);
             } catch (Throwable $e) {
                 report($e);
                 $sent = false;
@@ -80,14 +88,19 @@ class SendTracking
      * @param  list<string>  $to
      * @param  array{subject: string, body: string, html: bool}  $message
      * @param  list<string>  $attachments
+     * @param  list<string>  $cc
      */
-    private function deliver(Embarque $booking, array $to, array $message, string $greeting, array $attachments): void
+    private function deliver(Embarque $booking, array $to, array $message, string $greeting, array $attachments, array $cc = []): void
     {
         $import = $booking->impor_expor === 'i';
         [$from, $fromName] = $this->sender($booking->impor_expor);
 
-        $configure = function ($mail) use ($to, $message, $attachments, $import, $from, $fromName) {
+        $configure = function ($mail) use ($to, $message, $attachments, $cc, $import, $from, $fromName) {
             $mail->from(self::SYSTEM, 'DMF Logistics')->to($to)->subject($message['subject']);
+
+            if ($cc) {
+                $mail->cc($cc);
+            }
 
             if ($from && $from !== self::SYSTEM) {
                 $mail->replyTo($from, $fromName)->replyTo('tracking@dmflog.com.br', 'DMF Tracking Team');

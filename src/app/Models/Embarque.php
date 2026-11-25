@@ -261,6 +261,18 @@ class Embarque extends Model
         return $this->hasMany(Transborda::class, 'embarque_id', 'embarque_id')->orderByDesc('data_reg')->orderByDesc('transborda_id');
     }
 
+    /** Mensagens de confirmação de saída (frases da categoria 10). */
+    public function departureTrackings(): HasMany
+    {
+        return $this->trackings()->whereHas('phrase', fn ($query) => $query->where('categoria_id', 10));
+    }
+
+    /** Mensagens de confirmação de chegada (frases da categoria 11). */
+    public function arrivalTrackings(): HasMany
+    {
+        return $this->trackings()->whereHas('phrase', fn ($query) => $query->where('categoria_id', 11));
+    }
+
     /** Alterações de rota do navio, a mais recente primeiro. */
     public function routes(): HasMany
     {
