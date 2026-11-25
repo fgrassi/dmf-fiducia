@@ -23,6 +23,7 @@ class FinExpenses extends Model
     protected array $references = [
         'fin_expenses_values' => 'ref_expense',
         'fin_expenses_matrix' => 'ref_expense',
+        'matriz_despesa_pessoa' => 'ref_expense',
         'fin_charges_items' => 'ref_expense',
     ];
 

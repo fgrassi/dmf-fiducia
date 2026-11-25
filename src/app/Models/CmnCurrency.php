@@ -21,6 +21,7 @@ class CmnCurrency extends Model
     protected array $references = [
         'fin_expenses' => 'ref_currency',
         'fin_expenses_matrix' => 'ref_currency',
+        'matriz_despesa_pessoa' => ['ref_currency', 'moeda_compra_id'],
         'fin_expenses_values' => 'ref_currency_br',
         'fin_charges_items' => 'ref_currency',
         'fin_currencies_rates' => 'ref_currency',
