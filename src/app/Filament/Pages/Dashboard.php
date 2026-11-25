@@ -8,10 +8,10 @@ use App\Filament\Widgets\Birthdays;
 use App\Filament\Widgets\BookingsByModal;
 use App\Filament\Widgets\BookingsPerMonth;
 use App\Filament\Widgets\FinanceStats;
-use App\Filament\Widgets\NextArrivals;
-use App\Filament\Widgets\NextDepartures;
+use App\Filament\Widgets\NextMovements;
 use App\Filament\Widgets\OperationStats;
 use App\Filament\Widgets\OverdueCharges;
+use App\Filament\Widgets\TopClients;
 use Filament\Actions\Action;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Schemas\Components\Component;
@@ -37,7 +37,7 @@ class Dashboard extends BaseDashboard
     /** Seções do dashboard, que podem ser recolhidas (o estado fica salvo no navegador); a ordem dos widgets é a do `$sort`. */
     private const SECTIONS = [
         'Movimento diário' => [DailyMovement::class],
-        'Operações' => [OperationStats::class, BookingsPerMonth::class, BookingsByModal::class, NextDepartures::class, NextArrivals::class],
+        'Operações' => [OperationStats::class, BookingsPerMonth::class, BookingsByModal::class, NextMovements::class, TopClients::class],
         'Financeiro' => [FinanceStats::class, OverdueCharges::class],
         'Aniversários' => [Birthdays::class],
     ];

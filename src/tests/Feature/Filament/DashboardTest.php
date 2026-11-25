@@ -11,12 +11,13 @@ use App\Filament\Widgets\Birthdays;
 use App\Filament\Widgets\BookingsByModal;
 use App\Filament\Widgets\BookingsPerMonth;
 use App\Filament\Widgets\FinanceStats;
-use App\Filament\Widgets\NextArrivals;
-use App\Filament\Widgets\NextDepartures;
+use App\Filament\Widgets\NextMovements;
 use App\Filament\Widgets\OperationStats;
 use App\Filament\Widgets\OverdueCharges;
+use App\Filament\Widgets\TopClients;
 use App\Models\Embarque;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\Concerns\LegacySchema;
@@ -30,15 +31,15 @@ class DashboardTest extends TestCase
     {
         $this->actingAs($this->user('booking'));
         $this->assertTrue(OperationStats::canView());
-        $this->assertTrue(NextDepartures::canView());
+        $this->assertTrue(NextMovements::canView());
         $this->assertFalse(FinanceStats::canView());
         $this->assertFalse(OverdueCharges::canView());
-        $this->get('/admin')->assertOk()->assertSee('Widgets\\\\NextDepartures', false)->assertSee('Widgets\\\\BookingsPerMonth', false)->assertDontSee('Widgets\\\\OverdueCharges', false);
+        $this->get('/admin')->assertOk()->assertSee('Widgets\\\\NextMovements', false)->assertSee('Widgets\\\\BookingsPerMonth', false)->assertDontSee('Widgets\\\\OverdueCharges', false);
 
         $this->actingAs($this->user('financial'));
         $this->assertFalse(OperationStats::canView());
         $this->assertTrue(FinanceStats::canView());
-        $this->get('/admin')->assertOk()->assertSee('Widgets\\\\OverdueCharges', false)->assertDontSee('Widgets\\\\NextDepartures', false);
+        $this->get('/admin')->assertOk()->assertSee('Widgets\\\\OverdueCharges', false)->assertDontSee('Widgets\\\\NextMovements', false);
     }
 
     public function test_dashboard_title_carries_the_year_and_the_dates(): void
@@ -148,7 +149,7 @@ class DashboardTest extends TestCase
         $this->actingAs($this->user('booking', 'financial'));
         $today = today()->format('d/m/Y');
 
-        Livewire::test(NextDepartures::class)->assertSee("A partir de {$today}");
+        Livewire::test(NextMovements::class)->assertSee("A partir de {$today}");
         Livewire::test(OverdueCharges::class)->assertSee("vencidas antes de {$today}");
         $this->assertStringContainsString('desde 01/01/2026', $this->widgetData(OperationStats::class, 'getDescription'));
         $this->assertStringContainsString("antes de {$today}", $this->widgetData(FinanceStats::class, 'getDescription'));
@@ -172,7 +173,7 @@ class DashboardTest extends TestCase
 
             $this->assertSame([$seen], array_column($this->widgetData(BookingsPerMonth::class, 'getData')['datasets'], 'label'));
             $this->assertSame(1, array_sum($this->widgetData(BookingsByModal::class, 'getData')['datasets'][0]['data']));
-            Livewire::test(NextDepartures::class)->assertCountTableRecords(1)->assertSee($booking);
+            Livewire::test(NextMovements::class)->assertCountTableRecords(1)->assertSee($booking);
             $this->get('/admin')->assertSee('só '.mb_strtolower($seen === 'Importação' ? 'importação' : 'exportação'));
         }
 
@@ -183,6 +184,22 @@ class DashboardTest extends TestCase
             $this->assertCount(2, $this->widgetData(BookingsPerMonth::class, 'getData')['datasets']);
             $this->assertArrayNotHasKey('tab', $this->queryOf($this->widgetData(OperationStats::class, 'getStats')[2]->getUrl()));
         }
+    }
+
+    public function test_month_rankings_count_the_non_canceled_bookings_of_the_month_by_client(): void
+    {
+        $this->actingAs($this->user('booking'));
+        $this->travelTo('2026-06-15');
+        DB::table('pessoa')->insert([['pessoa_id' => 1, 'nome' => 'ACME'], ['pessoa_id' => 2, 'nome' => 'GLOBEX']]);
+        DB::table('vendedor')->insert([['vendedor_id' => 1, 'nome' => 'MARIA'], ['vendedor_id' => 2, 'nome' => 'JOAO']]);
+        $this->booking(['cliente_id' => 2, 'vendedor_id' => 2]);
+        $this->booking(['cliente_id' => 1, 'vendedor_id' => 1]);
+        $this->booking(['cliente_id' => 1, 'vendedor_id' => 1]);
+        $this->booking(['cliente_id' => 1, 'vendedor_id' => null]);
+        $this->booking(['cliente_id' => 2, 'vendedor_id' => 2, 'finalizado' => 'c']);
+        $this->booking(['cliente_id' => 2, 'vendedor_id' => 2, 'data_topo' => '2026-05-30 10:00:00']);
+
+        Livewire::test(TopClients::class)->assertSeeInOrder(['ACME', '3', 'GLOBEX', '1']);
     }
 
     public function test_operation_stats_count_open_bookings_and_the_next_seven_days(): void
@@ -228,10 +245,10 @@ class DashboardTest extends TestCase
         $this->booking(['booking' => 'CANC', 'finalizado' => 'c', 'saida_prevista' => today()->addDay()->toDateString()]);
         $this->booking(['booking' => 'ARR', 'finalizado' => 's', 'chegada_prevista' => today()->addDay()->toDateString()]);
 
-        Livewire::test(NextDepartures::class)->assertCanSeeTableRecords(
+        Livewire::test(NextMovements::class)->assertCanSeeTableRecords(
             Embarque::whereIn('booking', ['SOON', 'LATE'])->orderBy('saida_prevista')->get(), inOrder: true,
         )->assertCountTableRecords(2);
-        Livewire::test(NextArrivals::class)->assertCountTableRecords(1);
+        Livewire::test(NextMovements::class)->callAction(TestAction::make('alternar')->table())->assertSee('Próximas chegadas')->assertCountTableRecords(1)->assertSee('ARR');
     }
 
     public function test_finance_stats_and_overdue_list_ignore_settled_charges(): void
@@ -305,7 +322,7 @@ class DashboardTest extends TestCase
         $this->booking(['saida_prevista' => today()->addDay()->toDateString()]);
         $this->charge(['total_value' => 400, 'due_date' => today()->subDay()->toDateString()]);
 
-        Livewire::withQueryParams(['page' => 45])->test(NextDepartures::class)->assertCountTableRecords(1);
+        Livewire::withQueryParams(['page' => 45])->test(NextMovements::class)->assertCountTableRecords(1);
         Livewire::withQueryParams(['page' => 45])->test(OverdueCharges::class)->assertCountTableRecords(1);
     }
 
@@ -317,7 +334,7 @@ class DashboardTest extends TestCase
 
         $this->assertSame('0', $this->widgetData(OperationStats::class, 'getStats')[0]->getValue());
         $this->assertSame('R$ 0,00', $this->widgetData(FinanceStats::class, 'getStats')[0]->getValue());
-        Livewire::test(NextDepartures::class)->assertCountTableRecords(0);
+        Livewire::test(NextMovements::class)->assertCountTableRecords(0);
         Livewire::test(OverdueCharges::class)->assertCountTableRecords(0);
     }
 
