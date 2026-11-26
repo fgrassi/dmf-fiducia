@@ -2,19 +2,17 @@
 
 namespace App\Actions\Cobranca\Recalculation;
 
+use App\Enums\Alert;
 use App\Models\Embarque;
 use App\Models\FinCharges;
 use App\Services\LegacyMath;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /** Cotações do recálculo (Cobranca::calculaCotacao / verificaCotacoes / getDataCotacao do legado). */
 class ChargeRates
 {
     /** sfConfig hora_cobranca do gerenciador: depois dela, vale a cotação do próximo dia útil. */
     private const CUTOFF = '16:00';
-
-    private const FINANCE_EMAIL = 'financeiro@dmflog.com.br';
 
     /** Cobranca::getClienteId: cliente do embarque, senão exportador/importador; -1 sem nenhum. */
     public static function clientId(Embarque $embarque): int
@@ -133,6 +131,6 @@ class ChargeRates
 
     private function notify(string $title, string $message): void
     {
-        Mail::html($message, fn ($mail) => $mail->to(self::FINANCE_EMAIL)->subject("DMF Logistics: {$title}"));
+        Alert::CurrencyRate->send("DMF Logistics: {$title}", $message);
     }
 }

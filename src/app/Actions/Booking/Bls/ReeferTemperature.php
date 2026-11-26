@@ -2,10 +2,10 @@
 
 namespace App\Actions\Booking\Bls;
 
+use App\Enums\Alert;
 use App\Models\Container;
 use App\Models\Embarque;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /** TemperaturaReeferNotification (legado): a temperatura do BL tem que bater com a da reserva nos containers reefer. */
 class ReeferTemperature
@@ -69,13 +69,13 @@ class ReeferTemperature
             }
         }
 
-        Mail::html(
+        Alert::ReeferTemperature->send(
+            '[Aviso] Temperatura REEFER divergente - '.$booking->booking,
             '<p>Foi identificada divergência entre a temperatura informada na <strong>reserva</strong> e na <strong>aprovação de BL</strong> para o booking <strong>'.e($booking->booking).'</strong>:</p>'
                 .'<table cellpadding="0" cellspacing="0" border="0"><tr>'
                 .'<td valign="top" style="padding-right: 16px"><p>Reserva:</p>'.$this->table($sides['booking']).'</td>'
                 .'<td valign="top"><p>Aprovação de BL:</p>'.$this->table($sides['bl']).'</td>'
                 .'</tr></table><p>Solicitamos a revisão deste booking para validação das informações.</p>',
-            fn ($mail) => $mail->to(['exportacao@dmflog.com.br', 'draft@dmflog.com.br'])->subject('[Aviso] Temperatura REEFER divergente - '.$booking->booking),
         );
     }
 

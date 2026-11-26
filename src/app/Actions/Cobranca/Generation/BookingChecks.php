@@ -4,12 +4,12 @@ namespace App\Actions\Cobranca\Generation;
 
 use App\Actions\Cobranca\Items\ItemPricing;
 use App\Actions\Cobranca\Recalculation\ChargeRates;
+use App\Enums\Alert;
 use App\Models\Embarque;
 use App\Models\FinExpensesValues;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * Checagens da geração da IC (Cobranca legado): verificaDespesasOrfas, verificaDespesas, verificaDespesasObrigatorias,
@@ -17,8 +17,6 @@ use Illuminate\Support\Facades\Mail;
  */
 class BookingChecks
 {
-    public const FINANCE_EMAIL = 'financeiro@dmflog.com.br';
-
     /** Regras de despesa do frete separado (separa_taxas): 4 gera a IC de frete; 4 e 9 contam como pendentes. */
     private const FREIGHT_RULE = 4;
 
@@ -206,10 +204,10 @@ class BookingChecks
         );
     }
 
-    /** geraNotificacao: e-mail ao financeiro. @param  list<string>  $also */
-    public static function notify(string $title, string $message, array $also = []): void
+    /** geraNotificacao: alerta (por padrão ao financeiro). @param  list<string>  $also */
+    public static function notify(string $title, string $message, array $also = [], Alert $alert = Alert::ChargeChecks): void
     {
-        Mail::html($message, fn ($mail) => $mail->to(array_values(array_unique([...$also, self::FINANCE_EMAIL])))->subject("DMF Logistics: {$title}"));
+        $alert->send("DMF Logistics: {$title}", $message, also: $also);
     }
 
     /** @param  list<string>  $also */

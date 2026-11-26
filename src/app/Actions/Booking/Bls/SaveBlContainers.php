@@ -3,12 +3,12 @@
 namespace App\Actions\Booking\Bls;
 
 use App\Actions\Booking\BookingLog;
+use App\Enums\Alert;
 use App\Models\Bl;
 use App\Models\Container;
 use App\Models\Embarque;
 use DomainException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * executeUpdateContainer e executeRemoveContainer (legado): os equipamentos do BL.
@@ -149,11 +149,11 @@ class SaveBlContainers
         $drafts = Container::where('bl_id', $bl->getKey())->where('tipo_container_id', Container::LCL)->get()->map(fn (Container $c) => "{$c->numero} - {$c->volume}");
         $goods = DB::table('mercadoria')->where('embarque_id', $booking->getKey())->where('tipo_container_id', Container::LCL)->get()->map(fn (object $m) => "{$m->nome} - ".number_format((float) $m->cubature, 2, ',', '.'));
 
-        Mail::html(
+        Alert::LclVolume->send(
+            "Volume de LCL divergente entre Reserva e Draft: {$booking->booking} - {$bl->bl} - {$client}",
             '<p>O volume do equipamento LCL no BL '.e($bl->bl).' está divergente do que foi informado na reserva. Gentileza verificar!</p>'
                 .'<p>Equipamentos no Draft '.e($bl->bl).'</p>'.$list($drafts)
                 .'<p>Equipamentos na Reserva '.e($booking->booking).'</p>'.$list($goods),
-            fn ($mail) => $mail->to('exportacao@dmflog.com.br')->subject("Volume de LCL divergente entre Reserva e Draft: {$booking->booking} - {$bl->bl} - {$client}"),
         );
     }
 
@@ -164,9 +164,9 @@ class SaveBlContainers
             return;
         }
 
-        Mail::html(
+        Alert::LclNotes->send(
+            '[FINANCEIRO] Alerta de Alterações - LCL: '.$booking->booking,
             '<p>O embarque '.e($booking->booking).' possui Notas Cadastradas e os dados do Container foram atualizados</p>',
-            fn ($mail) => $mail->to('financeiro@dmflog.com.br')->subject('[FINANCEIRO] Alerta de Alterações - LCL: '.$booking->booking),
         );
     }
 }

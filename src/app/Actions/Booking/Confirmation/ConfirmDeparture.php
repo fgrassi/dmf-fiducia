@@ -5,6 +5,7 @@ namespace App\Actions\Booking\Confirmation;
 use App\Actions\Booking\Bls\FinalizeBl;
 use App\Actions\Booking\GenerateValueDispatchPendency;
 use App\Actions\Booking\Tracking\SendTracking;
+use App\Enums\Alert;
 use App\Models\Bl;
 use App\Models\Embarque;
 use App\Models\Porto;
@@ -12,7 +13,6 @@ use App\Models\Transborda;
 use Carbon\Carbon;
 use DomainException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * updateConfirmacaoEmbarque act=2 (legado): confirma a saída da reserva. Grava a mensagem de rastreamento (frase 82, texto
@@ -96,7 +96,7 @@ class ConfirmDeparture
         $booking->refresh();
 
         if ($releaseCreated) {
-            Mail::html('Gentileza verificar sobre a liberação de embarque - '.$booking->booking, fn ($mail) => $mail->to('importacao@dmflog.com.br')->subject('Nova pendência de Liberação de Embarque - '.$booking->booking));
+            Alert::ReleasePending->send('Nova pendência de Liberação de Embarque - '.$booking->booking, 'Gentileza verificar sobre a liberação de embarque - '.$booking->booking);
         }
 
         if ($first) {
@@ -212,11 +212,11 @@ class ConfirmDeparture
         if ($booking->impor_expor === 'e' && DB::table('fin_expenses_values')->where('ref_embarque', $booking->getKey())->where('billing', 'a')->exists()) {
             $shipper = DB::table('pessoa')->where('pessoa_id', $booking->pessoa_id_cliente)->value('nome');
 
-            Mail::html("É necessário revisar o embarque {$booking->booking}, pois existem despesas do tipo PA", fn ($mail) => $mail->to('exportacao@dmflog.com.br')->subject("Embarque com despesas do tipo PA / {$shipper}"));
+            Alert::DeparturePa->send("Embarque com despesas do tipo PA / {$shipper}", "É necessário revisar o embarque {$booking->booking}, pois existem despesas do tipo PA");
         }
 
         if ([(int) $booking->cliente_id, (int) $booking->pessoa_id_importador] === self::DUROLINE) {
-            Mail::html("A reserva {$booking->booking} teve seu embarque confirmado e é necessário gerar o arquivo MOMAST", fn ($mail) => $mail->to('draft@dmflog.com.br')->subject("[DMF] Nova reserva Duroline/Stemco com embarque confirmado: {$booking->booking}"));
+            Alert::Momast->send("[DMF] Nova reserva Duroline/Stemco com embarque confirmado: {$booking->booking}", "A reserva {$booking->booking} teve seu embarque confirmado e é necessário gerar o arquivo MOMAST");
         }
     }
 

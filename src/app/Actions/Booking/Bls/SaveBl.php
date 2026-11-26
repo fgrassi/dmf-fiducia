@@ -3,11 +3,11 @@
 namespace App\Actions\Booking\Bls;
 
 use App\Actions\Booking\BookingLog;
+use App\Enums\Alert;
 use App\Models\Bl;
 use App\Models\Embarque;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * executeUpdateAprovacaoBl (legado): cria ou altera o BL, registra o que ficou no rastreamento
@@ -106,16 +106,14 @@ class SaveBl
             default => 'N/D',
         };
 
-        Mail::html(
+        ($booking->impor_expor === 'i' ? Alert::FreightPlaceImport : Alert::FreightPlaceExport)->send(
+            '[ALERTA] Inconsistência de Local de Pagamento de Frete: '.$booking->booking,
             '<p>Gentileza notar que há inconsistência entre a informação de local de pagamento do frete e as depesas lançadas no sistema. Gentileza verificar.</p><ul>'
                 .'<li>Reserva: '.e($booking->booking).'</li>'
                 .'<li>BL: '.e($bl->bl).'</li>'
                 .'<li>Cliente: '.e($client).'</li>'
                 .'<li>Local de Pagamento do Frete (BL): '.e($freightAt).'</li>'
                 ."<li>Local de Pagamento do Frete (Reserva): {$bookingFreight}</li></ul>",
-            fn ($mail) => $mail
-                ->to($booking->impor_expor === 'i' ? ['importacao@dmflog.com.br', 'docimportacao@dmflog.com.br'] : ['exportacao@dmflog.com.br', 'draft@dmflog.com.br'])
-                ->subject('[ALERTA] Inconsistência de Local de Pagamento de Frete: '.$booking->booking),
         );
 
         $this->log->track($booking->getKey(), 'Inconsistência de Local de Pagamento de Frete', 'Inconsistência de Local de Pagamento de Frete', $userId, 'u');

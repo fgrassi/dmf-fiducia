@@ -3,6 +3,7 @@
 namespace App\Actions\Booking\Creation;
 
 use App\Actions\Notices\SendNoticeMail;
+use App\Enums\Alert;
 use App\Models\Embarque;
 use App\Models\FinExpensesValues;
 use Illuminate\Database\Query\Builder;
@@ -325,11 +326,12 @@ class ImportExpenseMatrix
 
     private function notifyGuarantee(Embarque $booking): void
     {
-        ($this->send)(
+        Alert::GuaranteeDepositReview->enabled() && ($this->send)(
             "Revisão de Reserva - Depósito de Garantia: {$booking->booking}",
             '<h3>Matriz de Despesas - Depósito de Garantia</h3><p>Prezado usuário.<br/>A reserva '.e((string) $booking->booking)
                 .' teve despesas atualizadas a partir da Matriz de Despesas - Depósito de Garantia.<br/>É necessário verificar os valores de venda (S/R).</p>',
-            ['importacao@dmflog.com.br', 'marcia@dmflog.com.br'],
+            Alert::GuaranteeDepositReview->recipients(),
+            cc: Alert::GuaranteeDepositReview->copies(),
             from: 'system@dmflog.com.br',
             fromName: 'DMF Logistics do Brasil - System Notification',
         );

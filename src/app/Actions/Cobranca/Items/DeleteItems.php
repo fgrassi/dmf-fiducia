@@ -2,6 +2,7 @@
 
 namespace App\Actions\Cobranca\Items;
 
+use App\Enums\Alert;
 use App\Enums\Cobranca\ChargeStatus;
 use App\Models\FinCharges;
 use App\Models\FinChargesLog;
@@ -9,7 +10,6 @@ use App\Models\User;
 use App\Services\Cobranca\ChargeDetails;
 use DomainException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * excluirItensIc (legado, Cobranca::excluirItensCobranca): remove despesas de uma cobrança em aberto,
@@ -17,9 +17,6 @@ use Illuminate\Support\Facades\Mail;
  */
 class DeleteItems
 {
-    /** Cobranca::getRecipientList('financial'): o legado usa só o e-mail do grupo. */
-    private const FINANCE_EMAIL = 'financeiro@dmflog.com.br';
-
     private const MIN_JUSTIFICATION = 15;
 
     public function __construct(private ChargeIof $iof) {}
@@ -116,7 +113,7 @@ class DeleteItems
         $issuedNfse = self::hasIssuedNfse($charge);
         $booking = (string) $charge->embarque->booking;
 
-        Mail::send('mail.cobranca.items-deleted', [
+        Alert::ChargeItemsDeleted->send("DMF Logistics: Exclusão de despesas na IC #{$charge->id}".($booking !== '' ? " — {$booking}" : ''), view('mail.cobranca.items-deleted', [
             'charge' => $charge,
             'booking' => $booking,
             'user' => $user?->getFilamentName() ?: 'Sistema',
@@ -127,9 +124,7 @@ class DeleteItems
             'iof' => self::brl($charge->valor_iof),
             'history' => $history,
             'issuedNfse' => $issuedNfse,
-        ], fn ($mail) => $mail
-            ->to(self::FINANCE_EMAIL)
-            ->subject("DMF Logistics: Exclusão de despesas na IC #{$charge->id}".($booking !== '' ? " — {$booking}" : '')));
+        ])->render());
 
         return 'Despesa(s) excluída(s) com sucesso.'
             .($issuedNfse ? ' Recalcule a cobrança e atualize a NFS-e com o valor atual.' : '');

@@ -5,6 +5,7 @@ namespace App\Actions\Booking\Creation;
 use App\Actions\Booking\BookingLog;
 use App\Actions\Booking\SellerRestriction;
 use App\Actions\Notices\SendNoticeMail;
+use App\Enums\Alert;
 use App\Enums\AmsDestination;
 use App\Models\Bl;
 use App\Models\Container;
@@ -310,12 +311,13 @@ class CreateBooking
             $justification,
         );
 
-        DB::afterCommit(fn () => ($this->send)(
+        DB::afterCommit(fn () => Alert::MandatoryInsuranceWaived->enabled() && ($this->send)(
             "[Aviso] Cliente com Seguro Obrigatório sem Reserva de Seguro - {$booking->booking}",
             "<h3>Seguro Obrigatório</h3><p>O cliente <b>{$client}</b> possui em nosso sistema o controle de Seguro Obrigatório.</p>"
                 ."<p>Entretanto, o usuário {$who} informou que não é necessário contratar seguro para a reserva <b>".e((string) $booking->booking).'</b> criada no dia '
                 .now()->format('d/m/Y \à\s H:i').' conforme justificativa abaixo:</p><p>Justificativa: '.nl2br(e($justification)).'</p>',
-            ['importacao@dmflog.com.br', 'marcia@dmflog.com.br'],
+            Alert::MandatoryInsuranceWaived->recipients(),
+            cc: Alert::MandatoryInsuranceWaived->copies(),
         ));
     }
 
@@ -329,13 +331,14 @@ class CreateBooking
             'Porto de Destino' => $booking->portoDestino?->nome,
         ];
 
-        ($this->send)(
+        Alert::DirectBlCollect->enabled() && ($this->send)(
             "[Aviso] Reserva com BL DIRETO: SIM e Local Pagamento: CC - {$booking->booking}",
             '<p>Gentileza notar que a reserva <strong>'.e((string) $booking->booking).'</strong> atende as condições:</p>'
                 .'<ul><li>BL DIRETO: Sim</li><li>Local de Pagamento do Frete: CC</li></ul>'
                 .'<p>Solicitamos a revisão deste booking para validação das informações.</p><p><strong>Dados do Booking:</strong></p><ul>'
                 .collect($lines)->map(fn ($value, $label) => "<li>{$label}: ".e((string) $value).'</li>')->implode('').'</ul>',
-            ['exportacao@dmflog.com.br'],
+            Alert::DirectBlCollect->recipients(),
+            cc: Alert::DirectBlCollect->copies(),
         );
     }
 }

@@ -2,9 +2,9 @@
 
 namespace App\Actions\Carriers;
 
+use App\Enums\Alert;
 use App\Models\FinExpensesMatrix;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * armador/verificaDespesa (legado), chamado a cada despesa nova da matriz.
@@ -15,13 +15,10 @@ use Illuminate\Support\Facades\Mail;
  */
 class MatrixChangeNotice
 {
-    private const FINANCE = 'financeiro@dmflog.com.br';
-
-    private const IT = 'chamado@dmflog.com.br';
-
+    /** Setor no assunto e alerta (destinatários) por operação. */
     private const SECTORS = [
-        'i' => ['IMPO', 'importacao@dmflog.com.br'],
-        'e' => ['EXPO', 'exportacao@dmflog.com.br'],
+        'i' => ['IMPO', Alert::CarrierMatrixImport],
+        'e' => ['EXPO', Alert::CarrierMatrixExport],
     ];
 
     private const IMPORT_WARNING = '<br/><strong>Note que as taxas portuárias são repasse dos valores cobrados pelas Cias Marítimas e estão sujeitas a alteração/reajuste sem aviso prévio e sem emissão de comunicado pelos armadores.</strong>'
@@ -30,7 +27,7 @@ class MatrixChangeNotice
     public function __invoke(FinExpensesMatrix $new, string $userName): void
     {
         $operation = $new->type === 'i' ? 'i' : 'e';
-        [$sector, $sectorEmail] = self::SECTORS[$operation];
+        [$sector, $alert] = self::SECTORS[$operation];
 
         $replaced = FinExpensesMatrix::query()
             ->where('ref_armador_porto', $new->ref_armador_porto)
@@ -44,11 +41,11 @@ class MatrixChangeNotice
             ->get();
 
         $replaced->isNotEmpty()
-            ? $this->noticeReplaced($new, $replaced, $operation, $sector, $sectorEmail)
-            : $this->noticeNew($new, $userName, $operation, $sector, $sectorEmail);
+            ? $this->noticeReplaced($new, $replaced, $operation, $sector, $alert)
+            : $this->noticeNew($new, $userName, $operation, $sector, $alert);
     }
 
-    private function noticeReplaced(FinExpensesMatrix $new, $replaced, string $operation, string $sector, string $sectorEmail): void
+    private function noticeReplaced(FinExpensesMatrix $new, $replaced, string $operation, string $sector, Alert $alert): void
     {
         foreach ($replaced as $old) {
             $old->update(['due_to' => $new->due_from]);
@@ -80,10 +77,10 @@ class MatrixChangeNotice
             : 'Os seguintes embarques possuem taxas de origem que sofreram alterações e precisam ser revisados.')
             ."<br/><ul>{$lines}</ul>".($operation === 'i' ? self::IMPORT_WARNING : '');
 
-        $this->send($sector, $sectorEmail, "Atualizacão de taxas [{$sector}]", $message);
+        $alert->send("Atualizacão de taxas [{$sector}]", $message);
     }
 
-    private function noticeNew(FinExpensesMatrix $new, string $userName, string $operation, string $sector, string $sectorEmail): void
+    private function noticeNew(FinExpensesMatrix $new, string $userName, string $operation, string $sector, Alert $alert): void
     {
         $port = $new->armadorPorto;
 
@@ -102,7 +99,7 @@ class MatrixChangeNotice
         $message = 'Uma nova taxa foi cadastrada na Matriz do Despesas pelo usuario '.e($userName)." e os seguintes embarques precisam ser revisados.<br/><ul>{$lines}</ul>"
             .($operation === 'i' ? self::IMPORT_WARNING : '');
 
-        $this->send($sector, $sectorEmail, "Atualizacão de taxas [{$sector}]: Nova despesa Armador ".$port->armador->nome, $message);
+        $alert->send("Atualizacão de taxas [{$sector}]: Nova despesa Armador ".$port->armador->nome, $message);
     }
 
     /** Embarques master abertos do armador no porto (destino na importação, origem na exportação) com previsão a partir da data. */
@@ -122,12 +119,5 @@ class MatrixChangeNotice
             ->where('e.tipo_embarque', 'm')
             ->distinct()
             ->select('e.embarque_id', 'e.booking', 'p.nome as cliente');
-    }
-
-    private function send(string $sector, string $sectorEmail, string $subject, string $message): void
-    {
-        Mail::html($message, fn ($mail) => $mail
-            ->to([$sectorEmail, self::FINANCE, self::IT])
-            ->subject($subject));
     }
 }

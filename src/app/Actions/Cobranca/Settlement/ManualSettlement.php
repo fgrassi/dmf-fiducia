@@ -3,13 +3,13 @@
 namespace App\Actions\Cobranca\Settlement;
 
 use App\Actions\Cobranca\Nfse\IssueNfse;
+use App\Enums\Alert;
 use App\Enums\Cobranca\ChargeStatus;
 use App\Models\FinCharges;
 use App\Models\FinChargesLog;
 use App\Models\User;
 use DomainException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * baixaManual (legado): baixa a IC com justificativa (status 3), opcionalmente libera o embarque
@@ -17,8 +17,6 @@ use Illuminate\Support\Facades\Mail;
  */
 class ManualSettlement
 {
-    private const FINANCE_EMAIL = 'financeiro@dmflog.com.br';
-
     public function __construct(private IssueNfse $nfse) {}
 
     /**
@@ -78,9 +76,9 @@ class ManualSettlement
             ]);
         });
 
-        Mail::html(
+        Alert::ManualSettlement->send(
+            'DMF Logistics: Cobrança com Baixa Manual',
             "A cobranca do embarque {$charge->embarque->booking} sofreu baixa manual, com a seguinte justificativa e responsável: ".e($obs),
-            fn ($mail) => $mail->to(self::FINANCE_EMAIL)->subject('DMF Logistics: Cobrança com Baixa Manual'),
         );
 
         return $this->nfse->forCharge($charge, $nfse, IssueNfse::SETTLEMENT, $user->getKey());

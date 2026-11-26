@@ -4,6 +4,7 @@ namespace App\Actions\Cobranca\Receipts;
 
 use App\Actions\Cobranca\Items\DeleteItems;
 use App\Actions\Cobranca\Maintenance\DeleteCharge;
+use App\Enums\Alert;
 use App\Enums\Cobranca\ChargeStatus;
 use App\Models\CmnFile;
 use App\Models\FinCharges;
@@ -11,7 +12,6 @@ use App\Models\FinChargesLog;
 use App\Models\User;
 use DomainException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * deleteRecibo (legado): remove todos os recibos e declarações da IC (e seus cmn_files)
@@ -72,6 +72,6 @@ class DeleteReceipts
             ]);
         });
 
-        Mail::raw($message, fn ($mail) => $mail->to(DeleteCharge::COLLECTION_EMAIL)->subject('Recibo/Declaração Excluída'));
+        Alert::ReceiptDeleted->send('Recibo/Declaração Excluída', e($message));
     }
 }

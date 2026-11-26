@@ -3,6 +3,7 @@
 namespace App\Actions\Followup;
 
 use App\Actions\Notices\SendNoticeMail;
+use App\Enums\Alert;
 use App\Models\AvaliacaoCliente;
 use App\Models\CmnClientFup;
 use App\Models\Pessoa;
@@ -17,9 +18,6 @@ use Illuminate\Support\Facades\DB;
  */
 class SaveFollowUp
 {
-    /** Quem recebe o aviso de um follow up já enviado que foi alterado (fixos no legado). */
-    private const CHANGE_NOTICE_TO = ['priscila@dmflog.com.br', 'fernando@dmflog.com.br'];
-
     /**
      * @param  array{ref_pessoa?: int, tipo?: string, volume_embarques?: int, abertura?: int, cidades_id?: ?int, data_ocorrencia: string, descr: string, data_proximo_contato?: ?string, obs?: ?string}  $data
      */
@@ -71,13 +69,14 @@ class SaveFollowUp
 
     private function update(CmnClientFup $fup, array $data, User $user): void
     {
-        if ($fup->status == 1) {
+        if ($fup->status == 1 && Alert::FollowUpChanged->enabled()) {
             (new SendNoticeMail)(
                 'FUP alterado',
                 'O FUP abaixo já havia sido enviado e foi alterado pelo usuario '.e($user->nome)
                 .' <br />Cliente: '.e($fup->pessoa?->nome).'<br /><br />Antiga descricão: <br />'.nl2br(e($fup->descr))
                 .' <br /> Nova descricão: <br />'.nl2br(e($data['descr'])),
-                self::CHANGE_NOTICE_TO,
+                Alert::FollowUpChanged->recipients(),
+                cc: Alert::FollowUpChanged->copies(),
                 from: 'system@dmflog.com.br',
             );
         }

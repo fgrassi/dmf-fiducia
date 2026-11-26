@@ -2,12 +2,12 @@
 
 namespace App\Actions\Brokers;
 
+use App\Enums\Alert;
 use App\Models\DespachantePorto;
 use App\Models\MatrizDespesaDespachante;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * despachante/saveExpense (legado): grava a despesa da matriz do despachante no porto. As outras despesas vigentes iguais
@@ -18,10 +18,6 @@ use Illuminate\Support\Facades\Mail;
  */
 class SaveBrokerExpense
 {
-    private const IMPORT_TO = ['imp2@dmflog.com.br', 'imp3@dmflog.com.br', 'imp4@dmflog.com.br', 'financeiro@dmflog.com.br'];
-
-    private const EXPORT_TO = ['export@dmflog.com.br'];
-
     private const IMPORT_WARNING = '<br/><strong>Note que as taxas portuárias são repasse dos valores cobrados pelas Cias Marítimas e estão sujeitas a alteração/reajuste sem aviso prévio e sem emissão de comunicado pelos armadores.</strong>'
         .'<strong>As taxas de destino (BL Fee, Capatazia, DPP, EHC, ISPS dentre outros) são cobradas de acordo com o valor vigente na data de chegada do container ao porto de descarga.</strong>';
 
@@ -93,8 +89,6 @@ class SaveBrokerExpense
         $message = "Os seguintes embarques possuem taxas locais que sofreram alteracões e precisam ser revisados.<br/><ul>{$lines}</ul>"
             .($type === 'i' ? self::IMPORT_WARNING : '');
 
-        Mail::html($message, fn ($mail) => $mail
-            ->to($type === 'i' ? self::IMPORT_TO : self::EXPORT_TO)
-            ->subject('Atualizacão de taxas'));
+        ($type === 'i' ? Alert::BrokerRatesImport : Alert::BrokerRatesExport)->send('Atualizacão de taxas', $message);
     }
 }

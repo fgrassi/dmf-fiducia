@@ -3,10 +3,10 @@
 namespace App\Actions\Booking\Route;
 
 use App\Actions\Booking\Tracking\SaveTracking;
+use App\Enums\Alert;
 use App\Models\Embarque;
 use App\Models\EmbarqueRota;
 use App\Models\Navio;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * updateRota (legado): grava a alteração de rota do navio e lança a mensagem "rota alterada" (frase 105) no
@@ -19,8 +19,6 @@ class SaveRoute
     public const PHRASE = 105;
 
     private const LARGE_SHIP_METERS = 300;
-
-    private const LARGE_SHIP_ALERT = ['diego@dmflog.com.br', 'trackingimp@dmflog.com.br', 'importacao@dmflog.com.br'];
 
     /** @var list<int> */
     public array $unsent = [];
@@ -78,9 +76,6 @@ class SaveRoute
             .$row('Booking', $booking->booking)
             .'</table>';
 
-        Mail::html($html, fn ($mail) => $mail
-            ->from('system@dmflog.com.br', 'DMF Logistics')
-            ->to(self::LARGE_SHIP_ALERT)
-            ->subject('[Aviso] Navio com mais de 300 metros de comprimento'));
+        Alert::LargeShip->send('[Aviso] Navio com mais de 300 metros de comprimento', $html, fn ($mail) => $mail->from('system@dmflog.com.br', 'DMF Logistics'));
     }
 }

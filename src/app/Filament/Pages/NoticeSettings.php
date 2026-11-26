@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Actions\Notices\NoticeTexts;
 use App\Actions\Notices\RenderNoticeEmail;
 use App\Actions\Notices\UpdateNoticeSetting;
+use App\Enums\Alert;
 use App\Enums\Notice;
 use App\Enums\Routine;
 use App\Models\NoticeSetting;
@@ -36,7 +37,8 @@ use UnitEnum;
 
 /**
  * Avisos automáticos por e-mail (cron): qual e-mail é enviado, quando, para quem, e se está ligado (como Email Notifications do
- * soprano-app). Na outra aba, as rotinas agendadas que geram dados (cobranças, ordens de pagamento, resumos das capas).
+ * soprano-app). Nas outras abas, os alertas internos disparados por ações no sistema (só liga/desliga e destinatários) e as rotinas
+ * agendadas que geram dados (cobranças, ordens de pagamento, resumos das capas).
  */
 class NoticeSettings extends Page implements HasTable
 {
@@ -73,6 +75,7 @@ class NoticeSettings extends Page implements HasTable
                 ->contained(false)
                 ->tabs([
                     'avisos' => Tab::make('Avisos por e-mail'),
+                    'alertas' => Tab::make('Alertas do sistema'),
                     'rotinas' => Tab::make('Rotinas de geração'),
                 ]),
             EmbeddedTable::make(),
@@ -106,12 +109,12 @@ class NoticeSettings extends Page implements HasTable
                     }),
                 TextColumn::make('to')
                     ->label('Para')
-                    ->visible(fn (): bool => $this->activeTab === 'avisos')
+                    ->visible(fn (): bool => $this->activeTab !== 'rotinas')
                     ->state(fn (array $record): string => $record['to'] ? implode(', ', $record['to']) : 'Contatos da reserva')
                     ->wrap(),
                 TextColumn::make('cc')
                     ->label('Cópia')
-                    ->visible(fn (): bool => $this->activeTab === 'avisos')
+                    ->visible(fn (): bool => $this->activeTab !== 'rotinas')
                     ->state(fn (array $record): string => ($record['cc'] && $record['copy_label'] !== 'Cópia' ? '(oculta) ' : '').implode(', ', $record['cc']))
                     ->placeholder('—')
                     ->wrap(),
@@ -183,11 +186,15 @@ class NoticeSettings extends Page implements HasTable
     /** @return list<array<string, mixed>> */
     private function records(?string $search, ?string $sortColumn = null, ?string $sortDirection = null): array
     {
-        $cases = $this->activeTab === 'rotinas' ? Routine::cases() : Notice::cases();
+        $cases = match ($this->activeTab) {
+            'alertas' => Alert::cases(),
+            'rotinas' => Routine::cases(),
+            default => Notice::cases(),
+        };
         $settings = NoticeSetting::all()->keyBy('notice');
 
         return collect($cases)
-            ->map(fn (Notice|Routine $case): array => [
+            ->map(fn (Notice|Alert|Routine $case): array => [
                 '__key' => $case->value,
                 'notice' => $case->value,
                 'routine' => $case instanceof Routine,
@@ -196,8 +203,8 @@ class NoticeSettings extends Page implements HasTable
                 'time' => $case->time(),
                 'weekdays' => $case->weekdays(),
                 'enabled' => $case->enabled(),
-                'to' => $case instanceof Notice && $case->hasFixedRecipients() ? $case->recipients() : [],
-                'cc' => $case instanceof Notice ? $case->copies() : [],
+                'to' => $case instanceof Alert || ($case instanceof Notice && $case->hasFixedRecipients()) ? $case->recipients() : [],
+                'cc' => $case instanceof Routine ? [] : $case->copies(),
                 'subject' => $case instanceof Notice ? $settings->get($case->value)?->subject : null,
                 'body' => $case instanceof Notice ? $settings->get($case->value)?->body : null,
                 'default_subject' => $case instanceof Notice ? NoticeTexts::for($case)['subject'] : null,
@@ -287,8 +294,8 @@ class NoticeSettings extends Page implements HasTable
     }
 
     /** @param  array<string, mixed>  $record */
-    private function setting(array $record): Notice|Routine
+    private function setting(array $record): Notice|Alert|Routine
     {
-        return Notice::tryFrom($record['notice']) ?? Routine::from($record['notice']);
+        return Notice::tryFrom($record['notice']) ?? Alert::tryFrom($record['notice']) ?? Routine::from($record['notice']);
     }
 }

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Filament;
 
 use App\Actions\Notices\NoticeTexts;
+use App\Enums\Alert;
 use App\Enums\Notice;
 use App\Enums\Routine;
 use App\Filament\Pages\NoticeSettings;
@@ -171,6 +172,24 @@ class NoticeSettingsTest extends TestCase
         $this->assertSame('03:15', Routine::GenerateCoverSummaries->time());
         $this->assertFalse(Routine::GenerateCharges->enabled());
         $this->assertNull(Routine::GenerateCharges->time());
+    }
+
+    public function test_alerts_tab_edits_the_switch_recipients_and_copy_of_an_alert(): void
+    {
+        $this->actingAs($this->user('financial'));
+
+        Livewire::test(NoticeSettings::class)
+            ->set('activeTab', 'alertas')
+            ->assertCanSeeTableRecords([Alert::ManualSettlement->value])
+            ->assertCanNotSeeTableRecords([Notice::HapagPending->value])
+            ->callAction(TestAction::make('edit')->table(Alert::ManualSettlement->value), ['enabled' => false, 'recipients' => ['novo@dmflog.com.br'], 'cc' => ['copia@dmflog.com.br']])
+            ->assertHasNoActionErrors()
+            ->callAction(TestAction::make('edit')->table(Alert::ManualSettlement->value), ['recipients' => []])
+            ->assertHasActionErrors(['recipients' => 'required']);
+
+        $this->assertFalse(Alert::ManualSettlement->enabled());
+        $this->assertSame(['novo@dmflog.com.br'], Alert::ManualSettlement->recipients());
+        $this->assertSame(['copia@dmflog.com.br'], Alert::ManualSettlement->copies());
     }
 
     public function test_edit_rejects_an_invalid_address_and_an_empty_recipient_list(): void

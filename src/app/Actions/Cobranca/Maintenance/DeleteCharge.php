@@ -3,12 +3,12 @@
 namespace App\Actions\Cobranca\Maintenance;
 
 use App\Actions\Cobranca\Items\DeleteItems;
+use App\Enums\Alert;
 use App\Models\FinCharges;
 use App\Models\FinChargesLog;
 use App\Models\User;
 use DomainException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * deleteCobranca (legado): exclui a IC com itens, arquivos, boletos e cotações negociadas,
@@ -16,8 +16,6 @@ use Illuminate\Support\Facades\Mail;
  */
 class DeleteCharge
 {
-    public const COLLECTION_EMAIL = 'cobranca@dmflog.com.br';
-
     /** Botão "Excluir" e "Remover recibo": manager/admin/excluir_cobranca. */
     public static function allowed(?User $user): bool
     {
@@ -107,6 +105,6 @@ class DeleteCharge
             $embarque->forceFill(['ctr_desp' => 1])->save();
         });
 
-        Mail::raw($message, fn ($mail) => $mail->to(self::COLLECTION_EMAIL)->subject('Cobranca Excluída'));
+        Alert::ChargeDeleted->send('Cobranca Excluída', e($message));
     }
 }

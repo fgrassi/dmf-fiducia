@@ -2,6 +2,7 @@
 
 namespace App\Actions\Booking\Bls;
 
+use App\Enums\Alert;
 use App\Models\Bl;
 use App\Models\CmnFile;
 use App\Models\Embarque;
@@ -113,6 +114,6 @@ class FinalizeBl
             return;
         }
 
-        Mail::html('Favor atualizar os valores conforme os dados atualizados da carga', fn ($mail) => $mail->to('importacao@dmflog.com.br')->subject('Verificar despesas - '.$booking->booking));
+        Alert::BlExpensesReview->send('Verificar despesas - '.$booking->booking, 'Favor atualizar os valores conforme os dados atualizados da carga');
     }
 }

@@ -4,6 +4,7 @@ namespace App\Actions\InvoiceControls;
 
 use App\Actions\Cobranca\Generation\BookingChecks;
 use App\Actions\Cobranca\Generation\GenerateCharges;
+use App\Enums\Alert;
 use App\Models\Embarque;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -109,7 +110,7 @@ class InvoiceGate
         BookingChecks::notify('Controle de Invoice: pendentes e aguardando arquivo',
             '<table cellpadding="4" border="1" style="border-collapse:collapse">'
             .'<tr><th>Armador</th><th>Reserva</th><th>Cliente</th><th>MBL</th><th>Criado em</th><th>ETD</th><th>ETA</th><th>Liberado em</th><th>Situação</th></tr>'
-            .$lines.'</table>');
+            .$lines.'</table>', alert: Alert::InvoiceControlPending);
     }
 
     /** montarItemDigestInvoice. @return array<string, string> */

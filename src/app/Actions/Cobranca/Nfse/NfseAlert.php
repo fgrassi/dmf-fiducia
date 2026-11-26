@@ -2,21 +2,19 @@
 
 namespace App\Actions\Cobranca\Nfse;
 
+use App\Enums\Alert;
 use App\Models\Embarque;
 use App\Models\FinCharges;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
- * enviarAlertaNfseGeracaoCobranca (legado): avisa o financeiro (cópia para chamado@) das NFS-e que não saíram
+ * enviarAlertaNfseGeracaoCobranca (legado): avisa (por padrão o financeiro, cópia para chamado@) das NFS-e que não saíram
  * na geração/recálculo da IC. Sem número de cobrança, a IC nem foi gerada (tomador inválido).
  *
  * @phpstan-type Row array{charge:?int, booking:string, bl:string, client:string, error:string}
  */
 class NfseAlert
 {
-    private const FINANCE_EMAIL = 'financeiro@dmflog.com.br';
-
     /** @return Row */
     public static function row(FinCharges $charge, string $error): array
     {
@@ -50,7 +48,8 @@ class NfseAlert
                 ->implode('').'</tr>')
             ->implode('');
 
-        Mail::html(
+        Alert::NfseNotIssued->send(
+            'DMF Logistics: '.count($rows).' NFSe(s) não emitida(s) na geração da instrução de cobrança',
             'As reservas abaixo não tiveram NFSe emitida automaticamente. '
                 .'Quando a cobrança está em branco, a IC não foi gerada (CNPJ/CPF do tomador inválido ou ausente) '
                 .'e o cron tentará novamente após a correção do Consignee/Shipper do BL. '
@@ -58,8 +57,6 @@ class NfseAlert
                 .'<table cellpadding="4" border="1" style="border-collapse:collapse">'
                 .'<tr><th>Cobrança</th><th>Booking</th><th>BL</th><th>Cliente</th><th>Erro</th></tr>'
                 .$lines.'</table>',
-            fn ($mail) => $mail->to(self::FINANCE_EMAIL)->cc('chamado@dmflog.com.br')
-                ->subject('DMF Logistics: '.count($rows).' NFSe(s) não emitida(s) na geração da instrução de cobrança'),
         );
     }
 }

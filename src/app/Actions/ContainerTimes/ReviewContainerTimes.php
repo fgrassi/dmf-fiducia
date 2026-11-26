@@ -2,12 +2,12 @@
 
 namespace App\Actions\ContainerTimes;
 
+use App\Enums\Alert;
 use App\Enums\ContainerTime;
 use App\Models\Embarque;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * Fim do executeSaveDemurrage / executeSaveDetention (legado): com todos os containers da reserva devolvidos, avisa o
@@ -83,13 +83,10 @@ class ReviewContainerTimes
             ])->all(),
         ])->render();
 
-        [$from, $group, $name] = $type === ContainerTime::Demurrage
-            ? ['system@dmflog.com.br', 'info_demurrage@dmflog.com.br', 'Grupo Demurrage']
-            : ['detention@dmflog.com.br', 'detention@dmflog.com.br', 'Detention Group'];
+        [$alert, $from] = $type === ContainerTime::Demurrage
+            ? [Alert::Demurrage, 'system@dmflog.com.br']
+            : [Alert::Detention, 'detention@dmflog.com.br'];
 
-        Mail::html($html, fn ($mail) => $mail
-            ->from($from, 'DMF Logistics')
-            ->to($group, $name)
-            ->subject("Embarque com incidencia de {$label}"));
+        $alert->send("Embarque com incidencia de {$label}", $html, fn ($mail) => $mail->from($from, 'DMF Logistics'));
     }
 }

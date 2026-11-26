@@ -2,6 +2,7 @@
 
 namespace App\Actions\Cobranca\Generation;
 
+use App\Enums\Alert;
 use App\Models\Embarque;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -33,7 +34,7 @@ class GenerateManualCharge
         );
 
         BookingChecks::notify("Cobrança gerada manualmente:{$b->booking}",
-            "<p>A reserva {$b->booking} teve a cobrança gerada manualmente pelo usuario {$user->getFilamentName()}.");
+            "<p>A reserva {$b->booking} teve a cobrança gerada manualmente pelo usuario {$user->getFilamentName()}.", alert: Alert::ChargeGeneratedManually);
 
         return $created;
     }

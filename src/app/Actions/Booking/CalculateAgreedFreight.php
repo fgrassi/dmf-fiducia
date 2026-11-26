@@ -2,11 +2,11 @@
 
 namespace App\Actions\Booking;
 
+use App\Enums\Alert;
 use App\Models\Embarque;
 use App\Models\FinExpensesValues;
 use DomainException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * booking/addValorFrete (legado, "Calcular Frete" e "Frete acordado"): monta o texto do valor do House BL a partir das
@@ -43,8 +43,6 @@ class CalculateAgreedFreight
     private const FCL_FREIGHT = [1, 200];
 
     private const AIR_FREIGHT = 73;
-
-    private const NOTICE_TO = ['Documentação', 'docimportacao@dmflog.com.br'];
 
     /**
      * @param  list<int>  $expenseIds  ids de fin_expenses_values marcadas
@@ -193,8 +191,6 @@ class CalculateAgreedFreight
             .$row('Atualizado em', now()->format('d/m/Y H:i:s'))
             .'</table></td></tr><tr><td><hr/></td></tr></table>';
 
-        Mail::html($html, fn ($mail) => $mail
-            ->to(self::NOTICE_TO[1], self::NOTICE_TO[0])
-            ->subject("[AVISO] Atualização de valor House BL | {$booking->booking} | {$importer}"));
+        Alert::HouseBlValue->send("[AVISO] Atualização de valor House BL | {$booking->booking} | {$importer}", $html);
     }
 }

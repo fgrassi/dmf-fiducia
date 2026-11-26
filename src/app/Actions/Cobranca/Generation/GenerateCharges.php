@@ -13,6 +13,7 @@ use App\Actions\Cobranca\Nfse\NfseAlert;
 use App\Actions\Cobranca\Nfse\ServiceTaker;
 use App\Actions\Cobranca\Recalculation\ChargeRates;
 use App\Actions\InvoiceControls\InvoiceGate;
+use App\Enums\Alert;
 use App\Enums\Cobranca\ChargeStatus;
 use App\Models\Embarque;
 use App\Models\FinCharges;
@@ -520,6 +521,6 @@ class GenerateCharges
         BookingChecks::notify(count($this->created).' cobrança(s) gerada(s) com sucesso',
             'As seguintes cobranças foram geradas com sucesso. <table cellpadding=1><tr>'
             .'<th>Booking</th><th>Valor Total</th><th>Cliente</th><th>Navio</th><th>POO</th><th>POD</th><th>Armador</th></tr>'
-            .implode('', $this->created).'</table>');
+            .implode('', $this->created).'</table>', alert: Alert::ChargesGenerated);
     }
 }

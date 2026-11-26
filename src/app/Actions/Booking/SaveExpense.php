@@ -2,12 +2,11 @@
 
 namespace App\Actions\Booking;
 
-use App\Actions\Cobranca\Generation\BookingChecks;
+use App\Enums\Alert;
 use App\Models\Embarque;
 use App\Models\FinExpensesValues;
 use DomainException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * updateEmbarqueExpenses act=2 (legado): cadastra ou altera uma despesa da reserva. As validações são as do navegador
@@ -248,9 +247,7 @@ class SaveExpense
         $name = e($expense->despesa->label);
         $bookingNumber = e($booking->booking);
 
-        Mail::html("<p>A seguinte despesa foi alterada: {$name}</p><p>O embarque {$bookingNumber} possui Notas Cadastradas</p>", fn ($mail) => $mail
-            ->to(BookingChecks::FINANCE_EMAIL)
-            ->subject("[FINANCEIRO] Alerta de Alterações: {$booking->booking}"));
+        Alert::ExpenseChangedWithNotes->send("[FINANCEIRO] Alerta de Alterações: {$booking->booking}", "<p>A seguinte despesa foi alterada: {$name}</p><p>O embarque {$bookingNumber} possui Notas Cadastradas</p>");
     }
 
     /** Embarque::temNotasCadastradas: nota de débito ou de crédito, ou arquivo do tipo 4 ou 5. */

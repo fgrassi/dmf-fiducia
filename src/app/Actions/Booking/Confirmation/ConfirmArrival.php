@@ -3,12 +3,12 @@
 namespace App\Actions\Booking\Confirmation;
 
 use App\Actions\Booking\Tracking\SendTracking;
+use App\Enums\Alert;
 use App\Models\Embarque;
 use App\Models\Transborda;
 use Carbon\Carbon;
 use DomainException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * updateConfirmacaoChegada act=2 (legado): confirma a chegada da reserva. Importação marítima escolhe o tipo (chegada,
@@ -112,7 +112,7 @@ class ConfirmArrival
         }
 
         if ($kind === ArrivalMessage::ARRIVAL && $this->matrix->hasArrivalDivergence($booking, $arrival->toDateTimeString())) {
-            Mail::html('<p>Existe inconsistência entre as despesas da reserva e as despesas do cadastro do armador/porto. Verifique!</p>', fn ($mail) => $mail->to('financeiro@dmflog.com.br')->subject("[FINANCEIRO] Alerta de Alterações: {$booking->booking}"));
+            Alert::ArrivalDivergence->send("[FINANCEIRO] Alerta de Alterações: {$booking->booking}", '<p>Existe inconsistência entre as despesas da reserva e as despesas do cadastro do armador/porto. Verifique!</p>');
         }
 
         return $tracking;
@@ -140,6 +140,6 @@ class ConfirmArrival
             return;
         }
 
-        Mail::html("Gentileza verificar o embarque: {$booking->booking}", fn ($mail) => $mail->to(['diego@dmflog.com.br', 'docimportacao@dmflog.com.br'])->subject('AVISO: Desconsolidação inferior à 3 dias da atracação do navio'));
+        Alert::Deconsolidation->send('AVISO: Desconsolidação inferior à 3 dias da atracação do navio', "Gentileza verificar o embarque: {$booking->booking}");
     }
 }

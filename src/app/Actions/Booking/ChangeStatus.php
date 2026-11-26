@@ -2,10 +2,10 @@
 
 namespace App\Actions\Booking;
 
+use App\Enums\Alert;
 use App\Models\Embarque;
 use DomainException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * cancelarEmbarque, suspenderEmbarque e removerPendencia (legado): troca o `finalizado` da reserva e registra a
@@ -62,9 +62,6 @@ class ChangeStatus
         $html = 'A reserva '.e($booking->booking).' foi cancelada, gentileza verificar, pois existe seguro adicionado.'
             .'<br/><br/>Segue a justificativa do cancelamento:<br/>'.nl2br(e($justification));
 
-        Mail::html($html, fn ($mail) => $mail
-            ->from('system@dmflog.com.br', 'DMF Logistics')
-            ->to('exportacao@dmflog.com.br', 'Exportação')
-            ->subject('AVISO! Cancelamento de Reserva com Seguro'));
+        Alert::InsuredBookingCancelled->send('AVISO! Cancelamento de Reserva com Seguro', $html, fn ($mail) => $mail->from('system@dmflog.com.br', 'DMF Logistics'));
     }
 }
