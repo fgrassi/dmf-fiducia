@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Embarques;
 
+use App\Filament\Resources\Embarques\Pages\CreateEmbarque;
 use App\Filament\Resources\Embarques\Pages\ListEmbarques;
 use App\Filament\Resources\Embarques\Pages\ListSeguros;
 use App\Filament\Resources\Embarques\Pages\ViewEmbarque;
@@ -39,7 +40,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
 
-/** Reserva (módulo booking do legado), por enquanto só para a aba de despesas (D1 de despesas-embarque.md). */
+/** Reserva (módulo booking do legado): lista, criação e as abas da reserva. */
 class EmbarqueResource extends Resource
 {
     protected static ?string $model = Embarque::class;
@@ -147,6 +148,7 @@ class EmbarqueResource extends Resource
         return [
             'index' => ListEmbarques::route('/'),
             'seguros' => ListSeguros::route('/seguros'),
+            'create' => CreateEmbarque::route('/nova/{operacao}/{tipo}'),
             'view' => ViewEmbarque::route('/{record}'),
         ];
     }

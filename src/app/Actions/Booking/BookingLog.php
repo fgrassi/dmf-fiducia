@@ -7,13 +7,14 @@ use Illuminate\Support\Facades\DB;
 /** DmfUtil::geraLog e geraRastreabilidadeAlteracao (legado): o que a reserva grava no rastreamento e no histórico de campos. */
 class BookingLog
 {
-    public function track(int $bookingId, string $subject, ?string $history, int $userId, ?string $event = null): void
+    public function track(int $bookingId, string $subject, ?string $history, int $userId, ?string $event = null, ?string $justification = null): void
     {
         DB::table('rastreamento')->insert([
             'assunto' => $subject,
             'historico' => $history,
             'ref_embarque' => $bookingId,
             'evento' => $event,
+            'justificativa' => $justification,
             'created_at' => now()->toDateString(),
             'created_time' => now()->format('H:i:s'),
             'created_by' => $userId,

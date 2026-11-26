@@ -2,6 +2,7 @@
 
 namespace App\Actions\Booking\Tracking;
 
+use App\Actions\Booking\SellerRestriction;
 use App\Models\Embarque;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +26,7 @@ class TrackingRecipients
 
         $seller = DB::table('vendedor')->where('vendedor_id', $booking->vendedor_id)->first();
 
-        if ($seller && $seller->receber_avisos === 's' && filled($seller->email) && (int) $seller->ctr_ferias === 0 && $this->sellerMayReceive($booking)) {
+        if ($seller && $seller->receber_avisos === 's' && filled($seller->email) && (int) $seller->ctr_ferias === 0 && app(SellerRestriction::class)($booking)) {
             $add([$seller], 'Vendedor');
         }
 
@@ -85,27 +86,5 @@ class TrackingRecipients
             ->whereColumn('c.ref_despachante', 'l.despachante_id')
             ->where('c.status', 1)
             ->whereIn('l.tipo', ['t', 'a']);
-    }
-
-    /** Embarque::checkVendedor: reservas antigas e vendedores sem restrição recebem; com restrição, só se o cliente é dele ou a reserva foi autorizada. */
-    private function sellerMayReceive(Embarque $booking): bool
-    {
-        if (($booking->data_topo ?? '') < '2015-01-05' || ! DB::table('vendedor_restricao')->where('vendedor_id', $booking->vendedor_id)->exists()) {
-            return true;
-        }
-
-        if (DB::table('vendedor_pessoa')->where('vendedor_id', $booking->vendedor_id)->where('pessoa_id', $booking->cliente_id)->exists()) {
-            return true;
-        }
-
-        $restriction = DB::table('vendedor_restricao_embarque')->where('embarque_id', $booking->getKey())->orderBy('vendedor_restricao_embarque_id')->first();
-
-        if ($restriction) {
-            return (int) $restriction->status !== 0;
-        }
-
-        DB::table('vendedor_restricao_embarque')->insert(['embarque_id' => $booking->getKey(), 'vendedor_id' => $booking->vendedor_id, 'status' => 0]);
-
-        return false;
     }
 }
