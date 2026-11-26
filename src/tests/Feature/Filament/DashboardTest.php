@@ -2,12 +2,12 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Livewire\Birthdays;
 use App\Filament\Livewire\ReportSectionTable;
 use App\Filament\Pages\DailyMovement;
 use App\Filament\Resources\Charges\Pages\ListCharges;
 use App\Filament\Resources\Embarques\EmbarqueResource;
 use App\Filament\Resources\Embarques\Pages\ListEmbarques;
-use App\Filament\Widgets\Birthdays;
 use App\Filament\Widgets\BookingsByModal;
 use App\Filament\Widgets\BookingsPerMonth;
 use App\Filament\Widgets\FinanceStats;
@@ -98,13 +98,22 @@ class DashboardTest extends TestCase
         $person('OUTSIDER', "1990-{$month}-06", [], 99);
 
         Livewire::test(Birthdays::class)
-            ->assertCountTableRecords(4)
+            ->mountAction('birthdays')
             ->assertSeeInOrder(['January Person', 'Early Person', '1234', 'Late Person', 'December Person'])
-            ->assertDontSee(['Inactive', 'Outsider'])
-            ->sortTable('aniversario', 'desc')
-            ->assertSeeInOrder(['December Person', 'Late Person', 'Early Person', 'January Person'])
-            ->sortTable('nome')
-            ->assertSeeInOrder(['December Person', 'Early Person', 'January Person', 'Late Person']);
+            ->assertDontSee(['Inactive', 'Outsider']);
+    }
+
+    public function test_birthdays_icon_turns_red_on_someones_birthday(): void
+    {
+        $this->actingAs($viewer = $this->user('booking'));
+        DB::table('pessoa_usuario')->insert(['usuario_id' => $viewer->getKey(), 'pessoa_id' => 2]);
+        DB::table('usuario')->where('usuario_id', $viewer->getKey())->update(['aniversario' => '1990-06-15']);
+
+        $this->travelTo('2026-06-14');
+        Livewire::test(Birthdays::class)->assertActionHasColor('birthdays', 'gray');
+
+        $this->travelTo('2026-06-15');
+        Livewire::test(Birthdays::class)->assertActionHasColor('birthdays', 'danger');
     }
 
     public function test_birthdays_are_visible_only_to_staff_of_the_dmf_companies(): void
@@ -112,14 +121,15 @@ class DashboardTest extends TestCase
         $user = $this->user('booking');
         $this->actingAs($user);
         $this->assertFalse(Birthdays::canView());
-        $this->get('/admin')->assertOk()->assertDontSee('Widgets\\\\Birthdays', false);
+        Livewire::test(Birthdays::class)->assertActionHidden('birthdays');
+        $this->get('/admin')->assertOk()->assertDontSeeLivewire(Birthdays::class);
 
         DB::table('pessoa_usuario')->insert(['usuario_id' => $user->getKey(), 'pessoa_id' => 99]);
         $this->assertFalse(Birthdays::canView());
 
         DB::table('pessoa_usuario')->insert(['usuario_id' => $user->getKey(), 'pessoa_id' => 3198]);
         $this->assertTrue(Birthdays::canView());
-        $this->get('/admin')->assertOk()->assertSee('Widgets\\\\Birthdays', false);
+        $this->get('/admin')->assertOk()->assertSeeLivewire(Birthdays::class);
     }
 
     public function test_daily_movement_section_follows_the_report_credentials(): void

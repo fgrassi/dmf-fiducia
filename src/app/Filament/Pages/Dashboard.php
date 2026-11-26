@@ -4,7 +4,6 @@ namespace App\Filament\Pages;
 
 use App\Filament\Livewire\ReportSectionTable;
 use App\Filament\Support\DashboardPeriod;
-use App\Filament\Widgets\Birthdays;
 use App\Filament\Widgets\BookingsByModal;
 use App\Filament\Widgets\BookingsPerMonth;
 use App\Filament\Widgets\FinanceStats;
@@ -39,7 +38,6 @@ class Dashboard extends BaseDashboard
         'Movimento diário' => [DailyMovement::class],
         'Operações' => [OperationStats::class, BookingsPerMonth::class, BookingsByModal::class, NextMovements::class, TopClients::class],
         'Financeiro' => [FinanceStats::class, OverdueCharges::class],
-        'Aniversários' => [Birthdays::class],
     ];
 
     public function getWidgetsContentComponent(): Component

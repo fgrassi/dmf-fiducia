@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Auth\LegacyUsuarioProvider;
+use App\Filament\Livewire\Birthdays;
 use App\Filament\Resources\AccountingCovers\AccountingCoverResource;
 use App\Filament\Resources\AccountingCovers\Pages\ListAccountingCovers;
 use App\Filament\Resources\ManualAccountingCovers\ManualAccountingCoverResource;
@@ -11,6 +12,7 @@ use Filament\Support\Facades\FilamentView;
 use Filament\Tables\Columns\Column;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -35,6 +37,7 @@ class AppServiceProvider extends ServiceProvider
 
         // campo "Pesquisar no menu" no topo da sidebar
         FilamentView::registerRenderHook(PanelsRenderHook::SIDEBAR_NAV_START, fn () => view('filament.sidebar-search'));
+        FilamentView::registerRenderHook(PanelsRenderHook::GLOBAL_SEARCH_AFTER, fn () => Birthdays::canView() ? Blade::render('@livewire(\App\Filament\Livewire\Birthdays::class)') : '');
 
         // abas "Capas normais" / "Capas manuais" no topo das duas listas (são dois resources, em tabelas diferentes)
         foreach (['normal' => ListAccountingCovers::class, 'manual' => ListManualAccountingCovers::class] as $active => $page) {
