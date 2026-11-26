@@ -17,6 +17,7 @@ use App\Actions\Comissoes\OpenCommissionsNotice;
 use App\Actions\ControlePa\ControlePaNotices;
 use App\Actions\Expenses\ExpenseDueNotice;
 use App\Actions\Financeiro\ExchangeDeadlineNotice;
+use App\Actions\Financeiro\ImportWithoutNotesReport;
 use App\Actions\Financeiro\NotesControlMonthlyReport;
 use App\Actions\Financeiro\PriorityArrivalsNotice;
 use App\Actions\Financeiro\ProvisioningNotice;
@@ -70,6 +71,7 @@ $notices = [
     ['comissoes:aviso-abertas', OpenCommissionsNotice::class, 'Comissões de embarque em aberto, ao financeiro (avisoComissoesAbertas)'],
     ['notas-agentes:aviso-atrasadas', OverdueNotesNotice::class, 'Notas de débito/crédito de exportação emitidas há mais de 30 dias (debitNotesAtrasadas)'],
     ['notas:relatorio-status-mensal', NotesControlMonthlyReport::class, 'Reservas que deixaram de precisar de nota no mês anterior, só no dia 1º (relatorioStatusNotas)'],
+    ['notas:relatorio-impo-sem-notas', ImportWithoutNotesReport::class, 'Importações confirmadas no mês sem nota de débito/crédito, só no último dia (enviaRelatorioImpoSemNotas)'],
     ['controle-pa:aviso-envio-agente', ControlePaNotices::class, 'Freight Invoices prontas para envio ao agente (controlePaAvisoEnvioAgente)', 'readyToSendToAgent'],
     ['controle-pa:aviso-envio-armador', ControlePaNotices::class, 'Freight Invoices prontas para envio ao armador (controlePaAvisoEnvioArmador)', 'readyToSendToCarrier'],
     ['controle-pa:aviso-pendencia-confirmacao', ControlePaNotices::class, 'Pagamentos ao armador sem recibo (controlePaAvisoPendenciaConfirmacao)', 'pendingReceipt'],

@@ -129,8 +129,12 @@ class PaymentOrderItemsTest extends TestCase
         app(EditOrderItem::class)->unitValue($item, 120);
         $this->assertSame([120.0, 600.0], [$item->fresh()->unitary_value, $item->fresh()->item_value]);
 
-        app(EditOrderItem::class)->rate($item->fresh(), 5.5);
+        app(EditOrderItem::class)->rate($item->fresh(), 5.5, 7);
         $this->assertSame([5.5, 660.0], [$item->fresh()->current_rate_value, $item->fresh()->item_value]);
+        $this->assertSame(
+            [['fin_payment_order_items', 'current_rate_value', '5.0000', '5.5000']],
+            DB::table('rastreabilidade_alteracao')->get()->map(fn ($row) => [$row->tabela, $row->campo, $row->valor_antigo, $row->valor_novo])->all(),
+        );
     }
 
     public function test_recalculates_the_open_order_with_todays_rate_and_skips_items_already_in_an_instruction(): void

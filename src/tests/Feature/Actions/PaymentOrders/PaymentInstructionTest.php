@@ -69,14 +69,19 @@ class PaymentInstructionTest extends TestCase
         $this->item($order, $thc, 100);
         $instruction = app(GeneratePaymentInstruction::class)($order);
 
-        app(EditPaymentIof::class)->order($order, 30);
-        app(EditPaymentIof::class)->instruction($instruction, 7.25);
+        app(EditPaymentIof::class)->order($order, 30, 5);
+        app(EditPaymentIof::class)->instruction($instruction, 7.25, 5);
 
         $this->assertSame([30.0, 7.25], [(float) $order->fresh()->valor_iof, (float) $instruction->fresh()->valor_iof]);
+        $this->assertSame(
+            [['fin_payment_orders', 'valor_iof', $order->getKey(), '0.00', '30.00', 5], ['instrucao_pagamento', 'valor_iof', $instruction->getKey(), '0.00', '7.25', 5]],
+            DB::table('rastreabilidade_alteracao')->orderBy('rastreabilidade_alteracao_id')->get()
+                ->map(fn ($row) => [$row->tabela, $row->campo, (int) $row->tabela_id, $row->valor_antigo, $row->valor_novo, (int) $row->created_by])->all(),
+        );
 
         $this->expectException(DomainException::class);
 
-        app(EditPaymentIof::class)->order($order, -1);
+        app(EditPaymentIof::class)->order($order, -1, 5);
     }
 
     public function test_sets_the_identification_code_and_the_bank_of_the_order_with_boleto_as_zero(): void
@@ -133,6 +138,26 @@ class PaymentInstructionTest extends TestCase
         $order->forceFill(['codigo_identificacao' => 'OVERRIDE'])->save();
 
         $this->assertSame('OVERRIDE', app(PaymentInstruction::class)($instruction->fresh())['bank']['code']);
+    }
+
+    public function test_keeps_the_bank_frame_with_the_order_code_when_the_account_no_longer_exists(): void
+    {
+        [$order, $instruction] = $this->instruction();
+        $order->forceFill(['fin_armador_bank_id' => 999, 'codigo_identificacao' => 'COD-9'])->save();
+
+        $this->assertSame(['bank' => '', 'agency' => '', 'account' => '', 'code' => 'COD-9', 'notes' => ''], app(PaymentInstruction::class)($instruction->fresh())['bank']);
+    }
+
+    public function test_keeps_long_bank_notes_on_a_single_page(): void
+    {
+        [$order, $instruction] = $this->instruction();
+        DB::table('fin_armador_banks')->insert([
+            'id' => 5, 'ref_armador' => 7, 'ref_bank' => 1, 'created_by' => 1,
+            'obs' => "CNPJ: 29.978.327/0001-14\r\nZIM do Brasil Ltda.\r\ncomprovantes para: collectionbr@zim.com",
+        ]);
+        $order->forceFill(['fin_armador_bank_id' => 5])->save();
+
+        $this->assertSame(1, app(PaymentInstructionPdf::class)->render($instruction->fresh())->getNumPages());
     }
 
     public function test_prints_the_ports_with_the_country_name_like_the_legacy_booking(): void

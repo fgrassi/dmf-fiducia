@@ -198,8 +198,9 @@ class PaymentInstructionPdf
         $pdf->MultiCell(125, 10, 'Observações', 'B', 'L', false, 0, 75, $y + 10, true);
         $pdf->SetTextColor(0);
 
-        foreach ([[$d['bank']['bank'], 15, $y + 3], [$d['bank']['agency'], 80, $y + 3], [$d['bank']['account'], 140, $y + 3], [$d['bank']['code'], 15, $y + 13], [$d['bank']['notes'], 80, $y + 13]] as [$text, $x, $textY]) {
-            $pdf->MultiCell(55, self::LINE, $text, 0, 'L', false, 0, $x, $textY, true);
+        // as observações ocupam o resto da linha: mais estreitas, quebram e jogam o fim para uma segunda página
+        foreach ([[$d['bank']['bank'], 15, $y + 3, 55], [$d['bank']['agency'], 80, $y + 3, 55], [$d['bank']['account'], 140, $y + 3, 55], [$d['bank']['code'], 15, $y + 13, 55], [$d['bank']['notes'], 80, $y + 13, 120]] as [$text, $x, $textY, $width]) {
+            $pdf->MultiCell($width, self::LINE, $text, 0, 'L', false, 0, $x, $textY, true);
         }
     }
 }

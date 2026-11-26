@@ -96,6 +96,11 @@ class NoticeTexts
                 '{{lista}}',
                 ['mes' => self::tag('Mês anterior, em maiúsculas', 'OUTUBRO'), 'ano' => self::tag('Ano', '2026'), 'lista' => self::tag('Texto de apresentação e tabela de reservas (ou "Nenhuma alteração realizada.")', '<p>Relatório de reservas que NÃO necessitam de notas e tiveram seu status alterado no período de 01/10/2026 a 31/10/2026.</p><table border=1><tr><th>Reserva</th><th>Data da Alteração</th></tr></table>', true)],
             ],
+            Notice::ImportWithoutNotes => [
+                'DMF RELATÓRIO DE NOTAS IMPORTACÃO: {{mes}}/{{ano}}',
+                '<p>Segue abaixo relação de reservas confirmadas este mês que não tem Notas Cadastradas</p>{{lista}}',
+                ['mes' => self::tag('Mês atual, em maiúsculas', 'OUTUBRO'), 'ano' => self::tag('Ano', '2026'), 'lista' => self::tag('Lista das reservas sem notas', '<ul><li>BKG123</li></ul>', true)],
+            ],
             Notice::ReadyToSendToAgent => self::controlePa('PREPAID ABROAD - Freight Invoices disponíveis para envio ao agente', 'As reservas abaixo possuem Freight Invoice disponíveis para envio ao agente'),
             Notice::ReadyToSendToCarrier => self::controlePa('PREPAID ABROAD - Freight Invoices disponíveis para envio ao Armador', 'As reservas abaixo possuem Freight Invoice disponíveis para envio ao Armador'),
             Notice::PendingReceipt => self::controlePa('PREPAID ABROAD - Pendências de Confirmação da Liberação', 'As reservas abaixo possuem Pendências de Confirmação da Liberação'),

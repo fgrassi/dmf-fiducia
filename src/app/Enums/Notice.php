@@ -28,6 +28,7 @@ enum Notice: string
     case OpenCommissions = 'comissoes:aviso-abertas';
     case OverdueNotes = 'notas-agentes:aviso-atrasadas';
     case NotesMonthlyReport = 'notas:relatorio-status-mensal';
+    case ImportWithoutNotes = 'notas:relatorio-impo-sem-notas';
     case ReadyToSendToAgent = 'controle-pa:aviso-envio-agente';
     case ReadyToSendToCarrier = 'controle-pa:aviso-envio-armador';
     case PendingReceipt = 'controle-pa:aviso-pendencia-confirmacao';
@@ -76,6 +77,7 @@ enum Notice: string
             self::OpenCommissions => ['label' => 'Comissões de embarque em aberto', ...$daily, 'to' => ['financeiro5@dmflog.com.br', self::MARCIA], 'cc' => []],
             self::OverdueNotes => ['label' => 'Notas de agentes emitidas há mais de 30 dias', ...$daily, 'to' => [self::MARCIA, self::FINANCE, 'chamado@dmflog.com.br'], 'cc' => []],
             self::NotesMonthlyReport => ['label' => 'Relatório mensal do controle de notas', 'weekdays' => null, 'fixed_days' => 'Dia 1º', 'time' => '08:00', 'to' => [self::MARCIA], 'cc' => []],
+            self::ImportWithoutNotes => ['label' => 'Importações confirmadas no mês sem nota de débito/crédito', 'weekdays' => null, 'fixed_days' => 'Último dia do mês', 'time' => '08:00', 'to' => [self::IT, self::FINANCE], 'cc' => []],
             self::ReadyToSendToAgent => ['label' => 'Freight Invoices prontas para envio ao agente', ...$controlePa],
             self::ReadyToSendToCarrier => ['label' => 'Freight Invoices prontas para envio ao armador', ...$controlePa],
             self::PendingReceipt => ['label' => 'Pagamentos ao armador sem recibo', ...$controlePa],

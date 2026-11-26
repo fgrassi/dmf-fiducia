@@ -43,7 +43,7 @@ class ItemsRelationManager extends RelationManager
             ->schema([TextInput::make('iof')->label('Despesas Financeiras/IOF (R$)')->numeric()->minValue(0)->required()])
             ->action(function (array $data, Action $action) {
                 try {
-                    app(EditPaymentIof::class)->order($this->getOwnerRecord(), (float) $data['iof']);
+                    app(EditPaymentIof::class)->order($this->getOwnerRecord(), (float) $data['iof'], auth()->id());
                 } catch (DomainException $e) {
                     Notification::make()->title($e->getMessage())->danger()->send();
                     $action->halt();

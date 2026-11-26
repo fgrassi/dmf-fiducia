@@ -14,7 +14,7 @@ class SaveNfseRule
     /** @param  array{ref_client:int, tomador:string, justificativa:string, bloquear_emissao?:bool, separar_nf_grupo_despesas?:bool, expense_rules?:list<int>}  $data */
     public function __invoke(array $data, int $userId, ?FinClientsNfseRegra $rule = null): FinClientsNfseRegra
     {
-        $rule ??= FinClientsNfseRegra::firstOrNew(['ref_client' => $data['ref_client']]);
+        $rule ??= FinClientsNfseRegra::where('ref_client', $data['ref_client'])->first() ?? new FinClientsNfseRegra;
         $split = (bool) ($data['separar_nf_grupo_despesas'] ?? false);
 
         return DB::transaction(function () use ($rule, $data, $userId, $split) {

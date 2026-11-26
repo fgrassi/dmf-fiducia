@@ -47,7 +47,7 @@ class OtherPaymentInstructionTest extends TestCase
 
     public function test_edits_the_iof_and_deletes_the_instruction_with_its_items(): void
     {
-        app(EditPaymentIof::class)->instruction($this->instruction, 20);
+        app(EditPaymentIof::class)->instruction($this->instruction, 20, 5);
 
         $this->assertEquals(20, $this->instruction->refresh()->valor_iof);
 

@@ -71,18 +71,19 @@ class PaymentInstruction
     /** @return ?array{bank: string, agency: string, account: string, code: string, notes: string} null = via boleto */
     private function bank($order): ?array
     {
-        $bank = $order->fin_armador_bank_id ? FinArmadorBanks::with('bank')->find($order->fin_armador_bank_id) : null;
-
-        if (! $bank) {
+        if (! $order->fin_armador_bank_id) {
             return null;
         }
 
+        // conta que saiu do cadastro (ordens antigas): como no legado, o quadro continua, em branco, e não vira boleto
+        $bank = FinArmadorBanks::with('bank')->find($order->fin_armador_bank_id);
+
         return [
-            'bank' => $bank->bank && filled($bank->bank->name) ? "{$bank->bank->name} ({$bank->bank->bank_number})" : '',
-            'agency' => (string) $bank->bank_agency,
-            'account' => (string) $bank->bank_account,
-            'code' => filled($order->codigo_identificacao) ? (string) $order->codigo_identificacao : (string) $bank->id_code,
-            'notes' => (string) $bank->obs,
+            'bank' => filled($bank?->bank?->name) ? "{$bank->bank->name} ({$bank->bank->bank_number})" : '',
+            'agency' => (string) $bank?->bank_agency,
+            'account' => (string) $bank?->bank_account,
+            'code' => filled($order->codigo_identificacao) ? (string) $order->codigo_identificacao : (string) $bank?->id_code,
+            'notes' => (string) $bank?->obs,
         ];
     }
 

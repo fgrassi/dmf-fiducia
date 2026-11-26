@@ -44,7 +44,7 @@ class ItemsRelationManager extends RelationManager
             ->schema([TextInput::make('iof')->label('Despesas Financeiras/IOF (R$)')->numeric()->minValue(0)->required()])
             ->action(function (array $data, Action $action) {
                 try {
-                    app(EditPaymentIof::class)->order($this->getOwnerRecord(), (float) $data['iof']);
+                    app(EditPaymentIof::class)->order($this->getOwnerRecord(), (float) $data['iof'], auth()->id());
                 } catch (DomainException $e) {
                     Notification::make()->title($e->getMessage())->danger()->send();
                     $action->halt();
@@ -123,7 +123,7 @@ class ItemsRelationManager extends RelationManager
                     ->fillForm(fn (FinPaymentOrderItem $record) => ['rate' => $record->current_rate_value])
                     ->schema([TextInput::make('rate')->label('Taxa')->numeric()->required()])
                     ->action(function (array $data, FinPaymentOrderItem $record) {
-                        $item = app(EditOrderItem::class)->rate($record, (float) $data['rate']);
+                        $item = app(EditOrderItem::class)->rate($record, (float) $data['rate'], auth()->id());
                         Notification::make()->title('Valor do item: R$ '.number_format((float) $item->item_value, 2, ',', '.'))->success()->send();
                     }),
                 Action::make('valorUnitario')

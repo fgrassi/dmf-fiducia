@@ -81,7 +81,7 @@ class InstructionsRelationManager extends RelationManager
                     ->schema([TextInput::make('iof')->label('IOF (R$)')->numeric()->minValue(0)->required()])
                     ->action(function (array $data, InstrucaoPagamentoOutros $record, Action $action) {
                         try {
-                            app(EditPaymentIof::class)->instruction($record, (float) $data['iof']);
+                            app(EditPaymentIof::class)->instruction($record, (float) $data['iof'], auth()->id());
                         } catch (DomainException $e) {
                             Notification::make()->title($e->getMessage())->danger()->send();
                             $action->halt();
