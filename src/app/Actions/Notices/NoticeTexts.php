@@ -60,6 +60,11 @@ class NoticeTexts
                 '{{venda_menor}}{{sem_cotacao}}',
                 ['data' => $date, 'venda_menor' => self::tag('Despesas com venda (S/R) abaixo da compra (B/R), com o texto de apresentação', '', true), 'sem_cotacao' => self::tag('Despesas de moedas diferentes sem cotação, com o texto de apresentação', '', true)],
             ],
+            Notice::UnreviewedExpenses => [
+                '[Aviso] Embarques sem revisão de despesas',
+                '<p>Segue abaixo reservas que não tiveram suas despesas revisadas.</p><p>Por favor, revise as despesas para que a cobrança possa ser gerada.</p>{{lista}}',
+                ['lista' => $list],
+            ],
             Notice::MblRelease => [
                 '[IMPORTANT] MBL Release Information: {{reserva}} - MBL: {{mbl}} - Cnee: {{importador}}',
                 '<p>Dear all</p><p>We would like to inform that DMF didn’t receive local charges payment for booking {{reserva}} . Please note that MBL release will be made by SS Line once payment is confirmed.</p>'

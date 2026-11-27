@@ -5,6 +5,7 @@ use App\Actions\AccountingCovers\RefreshCoverSummaries;
 use App\Actions\AgentNotes\OverdueNotesNotice;
 use App\Actions\Booking\Ams\AmsNotices;
 use App\Actions\Booking\ExpenseReviewNotice;
+use App\Actions\Booking\UnreviewedExpensesNotice;
 use App\Actions\Cobranca\Generation\GenerateAllCharges;
 use App\Actions\Cobranca\Notices\HapagPendingNotice;
 use App\Actions\Cobranca\Notices\MblReleaseNotice;
@@ -65,6 +66,7 @@ $notices = [
     ['cobranca:aviso-vencimento-despesa', ExpenseDueNotice::class, 'Lembrete dos vencimentos de despesas em 3 dias (avisoVencimentoDespesa)'],
     ['despesas:aviso-revisao-importacao', ExpenseReviewNotice::class, 'Despesas de importação lançadas hoje com venda abaixo da compra ou sem cotação (verificaDespesas)', 'imports'],
     ['despesas:aviso-revisao-exportacao', ExpenseReviewNotice::class, 'Despesas de exportação lançadas hoje com venda abaixo da compra ou sem cotação (verificaDespesas)', 'exports'],
+    ['despesas:aviso-sem-revisao', UnreviewedExpensesNotice::class, 'Importações marítimas sem revisão de despesas, chegada em até 3 dias (relacaoReservasSemRevisao)'],
     ['cobranca:aviso-liberacao-mbl', MblReleaseNotice::class, 'Avisa os agentes das exportações com frete a receber e chegada em até 5 dias (avisoAgenteFaltaPagamento)'],
     ['financeiro:aviso-limite-cambio', ExchangeDeadlineNotice::class, 'Agentes com prazo de envio de câmbio nos próximos 5 dias (avisoFinanceiroVencimentoEnvioCambio)'],
     ['financeiro:aviso-embarques-prioritarios', PriorityArrivalsNotice::class, 'Embarques prioritários que chegam em 5 e 2 dias (avisoFinanceiroEmbarquesPrioritarios)'],

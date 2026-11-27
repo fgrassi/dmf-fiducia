@@ -21,6 +21,7 @@ enum Notice: string
     case ExpenseDue = 'cobranca:aviso-vencimento-despesa';
     case ExpenseReviewImport = 'despesas:aviso-revisao-importacao';
     case ExpenseReviewExport = 'despesas:aviso-revisao-exportacao';
+    case UnreviewedExpenses = 'despesas:aviso-sem-revisao';
     case MblRelease = 'cobranca:aviso-liberacao-mbl';
     case ExchangeDeadline = 'financeiro:aviso-limite-cambio';
     case PriorityArrivals = 'financeiro:aviso-embarques-prioritarios';
@@ -70,6 +71,7 @@ enum Notice: string
             self::ExpenseDue => ['label' => 'Vencimento de despesas em 3 dias', ...$daily, 'to' => [self::FINANCE, self::IT], 'cc' => []],
             self::ExpenseReviewImport => ['label' => 'Revisão das despesas lançadas hoje (importação)', 'weekdays' => self::EVERY_DAY, 'time' => '18:00', 'to' => [self::BILLING, 'imp2@dmflog.com.br', 'imp3@dmflog.com.br', 'imp4@dmflog.com.br', 'imp5@dmflog.com.br'], 'cc' => []],
             self::ExpenseReviewExport => ['label' => 'Revisão das despesas lançadas hoje (exportação)', 'weekdays' => self::EVERY_DAY, 'time' => '18:00', 'to' => [self::BILLING, 'douglas@dmflog.com.br'], 'cc' => []],
+            self::UnreviewedExpenses => ['label' => 'Importações sem revisão de despesas, chegada em até 3 dias', ...$daily, 'to' => ['imp2@dmflog.com.br', 'imp3@dmflog.com.br', 'imp4@dmflog.com.br', 'imp5@dmflog.com.br', self::FINANCE], 'cc' => []],
             self::MblRelease => ['label' => 'Agentes: frete a receber e chegada em até 5 dias (Para: contatos da reserva)', ...$daily, 'to' => null, 'cc' => [self::FINANCE]],
             self::ExchangeDeadline => ['label' => 'Prazo de envio de câmbio dos agentes', ...$daily, 'to' => [self::FINANCE], 'cc' => []],
             self::PriorityArrivals => ['label' => 'Embarques prioritários com chegada próxima', ...$daily, 'to' => [self::FINANCE], 'cc' => []],
