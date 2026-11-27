@@ -16,6 +16,7 @@ use App\Filament\Widgets\OperationStats;
 use App\Filament\Widgets\OverdueCharges;
 use App\Filament\Widgets\TopClients;
 use App\Models\Embarque;
+use App\Models\FinCharges;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Support\Facades\DB;
@@ -273,16 +274,35 @@ class DashboardTest extends TestCase
         $this->assertSame('R$ 1.200,00', $stats['A receber']->getValue());
         $this->assertSame('R$ 900,00', $stats['Vencidas']->getValue());
         $this->assertSame('R$ 800,00', $stats['Recebido no mês']->getValue());
-        Livewire::test(OverdueCharges::class)->assertCountTableRecords(1);
+        Livewire::test(OverdueCharges::class)->assertCountTableRecords(1)->assertTableColumnStateSet('saldo', 900.0, FinCharges::first());
+    }
+
+    public function test_overdue_charges_list_all_of_them_ten_per_page_oldest_first(): void
+    {
+        $this->actingAs($this->user('financial'));
+
+        foreach (range(12, 1) as $daysAgo) {
+            $this->charge(['total_value' => 100, 'due_date' => today()->subDays($daysAgo)->toDateString()]);
+        }
+
+        $oldestFirst = FinCharges::orderBy('due_date')->get();
+
+        Livewire::test(OverdueCharges::class)
+            ->assertCountTableRecords(12)
+            ->assertCanSeeTableRecords($oldestFirst->take(10), inOrder: true)
+            ->assertCanNotSeeTableRecords($oldestFirst->skip(10))
+            ->call('gotoPage', 2, 'vencidasPage')
+            ->assertCanSeeTableRecords($oldestFirst->skip(10), inOrder: true);
     }
 
     public function test_overdue_charges_show_the_booking_name_operation_and_type(): void
     {
         $this->actingAs($this->user('financial'));
+        DB::table('pessoa')->insert(['pessoa_id' => 1, 'nome' => 'ACME']);
         $this->booking(['booking' => 'BK-77', 'impor_expor' => 'e', 'tipo_embarque' => 'a']);
         $this->charge(['ref_booking' => DB::table('embarque')->value('embarque_id'), 'total_value' => 400, 'due_date' => today()->subDay()->toDateString()]);
 
-        Livewire::test(OverdueCharges::class)->assertSee('BK-77')->assertSee('Exportação')->assertSee('Aéreo');
+        Livewire::test(OverdueCharges::class)->assertSee('BK-77')->assertSee('ACME')->assertSee('Exportação')->assertSee('Aéreo');
     }
 
     public function test_finance_cards_and_overdue_table_open_lists_with_the_same_records(): void

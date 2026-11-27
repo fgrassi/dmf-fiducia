@@ -16,8 +16,6 @@ class FinanceStats extends StatsOverviewWidget
 {
     protected static ?int $sort = 30;
 
-    protected ?string $heading = 'Financeiro';
-
     public static function canView(): bool
     {
         return (bool) auth()->user()?->hasLegacyCredential('financial');

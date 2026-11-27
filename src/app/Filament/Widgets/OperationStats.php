@@ -14,8 +14,6 @@ class OperationStats extends StatsOverviewWidget
 {
     protected static ?int $sort = 10;
 
-    protected ?string $heading = 'Operação';
-
     public static function canView(): bool
     {
         return (bool) auth()->user()?->hasLegacyCredential('booking');

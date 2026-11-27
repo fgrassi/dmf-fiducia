@@ -14,7 +14,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
 
-/** As 8 cobranças (ICs) em aberto vencidas há mais tempo. */
+/** As cobranças (ICs) em aberto vencidas, da mais antiga para a mais nova. */
 class OverdueCharges extends TableWidget
 {
     protected static ?int $sort = 50;
@@ -32,13 +32,13 @@ class OverdueCharges extends TableWidget
             ->heading('Cobranças vencidas')
             ->description('Em aberto, vencidas antes de '.today()->format('d/m/Y').', criadas desde '.DashboardPeriod::sinceLabel())
             ->query(fn () => FinCharges::query()
-                ->with('embarque:embarque_id,booking,impor_expor,tipo_embarque')
+                ->with(['embarque:embarque_id,booking,impor_expor,tipo_embarque,cliente_id', 'embarque.cliente:pessoa_id,nome'])
                 ->where('created_at', '>=', DashboardPeriod::SINCE)
                 ->where('status', 0)
                 ->where('due_date', '<', today()->toDateString())
                 ->where('due_date', '>', '0000-00-00')
                 ->orderBy('due_date')
-                ->limit(8))
+                ->orderBy('id'))
             ->columns([
                 TextColumn::make('id')
                     ->label('IC'),
@@ -46,6 +46,10 @@ class OverdueCharges extends TableWidget
                     ->label('Booking')
                     ->placeholder('—')
                     ->url(fn (FinCharges $record) => $record->embarque ? EmbarqueResource::getUrl('view', ['record' => $record->embarque]) : null),
+                TextColumn::make('embarque.cliente.nome')
+                    ->label('Cliente')
+                    ->placeholder('—')
+                    ->wrap(),
                 TextColumn::make('embarque.impor_expor')
                     ->label('Op.')
                     ->badge()
@@ -62,8 +66,9 @@ class OverdueCharges extends TableWidget
                     ->state(fn (FinCharges $record) => (int) $record->due_date->diffInDays(today()).' dias')
                     ->badge()
                     ->color('danger'),
-                TextColumn::make('total_value')
-                    ->label('Valor')
+                TextColumn::make('saldo')
+                    ->label('Saldo')
+                    ->state(fn (FinCharges $record) => (float) $record->total_value - (float) $record->discount - (float) $record->received_value)
                     ->money('BRL')
                     ->alignEnd(),
             ])
@@ -74,7 +79,10 @@ class OverdueCharges extends TableWidget
                     ->url(FinanceStats::overdueUrl()),
             ])
             ->recordUrl(fn (FinCharges $record) => ChargeResource::getUrl('view', ['record' => $record]))
-            ->paginated(false)
+            ->paginated([10])
+            ->defaultPaginationPageOption(10)
+            // nome próprio na URL: o ?page de outra tela não vale aqui
+            ->queryStringIdentifier('vencidas')
             ->emptyStateHeading('Nenhuma cobrança vencida');
     }
 }
