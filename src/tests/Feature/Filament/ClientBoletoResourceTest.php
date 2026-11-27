@@ -25,11 +25,11 @@ class ClientBoletoResourceTest extends TestCase
         $this->actingAs($this->user());
 
         Livewire::test(ManageClientBoletos::class)
-            ->callAction('create', ['ref_client' => 5, 'prazo' => '30 dias', 'prazo_imp' => 30, 'prazo_exp' => 0, 'boleto_imp' => 1, 'boleto_exp' => 0])
+            ->callAction('create', ['ref_client' => 5, 'prazo' => '30 dias', 'prazo_imp' => 30, 'prazo_exp' => 0, 'boleto_imp' => 1, 'boleto_exp' => 0, 'boleto_automatico_imp' => 1])
             ->assertHasNoFormErrors();
 
         $row = FinClientsBoleto::sole();
-        $this->assertSame([5, 30, 1], [(int) $row->ref_client, (int) $row->prazo_imp, (int) $row->boleto_imp]);
+        $this->assertSame([5, 30, 1, 1, 0], [(int) $row->ref_client, (int) $row->prazo_imp, (int) $row->boleto_imp, (int) $row->boleto_automatico_imp, (int) $row->boleto_automatico_exp]);
     }
 
     public function test_requires_client(): void

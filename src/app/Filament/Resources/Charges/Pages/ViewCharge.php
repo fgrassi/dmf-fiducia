@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Charges\Pages;
 
+use App\Actions\Cobranca\Boleto\BoletoPayload;
+use App\Actions\Cobranca\Boleto\IssueBoleto;
 use App\Actions\Cobranca\Documents\ChargeRecipients;
 use App\Actions\Cobranca\Documents\DebitNote;
 use App\Actions\Cobranca\Documents\PlainReceiptPdf;
@@ -28,6 +30,7 @@ use App\Models\Escritorio;
 use App\Models\FinCharges;
 use App\Models\FinChargesLog;
 use App\Models\FinChargesNfse;
+use App\Models\FinClientsBoleto;
 use App\Services\Cobranca\ChargeDetails;
 use Carbon\Carbon;
 use DomainException;
@@ -143,6 +146,8 @@ class ViewCharge extends ViewRecord
                     $this->notifyNfse($nfse);
                     $this->redirect(ChargeResource::getUrl('view', ['record' => $this->getRecord()]));
                 }),
+            $this->issueBoletoAction()
+                ->visible(fn () => $open() && FinClientsBoleto::usesBoleto($this->getRecord()->embarque)),
             Action::make('baixaManual')
                 ->label('Baixa Manual')
                 ->icon('heroicon-o-pencil-square')
@@ -222,6 +227,37 @@ class ViewCharge extends ViewRecord
                     $this->redirect(ChargeResource::getUrl('index'));
                 }),
         ];
+    }
+
+    /** geraBoletoSicredi: pede o vencimento (posterior a hoje) e cadastra o boleto na Sicredi, ou mostra o já emitido. */
+    private function issueBoletoAction(): Action
+    {
+        return Action::make('gerarBoletoSicredi')
+            ->label('Gerar Boleto Sicredi')
+            ->icon('heroicon-o-banknotes')
+            ->color('gray')
+            ->modalHeading('Gerar Boleto Sicredi')
+            ->modalSubmitActionLabel('Gerar boleto')
+            ->modalWidth('sm')
+            ->fillForm(fn () => ['due_date' => app(BoletoPayload::class)->suggestedDueDate($this->getRecord())->toDateString()])
+            ->schema([
+                DatePicker::make('due_date')
+                    ->label('Data de vencimento')
+                    ->required()
+                    ->minDate(today()->addDay())
+                    ->helperText('Deve ser posterior a hoje.'),
+            ])
+            ->action(function (array $data, Action $action) {
+                try {
+                    $result = app(IssueBoleto::class)($this->getRecord(), auth()->id(), $data['due_date']);
+                } catch (DomainException $e) {
+                    Notification::make()->title($e->getMessage())->danger()->send();
+                    $action->halt();
+                }
+
+                Notification::make()->title($result['reused'] ? 'Boleto já emitido para esta cobrança.' : 'Boleto gerado com sucesso.')->success()->send();
+                $this->redirect(ChargeResource::getUrl('view', ['record' => $this->getRecord()]));
+            });
     }
 
     /** reemitirNfse do legado: emissão antes da baixa (prazo/boleto, armador que não recalcula ou exceção) ou depois dela; disparada pelo botão do cabeçalho da seção NFSe. */

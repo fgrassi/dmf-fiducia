@@ -7,7 +7,7 @@
 @if ($withInstruction)
 <table width="960px" border="0">
     <tr bgcolor="#7e0001"><td>&nbsp;</td></tr>
-    @if ($s['mode'] !== 'exception')
+    @if (! $s['exception'])
         <tr><td><font face="Arial"><strong>Prezado Cliente,</strong></font></td></tr>
     @endif
     <tr><td><font face="Arial" color="black"><h3>Instrução de Cobrança e NFS-e Autorizada{{ $plural ? 's' : '' }}</h3></font></td></tr>
@@ -22,6 +22,9 @@
         @endif
         @if ($hasIc)
             A Instrução de Cobrança (IC) segue em anexo juntamente com a(s) nota(s).<br/>
+        @endif
+        @if ($hasBoleto)
+            O boleto bancário também segue em anexo.<br/>
         @endif
         {!! $notesHtml !!}
         <br/><br/>Atenciosamente,<br/>Departamento Financeiro<br/><br/>

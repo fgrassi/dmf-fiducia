@@ -81,6 +81,16 @@ class ClientBoletoResource extends Resource
                     ->options(self::YES_NO)
                     ->default(0)
                     ->selectablePlaceholder(false),
+                Select::make('boleto_automatico_imp')
+                    ->label('Boleto automático IMPO')
+                    ->options(self::YES_NO)
+                    ->default(0)
+                    ->selectablePlaceholder(false),
+                Select::make('boleto_automatico_exp')
+                    ->label('Boleto automático EXPO')
+                    ->options(self::YES_NO)
+                    ->default(0)
+                    ->selectablePlaceholder(false),
             ]);
     }
 
@@ -113,6 +123,10 @@ class ClientBoletoResource extends Resource
                         ->label('Boleto')
                         ->formatStateUsing(fn ($state) => self::YES_NO[(int) $state])
                         ->sortable(),
+                    TextColumn::make('boleto_automatico_imp')
+                        ->label('Automático')
+                        ->state(fn (FinClientsBoleto $record) => self::YES_NO[(int) $record->boleto_automatico_imp])
+                        ->sortable(),
                 ]),
                 ColumnGroup::make('EXPO', [
                     TextColumn::make('prazo_exp')
@@ -122,6 +136,10 @@ class ClientBoletoResource extends Resource
                     TextColumn::make('boleto_exp')
                         ->label('Boleto')
                         ->formatStateUsing(fn ($state) => self::YES_NO[(int) $state])
+                        ->sortable(),
+                    TextColumn::make('boleto_automatico_exp')
+                        ->label('Automático')
+                        ->state(fn (FinClientsBoleto $record) => self::YES_NO[(int) $record->boleto_automatico_exp])
                         ->sortable(),
                 ]),
             ])

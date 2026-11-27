@@ -61,6 +61,15 @@ class BuildChargeListQuery
             $query->where('fin_charges.status', (int) $f['status']);
         }
 
+        // cliente da reserva com a flag de boleto no modal dela (Clientes com Boleto)
+        if (isset($f['boleto'])) {
+            $query->whereHas('embarque', fn ($e) => $e->{(int) $f['boleto'] === 1 ? 'whereExists' : 'whereNotExists'}(
+                fn ($b) => $b->selectRaw('1')->from('fin_clients_boleto as fcb')->whereColumn('fcb.ref_client', 'embarque.cliente_id')
+                    ->where(fn ($m) => $m->where(fn ($i) => $i->where('embarque.impor_expor', 'i')->where('fcb.boleto_imp', 1))
+                        ->orWhere(fn ($x) => $x->where('embarque.impor_expor', 'e')->where('fcb.boleto_exp', 1))),
+            ));
+        }
+
         if (isset($f['status_nfse'])) {
             $this->applyNfseStatus($query, (string) $f['status_nfse']);
         }

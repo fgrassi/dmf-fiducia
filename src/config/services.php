@@ -39,6 +39,19 @@ return [
         'token' => env('NFSE_API_TOKEN'),
     ],
 
+    // API de Cobrança do Sicredi (boletos). Sem URL e credenciais nenhum boleto é emitido; o sandbox usa /sb/ na URL.
+    'sicredi' => [
+        'url' => env('SICREDI_BASE_URL'),
+        'x_api_key' => env('SICREDI_X_API_KEY'),
+        'username' => env('SICREDI_USERNAME'),
+        'password' => env('SICREDI_PASSWORD'),
+        'cooperativa' => env('SICREDI_COOPERATIVA'),
+        'posto' => env('SICREDI_POSTO'),
+        'beneficiary' => env('SICREDI_CODIGO_BENEFICIARIO'),
+        // segredo do POST /api/sicredi/webhook (?token= ou Authorization: Bearer); vazio = endpoint recusa (503)
+        'webhook_token' => env('SICREDI_WEBHOOK_TOKEN'),
+    ],
+
     // Geração automática das ICs (cobranca:gerar no agendador). Ligar só quando o cron do tracking for desligado.
     'cobranca' => [
         'automatic_generation' => env('COBRANCA_GERACAO_AUTOMATICA', false),

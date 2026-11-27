@@ -2,7 +2,9 @@
 
 namespace App\Actions\Cobranca\Nfse;
 
+use App\Actions\Cobranca\Boleto\IssueBoleto;
 use App\Actions\Cobranca\Documents\ChargeRecipients;
+use App\Actions\Cobranca\Documents\InstructionPdf;
 use App\Actions\Cobranca\Recalculation\ChargeRates;
 use App\Models\FinCharges;
 use App\Models\FinChargesNfse;
@@ -22,6 +24,7 @@ class SendAuthorizationEmail
     public function __construct(
         private NfseApi $api,
         private ChargeRecipients $recipients,
+        private IssueBoleto $boleto,
     ) {}
 
     public function __invoke(FinCharges $charge): void
@@ -91,10 +94,22 @@ class SendAuthorizationEmail
         $inException = DB::table('fin_clients_exception')->where('ref_client', $e->cliente_id)->exists()
             && ! $recalculated && ! EmissionGroups::carrierDoesNotRecalculate($e);
         $withInstruction = EmissionGroups::issuedWithInstruction($e);
+        $boleto = null;
+
+        // boleto automático junto com a IC e a NFS-e (não repete o já emitido)
+        if ($withInstruction) {
+            $this->boleto->automatic($charge);
+            $boleto = InstructionPdf::boletoFile($charge);
+        }
+
         $ic = $withInstruction ? $this->instructionFile($charge) : null;
 
         if ($ic) {
             $attachments[] = $ic;
+        }
+
+        if ($boleto) {
+            $attachments[] = $boleto;
         }
 
         Mail::send('mail.cobranca.nfse-authorized', [
@@ -103,6 +118,7 @@ class SendAuthorizationEmail
             'plural' => $plural !== '',
             'notes' => $notes,
             'hasIc' => (bool) $ic,
+            'hasBoleto' => (bool) $boleto,
         ], function ($mail) use ($withInstruction, $plural, $suffix, $inException, $charge, $attachments) {
             $mail->from(ChargeRecipients::COLLECTION_EMAIL, 'DMF Logistics do Brasil - Setor de Cobrança')
                 ->to([ChargeRecipients::COLLECTION_EMAIL, ...($inException ? [] : array_keys(($this->recipients)($charge)))])

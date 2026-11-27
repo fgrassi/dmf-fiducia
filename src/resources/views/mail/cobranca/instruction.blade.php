@@ -1,12 +1,12 @@
 {{-- Instrução de Cobrança: mesmo HTML do Cobranca::geraPdf legado (e-mail único com as seções aplicáveis). --}}
 <table width="960px" border="0">
     <tr bgcolor="#7e0001"><td>&nbsp;</td></tr>
-    @if ($sections['mode'] !== 'exception')
+    @if (! $sections['exception'])
         <tr><td><font face="Arial"><strong>Prezado Cliente,</strong></font></td></tr>
     @endif
     <tr><td><font face="Arial" color="black"><h3>Instrução de Cobrança</h3></font></td></tr>
     @include('mail.cobranca.partials.instruction-sections')
-    @if ($sections['mode'] !== 'exception')
+    @if (! $sections['exception'])
         <tr><td>&nbsp;</td></tr>
         <tr><td><font face="Arial">Atenciosamente,<br/>Departamento Financeiro</font></td></tr>
         <tr><td>&nbsp;</td></tr>

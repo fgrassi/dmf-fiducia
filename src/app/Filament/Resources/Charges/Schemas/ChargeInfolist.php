@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Charges\Schemas;
 
+use App\Actions\Cobranca\Boleto\CancelBoleto;
+use App\Actions\Cobranca\Boleto\CheckBoletoStatus;
 use App\Actions\Cobranca\Documents\DebitNote;
 use App\Actions\Cobranca\Documents\DeclarationPdf;
 use App\Actions\Cobranca\Items\DeleteItems;
@@ -16,6 +18,7 @@ use App\Actions\Cobranca\Receipts\SendBoletoReceipt;
 use App\Enums\Cobranca\ChargeStatus;
 use App\Models\Escritorio;
 use App\Models\FinCharges;
+use App\Models\FinChargesBoletoSicredi;
 use App\Services\Cobranca\ChargeDetails;
 use Carbon\CarbonInterface;
 use DomainException;
@@ -35,6 +38,7 @@ use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Storage;
 
 /** Página da cobrança (showSuccess do legado): coluna esquerda com os dados financeiros, direita com baixa/recibos/NFS-e. */
 class ChargeInfolist
@@ -275,6 +279,68 @@ class ChargeInfolist
                 JS);
     }
 
+    /** Quadro "Boleto Sicredi": o último boleto da cobrança, com o PDF, a consulta do status e o pedido de baixa. */
+    private static function boletoSection(): Section
+    {
+        $last = fn (FinCharges $r) => once(fn () => FinChargesBoletoSicredi::where('ref_charge', $r->getKey())->orderByDesc('id')->first());
+        $entry = fn (string $name, string $label, callable $value) => TextEntry::make("boleto_{$name}")
+            ->label($label)
+            ->state(fn (FinCharges $record) => $value($last($record)));
+        $run = function (Action $action, callable $call): string {
+            try {
+                return (string) $call();
+            } catch (DomainException $e) {
+                Notification::make()->title($e->getMessage())->danger()->send();
+                $action->halt();
+            }
+        };
+
+        return Section::make('Boleto Sicredi')
+            ->key('boleto_sicredi')
+            ->visible(fn (FinCharges $r) => ($b = $last($r)) && ($b->status === 'erro' || $b->isIssued() || filled($b->nosso_numero)))
+            ->columns(2)
+            ->headerActions([
+                Action::make('abrirBoleto')
+                    ->label('Abrir PDF')
+                    ->icon(Heroicon::DocumentText)
+                    ->link()
+                    ->visible(fn (FinCharges $record) => (bool) $last($record)?->pdfPath())
+                    ->action(fn (FinCharges $record) => Storage::disk('tracking_uploads')->download($last($record)->pdfPath())),
+                Action::make('consultarBoleto')
+                    ->label('Consultar status')
+                    ->icon(Heroicon::ArrowPath)
+                    ->link()
+                    ->visible(fn (FinCharges $record) => filled($last($record)?->nosso_numero))
+                    ->action(function (FinCharges $record, Action $action) use ($last, $run) {
+                        $situation = $run($action, fn () => app(CheckBoletoStatus::class)($last($record), auth()->id()));
+                        Notification::make()->title("Situação Sicredi: {$situation}")->success()->send();
+                    }),
+                Action::make('pedirBaixaBoleto')
+                    ->label('Baixar boleto')
+                    ->icon(Heroicon::XCircle)
+                    ->color('danger')
+                    ->link()
+                    ->visible(fn (FinCharges $record) => (bool) FinChargesBoletoSicredi::issuedFor($record->getKey()))
+                    ->requiresConfirmation()
+                    ->modalHeading('Baixar boleto Sicredi')
+                    ->modalDescription('Enviar pedido de baixa deste boleto à Sicredi? A cobrança não será alterada.')
+                    ->modalSubmitActionLabel('Sim, baixar')
+                    ->action(function (FinCharges $record, Action $action) use ($run) {
+                        $run($action, fn () => app(CancelBoleto::class)(FinChargesBoletoSicredi::issuedFor($record->getKey()), auth()->id()));
+                        Notification::make()->title('Pedido de baixa enviado à Sicredi.')->success()->send();
+                    }),
+            ])
+            ->schema([
+                $entry('status', 'Status', fn (?FinChargesBoletoSicredi $b) => $b?->status),
+                $entry('vencimento', 'Vencimento', fn (?FinChargesBoletoSicredi $b) => $b?->data_vencimento?->format('d/m/Y')),
+                $entry('valor', 'Valor', fn (?FinChargesBoletoSicredi $b) => $b ? 'R$ '.number_format($b->valor, 2, ',', '.') : null),
+                $entry('nosso_numero', 'Nosso número', fn (?FinChargesBoletoSicredi $b) => $b?->nosso_numero)->placeholder('—'),
+                $entry('linha', 'Linha digitável', fn (?FinChargesBoletoSicredi $b) => $b?->linha_digitavel)->copyable()->placeholder('—')->columnSpanFull(),
+                $entry('erro', 'Erro', fn (?FinChargesBoletoSicredi $b) => $b?->erro_mensagem)->color('danger')->columnSpanFull()
+                    ->visible(fn (FinCharges $record) => filled($last($record)?->erro_mensagem)),
+            ]);
+    }
+
     public static function configure(Schema $schema): Schema
     {
         $details = fn () => app(ChargeDetails::class);
@@ -410,6 +476,7 @@ class ChargeInfolist
                                 ]),
                         ]),
                         Group::make([
+                            self::boletoSection(),
                             Section::make('Baixa Bancária')
                                 ->visible($status(1))
                                 ->schema([

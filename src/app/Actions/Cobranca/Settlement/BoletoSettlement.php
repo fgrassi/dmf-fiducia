@@ -80,22 +80,7 @@ class BoletoSettlement
                 'created_by' => $user->getKey(),
             ]);
 
-            DB::table('transborda')->insert([
-                'usuario_id' => 1,
-                'embarque_id' => $charge->ref_booking,
-                'data_reg' => now()->toDateString(),
-                'descr' => 'Payment received',
-                'ref_frase_transborda' => 59,
-            ]);
-
-            $file = CmnFile::forceCreate([
-                'name' => 'declaracao_boleto_dmf_'.now()->format('YmdHis'),
-                'subject' => "Declaração de Recebimento do Booking {$charge->embarque->booking}",
-                'created_at' => now()->toDateString(),
-            ]);
-            $file->forceFill(['uid' => sha1((string) $file->getKey())])->save();
-
-            return FinPaymentBoleto::forceCreate(['ref_charge' => $charge->id, 'due_to' => $dueTo, 'ref_file' => $file->getKey()]);
+            return $this->declare($charge, $dueTo);
         });
 
         $this->sendDeclaration($charge, $declaration->file->name);
@@ -103,8 +88,29 @@ class BoletoSettlement
         return $this->nfse->forCharge($charge, $nfse, IssueNfse::SETTLEMENT, $user->getKey());
     }
 
+    /** geraDeclaracao: registra o pagamento no tracking e cria a declaração (fin_payment_boleto), ainda sem o PDF. */
+    public function declare(FinCharges $charge, string $dueTo): FinPaymentBoleto
+    {
+        DB::table('transborda')->insert([
+            'usuario_id' => 1,
+            'embarque_id' => $charge->ref_booking,
+            'data_reg' => now()->toDateString(),
+            'descr' => 'Payment received',
+            'ref_frase_transborda' => 59,
+        ]);
+
+        $file = CmnFile::forceCreate([
+            'name' => 'declaracao_boleto_dmf_'.now()->format('YmdHis'),
+            'subject' => "Declaração de Recebimento do Booking {$charge->embarque->booking}",
+            'created_at' => now()->toDateString(),
+        ]);
+        $file->forceFill(['uid' => sha1((string) $file->getKey())])->save();
+
+        return FinPaymentBoleto::forceCreate(['ref_charge' => $charge->id, 'due_to' => $dueTo, 'ref_file' => $file->getKey()]);
+    }
+
     /** Grava o PDF em uploads/declaracao e envia ao setor de cobrança e aos contatos do cliente. */
-    private function sendDeclaration(FinCharges $charge, string $name): void
+    public function sendDeclaration(FinCharges $charge, string $name): void
     {
         $path = "declaracao/{$name}.pdf";
         Storage::disk('tracking_uploads')->put($path, $this->pdf->render($charge, plain: false)->Output('', 'S'));

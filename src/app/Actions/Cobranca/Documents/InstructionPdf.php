@@ -2,12 +2,14 @@
 
 namespace App\Actions\Cobranca\Documents;
 
+use App\Actions\Cobranca\Boleto\IssueBoleto;
 use App\Actions\Cobranca\Listing\ChargeDueDate;
 use App\Actions\Cobranca\Nfse\EmissionGroups;
 use App\Actions\Cobranca\Nfse\InstructionEmailSections;
 use App\Actions\Cobranca\Recalculation\ChargeRates;
 use App\Models\CmnFile;
 use App\Models\FinCharges;
+use App\Models\FinChargesBoletoSicredi;
 use App\Services\Cobranca\ChargeDetails;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +21,8 @@ use TCPDF;
  * Cobranca::geraPdf (legado): PDF da Instrução de Cobrança (dados da reserva, containers, despesas, avisos,
  * dados bancários e contatos), gravado em uploads/cobranca como ic{modal}{id}{ddmmyyGi} e anexado à IC;
  * com $sendEmail, vai ao cliente no e-mail "Instrução de Cobrança" (cliente em exceção: só o financeiro).
+ * Antes, o cliente com boleto automático tem o boleto emitido (também quando o e-mail fica para depois), e o PDF dele
+ * vai anexado ao e-mail.
  *
  * A IC de seguro (geraPdfSeguro) é o InsurancePdf.  título em Helvetica (o legado usa BebasNeue).
  */
@@ -41,6 +45,7 @@ class InstructionPdf
         private ChargeDetails $details,
         private ChargeDueDate $dueDate,
         private ChargeRecipients $recipients,
+        private IssueBoleto $boleto,
     ) {}
 
     /** @return string arquivo em uploads/cobranca */
@@ -54,6 +59,8 @@ class InstructionPdf
         $file = CmnFile::forceCreate(['name' => $name, 'subject' => "Cobrança do Booking {$e->booking}", 'created_at' => now()->toDateString(), 'uid' => 1]);
         $file->forceFill(['uid' => sha1((string) $file->getKey())])->save();
         DB::table('fin_charges_files')->insert(['ref_charge' => $charge->id, 'ref_file' => $file->getKey()]);
+
+        $this->boleto->automatic($charge);
 
         if ($sendEmail) {
             $this->send($charge, "{$name}.pdf", $recalculated);
@@ -367,23 +374,49 @@ class InstructionPdf
     private function send(FinCharges $charge, string $file, bool $recalculated): void
     {
         $e = $charge->embarque;
-        // FinClientsException só recebe a IC depois do recálculo (salvo armador que não recalcula)
-        $inException = ! $recalculated && ! EmissionGroups::carrierDoesNotRecalculate($e)
-            && DB::table('fin_clients_exception')->where('ref_client', ChargeRates::clientId($e))->exists();
-        $client = DB::table('pessoa')->where('pessoa_id', ChargeRates::clientId($e))->first(['nome', 'razao_social']);
-        $type = (int) $charge->ref_type !== 1 ? ' - '.mb_strtoupper((string) $charge->type?->name) : '';
-        $subject = "DMF Logistics: Instrução de Cobrança {$type}: {$e->booking} - ".preg_replace("/\r?\n/m", ' ', (string) $e->invoice)
-            .' - '.($client ? ($client->razao_social ?: $client->nome) : '')
-            .($charge->ref_bl && filled($e->customer_ref) ? ' - '.preg_replace("/\r?\n/m", ' ', (string) $e->customer_ref) : '');
+        $inException = self::heldForRecalculation($charge, $recalculated);
+        $subject = self::subject($charge);
 
         Mail::send('mail.cobranca.instruction', [
             'sections' => InstructionEmailSections::build($charge, $inException),
         ], function ($mail) use ($charge, $file, $subject, $inException) {
+            if ($boleto = self::boletoFile($charge)) {
+                $mail->attach($boleto['path'], ['as' => $boleto['name']]);
+            }
+
             $mail->from(ChargeRecipients::COLLECTION_EMAIL, 'DMF Logistics do Brasil - Setor de Cobrança')
                 ->to([ChargeRecipients::COLLECTION_EMAIL, ...($inException ? [] : array_keys(($this->recipients)($charge)))])
                 ->subject($subject)
                 ->attach(Storage::disk('tracking_uploads')->path("cobranca/{$file}"), ['as' => $file]);
         });
+    }
+
+    /** FinClientsException só recebe a IC depois do recálculo (salvo armador que não recalcula). */
+    public static function heldForRecalculation(FinCharges $charge, bool $recalculated): bool
+    {
+        return ! $recalculated && ! EmissionGroups::carrierDoesNotRecalculate($charge->embarque)
+            && DB::table('fin_clients_exception')->where('ref_client', ChargeRates::clientId($charge->embarque))->exists();
+    }
+
+    /** Assunto do e-mail da IC. */
+    public static function subject(FinCharges $charge): string
+    {
+        $e = $charge->embarque;
+        $client = DB::table('pessoa')->where('pessoa_id', ChargeRates::clientId($e))->first(['nome', 'razao_social']);
+        $type = (int) $charge->ref_type !== 1 ? ' - '.mb_strtoupper((string) $charge->type?->name) : '';
+
+        return "DMF Logistics: Instrução de Cobrança{$type}: {$e->booking} - ".preg_replace("/\r?\n/m", ' ', (string) $e->invoice)
+            .' - '.($client ? ($client->razao_social ?: $client->nome) : '')
+            .($charge->ref_bl && filled($e->customer_ref) ? ' - '.preg_replace("/\r?\n/m", ' ', (string) $e->customer_ref) : '');
+    }
+
+    /** resolverArquivoBoletoSicredi: PDF do boleto emitido da cobrança. @return ?array{path:string, name:string} */
+    public static function boletoFile(FinCharges $charge): ?array
+    {
+        $path = FinChargesBoletoSicredi::issuedFor($charge->id)?->pdfPath();
+        $disk = Storage::disk('tracking_uploads');
+
+        return $path && $disk->exists($path) ? ['path' => $disk->path($path), 'name' => basename($path)] : null;
     }
 
     /** DMFUtil::getAlturaConteudo: altura que o texto ocupa numa célula de largura $w. */

@@ -12,14 +12,6 @@ class MergeRecordsTest extends TestCase
 {
     use LegacySchema;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        // tabela do app Fiducia: não está no fixture do legado, mas tem FK para pessoa no banco real
-        Schema::create('fiducia_contratos', fn ($table) => $table->unsignedBigInteger('cliente_id'));
-    }
-
     public function test_every_mapped_column_exists_in_the_legacy_schema(): void
     {
         foreach (MergeRecords::ENTITIES as $entity => $config) {

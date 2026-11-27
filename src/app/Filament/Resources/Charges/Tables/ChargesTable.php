@@ -75,11 +75,12 @@ class ChargesTable
                             TextInput::make('num_nota_fiscal')->label('Número NF'),
                             TextInput::make('id_fpr')->label('Número Recibo'),
                         ]),
-                        Fieldset::make('Classificação')->columns(5)->schema([
+                        Fieldset::make('Classificação')->columns(6)->schema([
                             Select::make('ref_type')->label('Tipo')->options(fn () => FinChargesTypes::pluck('name', 'id')),
                             Select::make('status')->label('Status')
                                 ->options(collect(ChargeStatus::cases())->mapWithKeys(fn ($s) => [$s->value => $s->label()])),
                             Select::make('status_nfse')->label('Status NFSe')->options(BuildChargeListQuery::NFSE_OPTIONS),
+                            Select::make('boleto')->label('Boleto')->options([1 => 'Sim', 0 => 'Não']),
                             TextInput::make('valor_total')->label('Valor Total')->placeholder('1.234,56'),
                             Select::make('grupo_empresa_id')
                                 ->label('Grupo de Empresa')
