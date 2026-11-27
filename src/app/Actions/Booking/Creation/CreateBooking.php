@@ -46,6 +46,7 @@ class CreateBooking
         private CreateInsuranceBooking $insurance,
         private HistorySnapshot $history,
         private BookingSnapshot $snapshot,
+        private NextBookingNumber $numbers,
         private SendNoticeMail $send,
     ) {}
 
@@ -130,6 +131,12 @@ class CreateBooking
 
         foreach ($required as $field => $message) {
             throw_if(blank(trim((string) ($data[$field] ?? ''))), DomainException::class, $message);
+        }
+
+        // Na importação o legado só bloqueia o campo na tela; aqui o número tem que ter saído do botão e ainda estar livre.
+        if ($operation === 'i') {
+            throw_unless($this->numbers->wasIssued((string) $data['booking'], $mode), DomainException::class, 'Gere o número do booking pelo botão "Solicitar número".');
+            throw_if(DB::table('embarque')->where('booking', $data['booking'])->exists(), DomainException::class, 'Este número de reserva já foi utilizado.');
         }
 
         foreach (BookingParties::PARTIES as [$column, , $label]) {

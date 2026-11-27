@@ -36,6 +36,9 @@ trait BookingCreationFixture
         $this->destination = $this->row('porto', ['nome' => 'RIO GRANDE', 'uncode' => 'BRRIG', 'ref_pais' => 1, 'tipo' => 'p']);
         $office = $this->row('sedes', ['nome' => 'Sul', 'prefixo_imp' => 'IMP']);
         $this->seller = $this->row('vendedor', ['nome' => 'Vera', 'sede_id' => $office]);
+        // Números já pedidos pelo botão: IMP1-26 e IMP2-26 (no aéreo, com o "A" na frente).
+        $this->row('import_booking', ['sequencia' => 1]);
+        $this->row('import_booking', ['sequencia' => 2]);
         $this->equipment = $this->row('tipo_container', ['nome' => "20' DRY", 'tipo_embarque' => 'm']);
     }
 

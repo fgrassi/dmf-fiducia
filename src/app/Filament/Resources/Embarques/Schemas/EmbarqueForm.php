@@ -228,7 +228,7 @@ class EmbarqueForm
                     }
 
                     try {
-                        $set('booking', app(NextBookingNumber::class)((int) $get('vendedor_id')));
+                        $set('booking', app(NextBookingNumber::class)((int) $get('vendedor_id'), $this->mode));
                     } catch (DomainException $e) {
                         Notification::make()->title($e->getMessage())->danger()->send();
                     }

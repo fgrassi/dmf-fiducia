@@ -101,7 +101,7 @@ class CreateBookingTest extends TestCase
 
         $without = $this->create($this->bookingData(['despachante_dmf_id' => $default]));
         DB::table('porto')->where('porto_id', $this->destination)->update(['despachante_id' => $default]);
-        $with = $this->create($this->bookingData(['despachante_dmf_id' => 999]));
+        $with = $this->create($this->bookingData(['booking' => 'IMP2-26', 'despachante_dmf_id' => 999]));
 
         $this->assertSame([null, $default], [$without->despachante_dmf_id, (int) $with->despachante_dmf_id]);
     }
@@ -129,10 +129,12 @@ class CreateBookingTest extends TestCase
     {
         DB::table('pessoa')->where('pessoa_id', $this->client)->update(['seguro_obrigatorio' => 's']);
 
-        $booking = $this->create($this->bookingData(['de' => 'Ana', 'justificativa_seguro' => 'Cliente tem apólice própria']), 'i', $mode);
+        $number = $mode === 'a' ? 'AIMP1-26' : 'IMP1-26';
+
+        $booking = $this->create($this->bookingData(['booking' => $number, 'de' => 'Ana', 'justificativa_seguro' => 'Cliente tem apólice própria']), 'i', $mode);
 
         $this->assertDatabaseHas('rastreamento', ['ref_embarque' => $booking->getKey(), 'justificativa' => 'Cliente tem apólice própria']);
-        $this->assertContains('[Aviso] Cliente com Seguro Obrigatório sem Reserva de Seguro - IMP1-26', $this->sentSubjects()->all());
+        $this->assertContains("[Aviso] Cliente com Seguro Obrigatório sem Reserva de Seguro - {$number}", $this->sentSubjects()->all());
     }
 
     public static function modes(): array
@@ -151,6 +153,9 @@ class CreateBookingTest extends TestCase
             'insurance' => DB::table('pessoa')->where('pessoa_id', $this->client)->update(['seguro_obrigatorio' => 's']),
             'agent' => $data['pessoa_id_representante'] = null,
             'reefer' => $data['goods'] = [['nome' => 'Frango', 'quantidade' => 1, 'tipo_container_id' => 8]],
+            'typed' => $data['booking'] = 'IMP999-26',
+            'free text' => $data['booking'] = 'QUALQUER',
+            'air number' => $data['booking'] = 'AIMP1-26',
         };
 
         try {
@@ -173,7 +178,19 @@ class CreateBookingTest extends TestCase
             'seguro obrigatório' => ['insurance', 'justifique'],
             'sem agente' => ['agent', 'Agente'],
             'reefer sem temperatura' => ['reefer', 'REEFER'],
+            'sequência não emitida' => ['typed', 'Solicitar número'],
+            'número digitado' => ['free text', 'Solicitar número'],
+            'número aéreo no marítimo' => ['air number', 'Solicitar número'],
         ];
+    }
+
+    public function test_refuses_an_import_number_already_used(): void
+    {
+        $this->create($this->bookingData());
+
+        $this->expectExceptionMessage('já foi utilizado');
+
+        $this->create($this->bookingData());
     }
 
     public function test_user_limited_to_import_cannot_create_an_export(): void
@@ -219,7 +236,7 @@ class CreateBookingTest extends TestCase
 
     public function test_air_booking_has_no_bl_expense_matrix_or_insurance_booking(): void
     {
-        $booking = $this->create($this->bookingData(['de' => 'Ana', 'insurance' => 's', 'saida_prevista' => '2026-12-01']), 'i', 'a');
+        $booking = $this->create($this->bookingData(['booking' => 'AIMP1-26', 'de' => 'Ana', 'insurance' => 's', 'saida_prevista' => '2026-12-01']), 'i', 'a');
 
         $this->assertSame(['a', null], [$booking->tipo_embarque, $booking->etd_inicial]);
         // Como no legado: em branco é '', senão os filtros `loading_type <> 'f'` e `ce_mercante = ''` pulam a reserva.
@@ -233,8 +250,8 @@ class CreateBookingTest extends TestCase
     {
         $this->row('import_booking', ['sequencia' => 41]);
 
-        $this->assertSame('IMP42-'.now()->format('y'), app(NextBookingNumber::class)($this->seller));
-        $this->assertSame('IMP43-'.now()->format('y'), app(NextBookingNumber::class)($this->seller));
+        $this->assertSame('IMP42-'.now()->format('y'), app(NextBookingNumber::class)($this->seller, 'm'));
+        $this->assertSame('AIMP43-'.now()->format('y'), app(NextBookingNumber::class)($this->seller, 'a'));
     }
 
     public function test_import_quotation_fills_the_form_with_default_contacts_broker_and_containers(): void
