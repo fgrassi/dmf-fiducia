@@ -8,6 +8,7 @@ use App\Actions\Booking\Creation\CreateBooking;
 use App\Actions\Booking\Creation\CreateInsuranceBooking;
 use App\Actions\Booking\Creation\HistorySnapshot;
 use App\Actions\Booking\Creation\ImportExpenseMatrix;
+use App\Actions\Booking\ShippingInstruction\AddInstructionFile;
 use App\Enums\Alert;
 use App\Enums\AmsDestination;
 use App\Models\Bl;
@@ -112,6 +113,14 @@ class UpdateBooking
 
         $changesValidity = array_key_exists('data_validade', $data) && self::changesValidity($booking, $data['data_validade']);
         throw_if($changesValidity && blank($data['justificativa_validade'] ?? null), DomainException::class, 'É necessário informar uma justificativa para a alteração da data de validade.');
+
+        // O destino é a pasta uploads do tracking, servida pelo PHP do legado: a extensão é conferida no servidor.
+        $file = $changesValidity ? ($data['arquivo_validade'] ?? null) : null;
+        throw_if(
+            $file && ! in_array(strtolower($file->getClientOriginalExtension()), AddInstructionFile::EXTENSIONS, true),
+            DomainException::class,
+            'Tipo de arquivo não aceito.',
+        );
 
         $needsInsuranceJustification = $this->creation->needsInsuranceJustification($data, $operation, $mode, $booking);
 
@@ -391,10 +400,11 @@ class UpdateBooking
         });
     }
 
-    /** addArquivo (legado): data e hora na frente do nome, sem espaços nem caracteres especiais. */
+    /** addArquivo (legado): data e hora na frente do nome, sem espaços nem caracteres especiais (aqui, também sem pontos). */
     private function storeValidityFile(Embarque $booking, UploadedFile $file, int $userId): void
     {
-        $name = now()->format('dmyGi').'_'.preg_replace('/[^A-Za-z0-9-._]/', '', str_replace(' ', '_', $file->getClientOriginalName()));
+        $base = preg_replace('/[^A-Za-z0-9-_]/', '', str_replace(' ', '_', pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)));
+        $name = now()->format('dmyGi')."_{$base}.".strtolower($file->getClientOriginalExtension());
         Storage::disk('tracking_uploads')->putFileAs('docs_emb', $file, $name);
 
         $stored = (new CmnFile)->forceFill(['uid' => 1, 'name' => $name, 'created_at' => now()->toDateString(), 'created_by' => $userId]);

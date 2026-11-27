@@ -298,6 +298,7 @@ class EmbarqueForm
             FileUpload::make('arquivo_validade')
                 ->label('Arquivo da negociação')
                 ->storeFiles(false)
+                ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/zip'])
                 ->maxSize(20480)
                 ->visible($changed)
                 ->columnSpanFull(),

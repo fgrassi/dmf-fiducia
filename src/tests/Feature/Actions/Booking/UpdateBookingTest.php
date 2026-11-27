@@ -254,6 +254,26 @@ class UpdateBookingTest extends TestCase
         $this->assertContains('Alteração da Data de Validade da Cotação - EXP-1 - ', $this->sentSubjects()->all());
     }
 
+    public function test_the_validity_file_cannot_be_a_script_on_the_legacy_uploads_folder(): void
+    {
+        $booking = $this->export();
+        $change = ['data_validade' => '2027-03-31', 'justificativa_validade' => 'Renegociado'];
+
+        try {
+            $this->updateExport($booking, [...$change, 'arquivo_validade' => UploadedFile::fake()->create('shell.php', 1)]);
+            $this->fail('Aceitou um script.');
+        } catch (DomainException $e) {
+            $this->assertStringContainsString('não aceito', $e->getMessage());
+        }
+
+        $this->assertSame([], Storage::disk('tracking_uploads')->allFiles());
+        $this->assertSame('2027-01-31', substr($booking->fresh()->data_validade, 0, 10));
+
+        $this->updateExport($booking, [...$change, 'arquivo_validade' => UploadedFile::fake()->create('shell.php.PDF', 1)]);
+
+        $this->assertStringEndsWith('_shellphp.pdf', DB::table('cmn_files')->value('name'));
+    }
+
     public function test_anticipating_the_etd_or_changing_the_ship_of_an_insured_export_warns_about_the_policy(): void
     {
         $ship = $this->row('navio', ['nome' => 'UM']);
