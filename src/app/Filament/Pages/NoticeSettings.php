@@ -12,10 +12,9 @@ use App\Models\NoticeSetting;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
-use Filament\Forms\Components\RichEditor;
-use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\Toggle;
@@ -172,9 +171,10 @@ class NoticeSettings extends Page implements HasTable
                         ], fn ($value) => $value !== null);
 
                         if ($record['tags'] !== []) {
-                            // em branco vale o texto padrão
+                            // em branco ou igual ao padrão, vale o texto padrão
                             $changes['subject'] = filled($data['subject'] ?? null) && $data['subject'] !== $record['default_subject'] ? $data['subject'] : null;
-                            $changes['body'] = filled(trim(strip_tags((string) ($data['body'] ?? '')))) ? $data['body'] : null;
+                            $body = str_replace("\r\n", "\n", (string) ($data['body'] ?? ''));
+                            $changes['body'] = filled($body) && $body !== $record['default_body'] ? $body : null;
                         }
 
                         app(UpdateNoticeSetting::class)($this->setting($record), $changes);
@@ -208,7 +208,7 @@ class NoticeSettings extends Page implements HasTable
                 'subject' => $case instanceof Notice ? $settings->get($case->value)?->subject : null,
                 'body' => $case instanceof Notice ? $settings->get($case->value)?->body : null,
                 'default_subject' => $case instanceof Notice ? NoticeTexts::for($case)['subject'] : null,
-                'default_body' => $case instanceof Notice ? NoticeTexts::editorBody($case) : null,
+                'default_body' => $case instanceof Notice ? NoticeTexts::for($case)['body'] : null,
                 'tags' => $case instanceof Notice ? array_map(fn (array $tag): string => $tag['label'], NoticeTexts::for($case)['tags']) : [],
                 'copy_label' => $case instanceof Notice && $case->copiesAreBlind() ? 'Cópia oculta' : 'Cópia',
             ])
@@ -251,28 +251,19 @@ class NoticeSettings extends Page implements HasTable
                         return;
                     }
 
-                    $body = $get('body');
-                    $set('body', is_array($body)
-                        ? [...$body, 'content' => [...($body['content'] ?? []), ['type' => 'paragraph', 'content' => [['type' => 'mergeTag', 'attrs' => ['id' => $state]]]]]]
-                        : $body.'<p><span data-type="mergeTag" data-id="'.$state.'"></span></p>');
+                    $set('body', $get('body').'{{'.$state.'}}');
                     $set('insert_body_tag', null);
                 })
                 ->columnSpanFull(),
-            RichEditor::make('body')
-                ->label('Texto do e-mail')
-                ->helperText('Já vem com o texto padrão; apagando tudo vale o padrão. Para inserir uma variável use o botão de variáveis da barra (digitar "{{" também abre a busca); a variável "Lista" é a tabela que a rotina calcula.')
-                ->mergeTags($record['tags'])
-                ->saveRelationshipsUsing(null)
-                ->toolbarButtons([
-                    ['bold', 'italic', 'underline', 'strike', 'link', 'textColor'],
-                    ['h2', 'h3', 'alignStart', 'alignCenter', 'alignEnd'],
-                    ['bulletList', 'orderedList'],
-                    ['mergeTags'],
-                    ['undo', 'redo'],
-                ])
+            // como nos Textos de E-mail (IC): HTML editado direto, porque o editor rico apaga o <font> e os estilos
+            Textarea::make('body')
+                ->label('Corpo (HTML)')
+                ->helperText('Já vem com o texto padrão; apagando tudo vale o padrão. Marcadores: '.collect($record['tags'])->keys()->map(fn (string $tag) => '{{'.$tag.'}}')->implode(' ').'. O {{lista}} e os outros marcadores de tabela entram com o HTML que a rotina calcula.')
+                ->rows(18)
+                ->extraInputAttributes(['class' => 'font-mono text-sm'])
                 ->hintAction(Action::make('loadDefaultText')
                     ->label('Carregar o texto padrão')
-                    ->action(fn (Set $set) => $set('body', NoticeTexts::editorBody(Notice::from($record['notice'])))))
+                    ->action(fn (Set $set) => $set('body', $default['body'])))
                 ->columnSpanFull(),
         ];
     }
@@ -284,13 +275,12 @@ class NoticeSettings extends Page implements HasTable
     private function preview(array $record, array $data): HtmlString
     {
         $notice = Notice::from($record['notice']);
-        $body = $data['body'] ?? null;
-        $body = is_array($body) ? RichContentRenderer::make($body)->toHtml() : $body;
         $samples = array_map(fn (array $tag): string => $tag['sample'], NoticeTexts::for($notice)['tags']);
 
-        [$subject, $html] = app(RenderNoticeEmail::class)->render($notice, $data['subject'] ?? null, $body, $samples);
+        [$subject, $html] = app(RenderNoticeEmail::class)->render($notice, $data['subject'] ?? null, $data['body'] ?? null, $samples);
 
-        return new HtmlString('<p class="mb-2 font-semibold">'.e($subject).'</p><iframe class="w-full rounded border border-gray-300" style="height: 28rem; background: #fff" srcdoc="'.e('<body style="font-family: sans-serif; font-size: 14px">'.$html.'</body>').'"></iframe>');
+        // iframe sem scripts: o corpo é HTML livre da tela
+        return new HtmlString('<p class="mb-2 font-semibold">'.e($subject).'</p><iframe sandbox="" class="w-full rounded border border-gray-300" style="height: 28rem; background: #fff" srcdoc="'.e('<body style="font-family: sans-serif; font-size: 14px">'.$html.'</body>').'"></iframe>');
     }
 
     /** @param  array<string, mixed>  $record */

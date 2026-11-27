@@ -64,11 +64,12 @@ class NoticeSettingsTest extends TestCase
 
         Livewire::test(NoticeSettings::class)
             ->mountAction(TestAction::make('edit')->table($notice->value))
-            ->assertSchemaStateSet(['subject' => $default['subject'], 'body' => NoticeTexts::editorBody($notice)])
-            ->callMountedAction([...$edit, 'subject' => $default['subject']])
+            ->assertSchemaStateSet(['subject' => $default['subject'], 'body' => $default['body']])
+            ->callMountedAction([...$edit, 'subject' => $default['subject'], 'body' => $default['body']])
             ->assertHasNoActionErrors();
 
         $this->assertNull(NoticeSetting::firstWhere('notice', $notice->value)->subject);
+        $this->assertNull(NoticeSetting::firstWhere('notice', $notice->value)->body);
     }
 
     public function test_the_select_appends_the_variable_to_the_body(): void
@@ -79,7 +80,7 @@ class NoticeSettingsTest extends TestCase
         Livewire::test(NoticeSettings::class)
             ->mountAction(TestAction::make('edit')->table($notice->value))
             ->fillForm(['insert_body_tag' => 'data'])
-            ->assertSchemaStateSet(['body' => NoticeTexts::editorBody($notice).'<p><span data-type="mergeTag" data-id="data"></span></p>', 'insert_body_tag' => null]);
+            ->assertSchemaStateSet(['body' => NoticeTexts::for($notice)['body'].'{{data}}', 'insert_body_tag' => null]);
     }
 
     public function test_preview_renders_the_unsaved_text_with_sample_values(): void
@@ -92,8 +93,8 @@ class NoticeSettingsTest extends TestCase
         $this->assertStringContainsString('Vence 21/11/2026', $default);
         $this->assertStringContainsString('Lembrete: os vencimentos abaixo ocorrem em 3 dias (21/11/2026)', $default);
 
-        $document = ['type' => 'doc', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Texto novo para '], ['type' => 'mergeTag', 'attrs' => ['id' => 'vencimento']]]]]];
-        $custom = html_entity_decode($preview(['subject' => null, 'body' => $document]));
+        $custom = html_entity_decode($preview(['subject' => null, 'body' => '<p>Texto novo para {{vencimento}}</p>']));
+        $this->assertStringContainsString('<iframe sandbox=""', $custom);
         $this->assertStringContainsString('Texto novo para', $custom);
         $this->assertStringContainsString('21/11/2026', $custom);
         $this->assertStringNotContainsString('Lembrete', $custom);

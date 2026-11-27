@@ -119,15 +119,6 @@ class NoticeTexts
         return compact('subject', 'body', 'tags');
     }
 
-    /**
-     * Corpo padrão com as {{variáveis}} como chips do editor (nós "mergeTag"). Como texto literal o editor abre o seletor de variáveis
-     * ("No merge tag results.") toda vez que o cursor fica depois de {{.
-     */
-    public static function editorBody(Notice $notice): string
-    {
-        return preg_replace('/\{\{(\w+)\}\}/', '<span data-type="mergeTag" data-id="$1"></span>', self::for($notice)['body']);
-    }
-
     /** @return array<string, array{label: string, sample: string, html: bool}> variáveis prontas da reserva (BookingTags) */
     private static function bookingTags(): array
     {

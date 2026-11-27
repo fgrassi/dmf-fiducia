@@ -4,7 +4,6 @@ namespace App\Actions\Notices;
 
 use App\Enums\Notice;
 use App\Models\NoticeSetting;
-use Filament\Forms\Components\RichEditor\RichContentRenderer;
 
 /**
  * Monta assunto e HTML de um aviso: o texto editado na tela (notice_settings) ou, sem ele, o padrão de NoticeTexts, trocando as
@@ -40,17 +39,6 @@ class RenderNoticeEmail
             $subjectValues['{{'.$tag.'}}'] = $value;
         }
 
-        $html = filled($body)
-            ? RichContentRenderer::make($body)->mergeTags(array_combine(array_keys($raw), array_map(fn ($tag) => '{{'.$tag.'}}', array_keys($raw))))->toHtml()
-            : $text['body'];
-
-        // o chip do editor vira só {{variável}} (sem o <span>, que não pode envolver uma tabela)
-        $html = preg_replace('#<span[^>]*data-type="mergeTag"[^>]*>(\{\{\w+\}\})</span>#', '$1', $html);
-
-        // o editor põe a variável sozinha dentro de um <p>; tabela dentro de parágrafo é HTML inválido
-        $htmlTags = array_keys(array_filter($text['tags'], fn (array $tag) => $tag['html'] ?? false));
-        $html = preg_replace('#<p>\s*(\{\{(?:'.implode('|', array_map('preg_quote', $htmlTags ?: ['-'])).')\}\})\s*</p>#', '$1', $html);
-
-        return [strtr(filled($subject) ? $subject : $text['subject'], $subjectValues), strtr($html, $safe)];
+        return [strtr(filled($subject) ? $subject : $text['subject'], $subjectValues), strtr(filled($body) ? $body : $text['body'], $safe)];
     }
 }

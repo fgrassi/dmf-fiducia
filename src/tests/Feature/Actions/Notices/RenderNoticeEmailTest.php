@@ -43,20 +43,17 @@ class RenderNoticeEmailTest extends TestCase
         $this->assertStringContainsString('<ul><li>ok</li></ul>', $html);
     }
 
-    public function test_a_saved_text_replaces_the_default_with_plain_variables_and_editor_merge_tags(): void
+    public function test_a_saved_text_replaces_the_default_and_keeps_its_html_as_typed(): void
     {
-        $chip = '<span data-type="mergeTag" data-id="data"></span>';
         app(UpdateNoticeSetting::class)(Notice::OpenCommissions, [
             'subject' => 'Aviso de {{data}}',
-            'body' => "<p>Olá, hoje é {$chip}.</p><p>{{lista}}</p>",
+            'body' => '<font color="red">Olá, hoje é {{data}}.</font>{{lista}}',
         ]);
 
         [$subject, $html] = app(RenderNoticeEmail::class)(Notice::OpenCommissions, ['data' => '18/11/2026', 'lista' => '<table><tr><td>C1</td></tr></table>']);
 
         $this->assertSame('Aviso de 18/11/2026', $subject);
-        $this->assertStringContainsString('Olá, hoje é 18/11/2026.', $html);
-        $this->assertStringContainsString('</p><table><tr><td>C1</td></tr></table>', $html);
-        $this->assertStringNotContainsString('{{', $html);
+        $this->assertSame('<font color="red">Olá, hoje é 18/11/2026.</font><table><tr><td>C1</td></tr></table>', $html);
     }
 
     public function test_the_notice_sends_the_saved_text(): void
@@ -80,18 +77,5 @@ class RenderNoticeEmailTest extends TestCase
 
             $this->assertSame([], array_diff($used[1], array_keys($text['tags'])), $notice->value);
         }
-    }
-
-    public function test_the_default_body_as_editor_chips_renders_the_table_without_a_span_or_paragraph_around_it(): void
-    {
-        $body = NoticeTexts::editorBody(Notice::ExchangeDeadline);
-
-        $this->assertStringContainsString('<span data-type="mergeTag" data-id="lista"></span>', $body);
-        $this->assertStringNotContainsString('{{', $body);
-
-        [, $html] = app(RenderNoticeEmail::class)->render(Notice::ExchangeDeadline, null, '<h3>Prazos</h3><p><span data-type="mergeTag" data-id="lista"></span></p>', ['lista' => '<table><tr><td>A1</td></tr></table>']);
-
-        $this->assertStringContainsString('<h3>Prazos</h3><table><tr><td>A1</td></tr></table>', $html);
-        $this->assertStringNotContainsString('mergeTag', $html);
     }
 }
