@@ -40,6 +40,7 @@ class MembersRelationManager extends RelationManager
                             ->getSearchResultsUsing(fn (string $search) => Pessoa::query()
                                 ->where(fn ($query) => $query->where('nome', 'like', "%{$search}%")->orWhere('cnpj', 'like', "%{$search}%"))
                                 ->whereNotIn('pessoa_id', $this->getOwnerRecord()->membros()->select('pessoa_id'))
+                                ->orderByRaw('case when nome like ? then 0 else 1 end', ["{$search}%"])
                                 ->orderBy('nome')
                                 ->limit(30)
                                 ->pluck('nome', 'pessoa_id'))
