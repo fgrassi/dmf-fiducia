@@ -11,18 +11,22 @@ use App\Models\FinClientsBoleto;
 use DomainException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Sleep;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
  * SicrediBoletoService::emitir (legado): cadastra o boleto da IC na Sicredi, baixa o PDF para uploads/boleto e grava em
- * fin_charges_boleto_sicredi. Reaproveita o boleto já emitido; se o cadastro saiu e só o PDF falhou, baixa de novo sem
- * cadastrar outro. Um lock por cobrança impede dois cadastros do mesmo boleto (novo em relação ao legado).
+ * fin_charges_boleto_sicredi. Reaproveita o boleto já emitido; se o cadastro saiu e só o PDF falhou (ou o emitido está
+ * sem arquivo), baixa de novo sem cadastrar outro. Um lock por cobrança impede dois cadastros do mesmo boleto (novo em relação ao legado).
  *
  * Como no legado, o boleto emitido é reaproveitado mesmo que a IC tenha sido recalculada depois: para trocar o valor,
  * baixar o boleto e emitir de novo.
  */
 class IssueBoleto
 {
+    private const PDF_ATTEMPTS = 4;
+
     public function __construct(
         private SicrediApi $api,
         private BoletoPayload $payload,
@@ -43,21 +47,23 @@ class IssueBoleto
             throw new DomainException('Cliente sem flag de boleto para o modal desta cobrança (IMPO/EXPO).');
         }
 
-        $lock = Cache::lock("sicredi-boleto-{$charge->id}", 120);
+        $lock = Cache::lock("sicredi-boleto-{$charge->id}", 180);
 
         if (! $lock->get()) {
             throw new DomainException('Já há uma emissão de boleto em andamento para esta cobrança.');
         }
 
         try {
-            if ($issued = FinChargesBoletoSicredi::issuedFor($charge->id)) {
+            $issued = FinChargesBoletoSicredi::issuedFor($charge->id);
+
+            if ($issued?->ref_file) {
                 return ['boleto' => $issued, 'reused' => true];
             }
 
             $registered = FinChargesBoletoSicredi::where('ref_charge', $charge->id)->where('status', 'erro')
                 ->where('linha_digitavel', '<>', '')->orderByDesc('id')->first();
 
-            return ['boleto' => $this->attachPdf($charge, $registered ?? $this->register($charge, $userId, $due)), 'reused' => false];
+            return ['boleto' => $this->attachPdf($charge, $issued ?? $registered ?? $this->register($charge, $userId, $due)), 'reused' => false];
         } finally {
             $lock->release();
         }
@@ -130,13 +136,20 @@ class IssueBoleto
         return $error ? throw new DomainException($error) : $boleto;
     }
 
-    private function attachPdf(FinCharges $charge, FinChargesBoletoSicredi $boleto): FinChargesBoletoSicredi
+    /**
+     * baixarPdfEAtualizar: baixa o PDF do boleto já cadastrado e o marca como emitido; sem o PDF, fica como "erro".
+     *
+     * @throws DomainException
+     */
+    public function attachPdf(FinCharges $charge, FinChargesBoletoSicredi $boleto): FinChargesBoletoSicredi
     {
-        $response = $this->api->pdf($boleto->linha_digitavel);
+        $response = $this->downloadPdf($boleto->linha_digitavel);
 
-        if (! $response['ok'] || ! str_starts_with($response['raw'], '%PDF')) {
-            $error = SicrediApi::errorMessage($response, 'Boleto cadastrado, mas falha ao baixar o PDF.');
-            $boleto->update(['erro_mensagem' => $error]);
+        if (! self::isPdf($response)) {
+            $detail = SicrediApi::errorMessage($response, 'Boleto cadastrado, mas falha ao baixar o PDF.');
+            $error = "Boleto cadastrado na Sicredi (linha digitável disponível), mas o PDF não foi liberado. Tente gerar novamente em alguns segundos. Detalhe: {$detail}";
+            $boleto->update(['status' => 'erro', 'erro_mensagem' => $error]);
+            logger()->error("[SicrediPdf] falha charge={$charge->id} nosso={$boleto->nosso_numero} http={$response['http_code']} msg={$detail}");
 
             throw new DomainException($error);
         }
@@ -149,5 +162,28 @@ class IssueBoleto
         $boleto->update(['ref_file' => $file->getKey(), 'status' => 'emitido', 'erro_mensagem' => null]);
 
         return $boleto;
+    }
+
+    /**
+     * baixarPdfComRetentativa: a Sicredi devolve a linha digitável no cadastro, mas o PDF costuma responder
+     * "Boleto não localizado" por alguns segundos. Repete só nesse caso, no limite de requisições ou sem resposta.
+     */
+    private function downloadPdf(string $digitableLine): array
+    {
+        for ($attempt = 1; ; $attempt++) {
+            $response = $this->api->pdf($digitableLine);
+
+            if (self::isPdf($response) || $attempt === self::PDF_ATTEMPTS || ! (in_array($response['http_code'], [0, 429], true)
+                || str_contains(strtolower(Str::ascii(SicrediApi::errorMessage($response, ''))), 'nao localizado'))) {
+                return $response;
+            }
+
+            Sleep::for(2)->seconds();
+        }
+    }
+
+    private static function isPdf(array $response): bool
+    {
+        return $response['ok'] && str_starts_with($response['raw'], '%PDF');
     }
 }

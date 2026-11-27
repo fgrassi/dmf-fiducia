@@ -52,6 +52,18 @@ class SicrediBoletoPagesTest extends TestCase
             ->assertDontSee('Boleto Sicredi');
     }
 
+    public function test_a_boleto_settlement_offers_the_swap_to_bank_or_manual(): void
+    {
+        $this->charge->forceFill(['status' => 2])->save();
+
+        Livewire::test(ViewCharge::class, ['record' => $this->charge->id])
+            ->assertActionHasLabel('baixaBancaria', 'Trocar para Baixa Bancária')
+            ->assertActionHasLabel('baixaManual', 'Trocar para Baixa Manual')
+            ->assertActionHidden('baixaBoleto')
+            ->mountAction('baixaBancaria')
+            ->assertMountedActionModalSee('a declaração de boleto é removida');
+    }
+
     public function test_cancel_request_from_the_charge_page(): void
     {
         app(IssueBoleto::class)($this->charge, 1);

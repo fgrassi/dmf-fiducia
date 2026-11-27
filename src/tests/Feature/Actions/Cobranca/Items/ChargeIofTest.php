@@ -32,6 +32,16 @@ class ChargeIofTest extends TestCase
         $this->assertSame(35.0, app(ChargeIof::class)->amount($charge));
     }
 
+    public function test_expenses_due_to_dmf_pay_no_iof(): void
+    {
+        $charge = $this->charge();
+        $this->item($charge, currency: 2, value: 1000);
+        $this->item($charge, currency: 2, value: 200, dueTo: 7);
+        $this->item($charge, currency: 2, value: 100, dueTo: 1);
+
+        $this->assertSame(38.5, app(ChargeIof::class)->amount($charge));
+    }
+
     public function test_exempt_client_pays_no_iof(): void
     {
         $charge = $this->charge(client: ['isento_iof' => 1]);
@@ -66,9 +76,9 @@ class ChargeIofTest extends TestCase
         return FinCharges::find($id);
     }
 
-    private function item(FinCharges $charge, int $currency, float $value, int $expense = 500): void
+    private function item(FinCharges $charge, int $currency, float $value, int $expense = 500, ?int $dueTo = null): void
     {
-        $valueId = DB::table('fin_expenses_values')->insertGetId(['ref_embarque' => 10, 'ref_expense' => $expense]);
+        $valueId = DB::table('fin_expenses_values')->insertGetId(['ref_embarque' => 10, 'ref_expense' => $expense, 'ref_due_to' => $dueTo]);
         DB::table('fin_charges_items')->insert([
             'ref_charge' => $charge->id,
             'ref_expense' => $valueId,

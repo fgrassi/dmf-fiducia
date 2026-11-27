@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * baixaManual (legado): baixa a IC com justificativa (status 3), opcionalmente libera o embarque
- * avisa o financeiro e emite a NFS-e marcada.
+ * avisa o financeiro e emite a NFS-e marcada. Numa IC com baixa por boleto, troca a baixa e apaga a declaração.
  */
 class ManualSettlement
 {
@@ -26,7 +26,7 @@ class ManualSettlement
      */
     public function __invoke(FinCharges $charge, string $justification, ?int $officeId, bool $releaseShipment, User $user, ?array $emails = null, array $nfse = []): ?array
     {
-        if ($charge->status !== ChargeStatus::Open) {
+        if (! $charge->status->allowsBankOrManualSettlement()) {
             throw new DomainException('Somente cobranças em aberto podem receber baixa manual.');
         }
 
@@ -38,7 +38,14 @@ class ManualSettlement
 
         $obs = "{$justification}\rResponsável: {$user->getFilamentName()}\rData: ".now()->format('d/m/Y');
 
-        DB::transaction(function () use ($charge, $justification, $obs, $officeId, $releaseShipment, $user, $emails) {
+        $previous = $charge->status;
+        $swap = $previous === ChargeStatus::Boleto;
+
+        DB::transaction(function () use ($charge, $justification, $obs, $officeId, $releaseShipment, $user, $emails, $previous, $swap) {
+            if ($swap) {
+                BoletoSettlement::removeDeclarations($charge);
+            }
+
             $charge->forceFill([
                 'status' => ChargeStatus::ManualSettlement,
                 'obs' => $obs,
@@ -68,17 +75,19 @@ class ManualSettlement
             FinChargesLog::forceCreate([
                 'ref_charge' => $charge->id,
                 'acao' => 'baixa_manual',
-                'historico' => "Baixa manual. Justificativa: {$justification}".FinCharges::recipientsLogSummary($emails),
-                'status_anterior' => ChargeStatus::Open->value,
+                'historico' => ($swap ? 'Troca de baixa por boleto para baixa manual' : 'Baixa manual').". Justificativa: {$justification}".FinCharges::recipientsLogSummary($emails),
+                'status_anterior' => $previous->value,
                 'status_novo' => ChargeStatus::ManualSettlement->value,
                 'created_at' => now(),
                 'created_by' => $user->getKey(),
             ]);
         });
 
+        $what = $swap ? 'teve a baixa por boleto trocada por baixa manual' : 'sofreu baixa manual';
+
         Alert::ManualSettlement->send(
             'DMF Logistics: Cobrança com Baixa Manual',
-            "A cobranca do embarque {$charge->embarque->booking} sofreu baixa manual, com a seguinte justificativa e responsável: ".e($obs),
+            "A cobranca do embarque {$charge->embarque->booking} {$what}, com a seguinte justificativa e responsável: ".e($obs),
         );
 
         return $this->nfse->forCharge($charge, $nfse, IssueNfse::SETTLEMENT, $user->getKey());

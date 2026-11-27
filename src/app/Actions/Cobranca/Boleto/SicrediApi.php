@@ -58,7 +58,7 @@ class SicrediApi
     /** @return Result */
     public function pdf(string $digitableLine): array
     {
-        return $this->authorized(fn (PendingRequest $http) => $http->accept('application/pdf, application/json, application/octet-stream')
+        return $this->authorized(fn (PendingRequest $http) => $http->withHeaders($this->office())->accept('application/pdf, application/json, application/octet-stream')
             ->get(self::BOLETOS.'/pdf', ['linhaDigitavel' => $digitableLine]));
     }
 

@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * update (legado, "Baixa Bancária"): grava os dados do pagamento, baixa a IC como paga (status 1)
  * e gera os recibos (um por grupo de NFS-e), enviados ao cliente; depois emite a NFS-e marcada (uma por grupo).
+ *
+ * Numa IC com baixa por boleto, troca a baixa: apaga a declaração e não registra o "Payment received" de novo.
  */
 class BankSettlement
 {
@@ -30,13 +32,19 @@ class BankSettlement
      */
     public function __invoke(FinCharges $charge, array $data, User $user, ?array $emails = null, array $nfse = []): array
     {
-        if ($charge->status !== ChargeStatus::Open) {
+        if (! $charge->status->allowsBankOrManualSettlement()) {
             throw new DomainException('Somente cobranças em aberto podem receber baixa bancária.');
         }
 
         $values = PaymentFields::parse($data);
+        $previous = $charge->status;
+        $swap = $previous === ChargeStatus::Boleto;
 
-        DB::transaction(function () use ($charge, $values, $user, $emails) {
+        DB::transaction(function () use ($charge, $values, $user, $emails, $previous, $swap) {
+            if ($swap) {
+                BoletoSettlement::removeDeclarations($charge);
+            }
+
             $charge->forceFill([
                 ...$values,
                 'discount_author' => $user->getKey(),
@@ -61,20 +69,22 @@ class BankSettlement
             FinChargesLog::forceCreate([
                 'ref_charge' => $charge->id,
                 'acao' => 'baixa_bancaria',
-                'historico' => 'Baixa bancária. Valor recebido: '.number_format((float) $charge->received_value, 2, '.', '').'; Banco: '.($bank ? "{$bank->name} ({$bank->bank_number})" : '—').FinCharges::recipientsLogSummary($emails),
-                'status_anterior' => ChargeStatus::Open->value,
+                'historico' => ($swap ? 'Troca de baixa por boleto para baixa bancária' : 'Baixa bancária').'. Valor recebido: '.number_format((float) $charge->received_value, 2, '.', '').'; Banco: '.($bank ? "{$bank->name} ({$bank->bank_number})" : '—').FinCharges::recipientsLogSummary($emails),
+                'status_anterior' => $previous->value,
                 'status_novo' => ChargeStatus::Paid->value,
                 'created_at' => now(),
                 'created_by' => $user->getKey(),
             ]);
 
-            DB::table('transborda')->insert([
-                'usuario_id' => 1,
-                'embarque_id' => $charge->ref_booking,
-                'data_reg' => now()->toDateString(),
-                'descr' => 'Payment received',
-                'ref_frase_transborda' => 59,
-            ]);
+            if (! $swap) {
+                DB::table('transborda')->insert([
+                    'usuario_id' => 1,
+                    'embarque_id' => $charge->ref_booking,
+                    'data_reg' => now()->toDateString(),
+                    'descr' => 'Payment received',
+                    'ref_frase_transborda' => 59,
+                ]);
+            }
         });
 
         // depois do commit, como o legado: os recibos (MyISAM), o e-mail e a NFS-e não voltam atrás

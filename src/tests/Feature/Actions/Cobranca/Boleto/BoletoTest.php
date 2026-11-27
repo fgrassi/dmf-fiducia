@@ -12,6 +12,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Sleep;
 use PHPUnit\Framework\Attributes\TestWith;
 use Tests\Concerns\BuildsBoletos;
 use Tests\Concerns\BuildsCharges;
@@ -67,6 +68,49 @@ class BoletoTest extends TestCase
 
         $this->assertSame(['erro'], FinChargesBoletoSicredi::pluck('status')->all());
         $this->assertCount(1, Http::recorded(fn (Request $r) => $r->method() === 'POST' && str_ends_with($r->url(), '/v1/boletos')));
+    }
+
+    public function test_a_pdf_not_released_yet_is_retried(): void
+    {
+        $this->sicredi(Http::sequence()->push(['message' => 'Boleto não localizado'], 422)->push('%PDF-1.4 boleto'));
+
+        $boleto = app(IssueBoleto::class)($this->boletoCharge(), 1)['boleto'];
+
+        $this->assertSame('emitido', $boleto->status);
+        Sleep::assertSleptTimes(1);
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), '/boletos/pdf') && $r->hasHeader('cooperativa', '6789') && $r->hasHeader('posto', '03'));
+    }
+
+    public function test_an_issued_boleto_without_the_pdf_downloads_it_again(): void
+    {
+        $this->sicredi();
+        $charge = $this->boletoCharge();
+        app(IssueBoleto::class)($charge, 1)['boleto']->update(['ref_file' => null]);
+
+        ['boleto' => $boleto, 'reused' => $reused] = app(IssueBoleto::class)($charge, 1);
+
+        $this->assertFalse($reused);
+        $this->assertNotNull($boleto->ref_file);
+        $this->assertSame(1, FinChargesBoletoSicredi::count());
+    }
+
+    #[TestWith(['%PDF-1.4 boleto', 'emitido', 'EM CARTEIRA. PDF do boleto baixado.'])]
+    #[TestWith(['indisponível', 'erro', 'EM CARTEIRA. Boleto cadastrado na Sicredi'])]
+    public function test_the_status_check_only_marks_as_issued_with_the_pdf(string $pdf, string $status, string $message): void
+    {
+        $this->sicredi($pdf, situation: 'EM CARTEIRA');
+        $charge = $this->boletoCharge();
+
+        try {
+            app(IssueBoleto::class)($charge, 1);
+        } catch (DomainException) {
+        }
+
+        $boleto = FinChargesBoletoSicredi::sole();
+        $boleto->update(['ref_file' => null]);
+
+        $this->assertStringStartsWith($message, app(CheckBoletoStatus::class)($boleto, 1));
+        $this->assertSame($status, $boleto->fresh()->status);
     }
 
     #[TestWith([0])]

@@ -88,6 +88,15 @@ class BoletoSettlement
         return $this->nfse->forCharge($charge, $nfse, IssueNfse::SETTLEMENT, $user->getKey());
     }
 
+    /** removerDeclaracoesBaixaBoleto: apaga a declaração (fin_payment_boleto e cmn_files) na troca de baixa; a NFS-e fica. */
+    public static function removeDeclarations(FinCharges $charge): void
+    {
+        $files = $charge->boletoPayments()->pluck('ref_file')->filter();
+        // a declaração antes do arquivo, por causa da FK
+        $charge->boletoPayments()->delete();
+        CmnFile::whereKey($files)->delete();
+    }
+
     /** geraDeclaracao: registra o pagamento no tracking e cria a declaração (fin_payment_boleto), ainda sem o PDF. */
     public function declare(FinCharges $charge, string $dueTo): FinPaymentBoleto
     {

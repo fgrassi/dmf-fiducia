@@ -14,6 +14,7 @@ use DomainException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Mockery;
+use PHPUnit\Framework\Attributes\TestWith;
 use TCPDF;
 use Tests\Concerns\BuildsCharges;
 use Tests\Concerns\LegacySchema;
@@ -140,6 +141,30 @@ class SettlementTest extends TestCase
         $this->assertSame('baixa_boleto', DB::table('fin_charges_log')->value('acao'));
         $this->assertStringContainsString('Demonstrativo de Baixa do Boleto Bancário', $this->sentSubjects()->first());
         $this->assertStringEndsWith(' - ACME (11.222.333/0001-81)', $this->sentSubjects()->first());
+    }
+
+    #[TestWith(['bank', ChargeStatus::Paid, 'baixa_bancaria', 'Troca de baixa por boleto para baixa bancária.'])]
+    #[TestWith(['manual', ChargeStatus::ManualSettlement, 'baixa_manual', 'Troca de baixa por boleto para baixa manual.'])]
+    public function test_a_boleto_settlement_can_be_swapped_and_drops_the_declaration(string $kind, ChargeStatus $status, string $action, string $history): void
+    {
+        $charge = $this->charge(['status' => ChargeStatus::Boleto->value]);
+        $file = DB::table('cmn_files')->insertGetId(['name' => 'declaracao_boleto_dmf_1']);
+        DB::table('fin_payment_boleto')->insert(['ref_charge' => $charge->id, 'ref_file' => $file, 'due_to' => '2026-10-27']);
+
+        if ($kind === 'bank') {
+            $this->mockReceipts();
+            app(BankSettlement::class)($charge, self::PAYMENT, $this->user());
+        } else {
+            app(ManualSettlement::class)($charge, 'Pago via PIX', null, false, $this->user('financial'));
+        }
+
+        $this->assertSame($status, $charge->refresh()->status);
+        $this->assertDatabaseCount('fin_payment_boleto', 0);
+        $this->assertDatabaseMissing('cmn_files', ['id' => $file]);
+        $this->assertDatabaseCount('transborda', 0);
+        $log = DB::table('fin_charges_log')->first();
+        $this->assertSame([$action, 2, $status->value], [$log->acao, (int) $log->status_anterior, (int) $log->status_novo]);
+        $this->assertStringStartsWith($history, $log->historico);
     }
 
     private function assertRefused(callable $call, string $message): void

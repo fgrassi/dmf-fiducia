@@ -3,28 +3,31 @@
 namespace Tests\Concerns;
 
 use App\Models\FinCharges;
+use Illuminate\Http\Client\ResponseSequence;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Sleep;
 
 /** Cliente com boleto e a API do Sicredi simulada (usar junto com LegacySchema e BuildsCharges). */
 trait BuildsBoletos
 {
-    protected function sicredi(string $pdf = '%PDF-1.4 boleto'): void
+    protected function sicredi(string|ResponseSequence $pdf = '%PDF-1.4 boleto', string $situation = 'LIQUIDADO PIX'): void
     {
         config(['services.sicredi' => [
             'url' => 'https://sicredi.test/sb/', 'x_api_key' => 'key', 'username' => 'user', 'password' => 'secret',
             'cooperativa' => '6789', 'posto' => '03', 'beneficiary' => '12345', 'webhook_token' => 'segredo',
         ]]);
         Storage::fake('tracking_uploads');
+        Sleep::fake();
         Http::preventStrayRequests();
         Http::fake([
             'sicredi.test/sb/auth/*' => Http::response(['access_token' => 'jwt', 'expires_in' => 300]),
-            'sicredi.test/sb/cobranca/boleto/v1/boletos/pdf*' => Http::response($pdf),
+            'sicredi.test/sb/cobranca/boleto/v1/boletos/pdf*' => is_string($pdf) ? Http::response($pdf) : $pdf,
             'sicredi.test/sb/cobranca/boleto/v1/boletos/*/baixa' => Http::response([], 202),
             'sicredi.test/sb/cobranca/boleto/v1/boletos*' => Http::sequence()
                 ->push(['nossoNumero' => '211001234', 'linhaDigitavel' => '74891.12100 12345', 'codigoBarras' => '7489'], 201)
-                ->whenEmpty(Http::response(['situacao' => 'LIQUIDADO PIX'])),
+                ->whenEmpty(Http::response(['situacao' => $situation])),
         ]);
     }
 

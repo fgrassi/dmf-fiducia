@@ -20,6 +20,12 @@ enum ChargeStatus: int
         };
     }
 
+    /** Baixa bancária e manual valem para a IC em aberto ou para trocar a baixa por boleto. */
+    public function allowsBankOrManualSettlement(): bool
+    {
+        return in_array($this, [self::Open, self::Boleto], true);
+    }
+
     public function isSettled(): bool
     {
         return $this !== self::Open;

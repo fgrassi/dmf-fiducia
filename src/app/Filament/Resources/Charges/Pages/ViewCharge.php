@@ -71,6 +71,9 @@ class ViewCharge extends ViewRecord
         $open = fn () => $this->getRecord()->status === ChargeStatus::Open;
         $allowed = fn () => $open() && app(ChargeDetails::class)->allowsRecalculation($this->getRecord());
 
+        $settleable = fn () => $this->getRecord()->status->allowsBankOrManualSettlement();
+        $swap = fn () => $this->getRecord()->status === ChargeStatus::Boleto;
+
         return [
             $this->recalculateAction('recalcular', 'Recalcular', RecalculateCharge::SINGLE)
                 ->visible($allowed)
@@ -99,11 +102,12 @@ class ViewCharge extends ViewRecord
                 ->modalDescription('Recalcular a cobrança com IOF zerado?')
                 ->schema(fn () => $this->recalculationNfseFields()),
             Action::make('baixaBancaria')
-                ->label('Baixa Bancária')
+                ->label(fn () => $swap() ? 'Trocar para Baixa Bancária' : 'Baixa Bancária')
                 ->icon('heroicon-o-building-library')
                 ->color('gray')
-                ->visible($open)
-                ->modalHeading('Baixa Bancária')
+                ->visible($settleable)
+                ->modalHeading(fn () => $swap() ? 'Trocar para Baixa Bancária' : 'Baixa Bancária')
+                ->modalDescription(fn () => $swap() ? 'Ao salvar, a declaração de boleto é removida e a baixa passa a ser bancária. A NFS-e já emitida permanece.' : null)
                 ->modalSubmitActionLabel('Salvar')
                 ->modalWidth('2xl')
                 ->fillForm(fn () => $this->paymentDefaults())
@@ -149,11 +153,12 @@ class ViewCharge extends ViewRecord
             $this->issueBoletoAction()
                 ->visible(fn () => $open() && FinClientsBoleto::usesBoleto($this->getRecord()->embarque)),
             Action::make('baixaManual')
-                ->label('Baixa Manual')
+                ->label(fn () => $swap() ? 'Trocar para Baixa Manual' : 'Baixa Manual')
                 ->icon('heroicon-o-pencil-square')
                 ->color('gray')
-                ->visible($open)
-                ->modalHeading('Baixa Manual')
+                ->visible($settleable)
+                ->modalHeading(fn () => $swap() ? 'Trocar para Baixa Manual' : 'Baixa Manual')
+                ->modalDescription(fn () => $swap() ? 'Ao concluir, a declaração de boleto é removida e a baixa passa a ser manual. A NFS-e já emitida permanece.' : null)
                 ->modalSubmitActionLabel('Confirmar baixa')
                 ->modalWidth('2xl')
                 ->fillForm(fn () => [

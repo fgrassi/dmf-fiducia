@@ -405,6 +405,7 @@ class ChargeDetails
     private function exemptFromIof(stdClass $i): bool
     {
         return (int) $i->ref_currency === 1
+            || (int) $i->ref_due_to === ChargeIof::DUE_TO_DMF
             || in_array((int) $i->expense_value_expense, ChargeIof::BL_FEE_EXPENSES, true)
             || DB::table('regra_despesa_cobranca_item')->where('despesa_id', $i->expense_value_expense)->where('regra_despesa_cobranca_id', 10)->exists();
     }

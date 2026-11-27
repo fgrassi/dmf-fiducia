@@ -6,12 +6,18 @@ use App\Models\FinChargesBoletoSicredi;
 use DomainException;
 use Illuminate\Support\Str;
 
-/** SicrediBoletoService::consultarStatus (legado): atualiza o status do boleto pela situação na Sicredi, sem mudar a IC. */
+/**
+ * SicrediBoletoService::consultarStatus (legado): atualiza o status do boleto pela situação na Sicredi, sem mudar a IC.
+ * Título já em carteira e ainda sem PDF: baixa o arquivo; sem ele não vira "emitido", senão "Gerar" acha que acabou.
+ */
 class CheckBoletoStatus
 {
-    public function __construct(private SicrediApi $api) {}
+    public function __construct(
+        private SicrediApi $api,
+        private IssueBoleto $issue,
+    ) {}
 
-    /** @return string a situação informada pela Sicredi */
+    /** @return string a situação informada pela Sicredi, com o resultado do download do PDF quando houve */
     public function __invoke(FinChargesBoletoSicredi $boleto, ?int $userId): string
     {
         $ourNumber = preg_replace('/\D+/', '', (string) $boleto->nosso_numero);
@@ -35,13 +41,27 @@ class CheckBoletoStatus
 
         $before = $boleto->status;
         $status = self::status($situation, $before);
+        $label = $situation !== '' ? $situation : '(não informada)';
+
+        if ($status === 'emitido' && ! $boleto->ref_file) {
+            $boleto->update(['response_json' => $debug]);
+
+            try {
+                $this->issue->attachPdf($boleto->charge, $boleto);
+            } catch (DomainException $e) {
+                return "{$label}. {$e->getMessage()}";
+            }
+
+            return "{$label}. PDF do boleto baixado.";
+        }
+
         $boleto->update(['status' => $status, 'erro_mensagem' => null, 'response_json' => $debug]);
 
         if ($status !== $before) {
             IssueBoleto::log($boleto->charge, "Consulta Sicredi: situação \"{$situation}\" → status boleto \"{$status}\" (nosso número {$ourNumber}). IC inalterada.", $userId);
         }
 
-        return $situation !== '' ? $situation : '(não informada)';
+        return $label;
     }
 
     /** mapearSituacaoParaStatus: situação desconhecida mantém o status. */
