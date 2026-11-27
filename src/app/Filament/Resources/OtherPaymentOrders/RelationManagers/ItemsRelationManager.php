@@ -4,6 +4,7 @@ namespace App\Filament\Resources\OtherPaymentOrders\RelationManagers;
 
 use App\Actions\PaymentOrders\EditPaymentIof;
 use App\Actions\PaymentOrders\Other\EditOtherOrderItem;
+use App\Actions\PaymentOrders\Other\RemoveOtherOrderItem;
 use App\Models\OrdemPagamentoItem;
 use App\Services\Cobranca\ChargeDetails;
 use DomainException;
@@ -150,6 +151,25 @@ class ItemsRelationManager extends RelationManager
                     ->action(function (OrdemPagamentoItem $record) {
                         $enabled = app(EditOtherOrderItem::class)->toggle($record);
                         Notification::make()->title($enabled ? 'Despesa ligada.' : 'Despesa desligada.')->success()->send();
+                    }),
+                Action::make('remover')
+                    ->label('Remover')
+                    ->icon('heroicon-o-x-mark')
+                    ->color('danger')
+                    ->visible(fn () => (bool) auth()->user()?->hasLegacyCredential('admin'))
+                    ->requiresConfirmation()
+                    ->modalHeading('Remover despesa?')
+                    ->modalDescription('A despesa será removida desta ordem de pagamento.')
+                    ->modalSubmitActionLabel('Remover')
+                    ->action(function (OrdemPagamentoItem $record, Action $action) {
+                        try {
+                            app(RemoveOtherOrderItem::class)($record, auth()->user());
+                        } catch (DomainException $e) {
+                            Notification::make()->title($e->getMessage())->warning()->send();
+                            $action->halt();
+                        }
+
+                        Notification::make()->title('Despesa removida da ordem.')->success()->send();
                     }),
             ]);
     }

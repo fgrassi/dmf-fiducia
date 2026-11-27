@@ -7,9 +7,11 @@ use App\Actions\PaymentOrders\Other\EditOtherOrderItem;
 use App\Actions\PaymentOrders\Other\OtherOrderItemValue;
 use App\Actions\PaymentOrders\Other\OtherOrderParties;
 use App\Actions\PaymentOrders\Other\RecalculateOtherPaymentOrder;
+use App\Actions\PaymentOrders\Other\RemoveOtherOrderItem;
 use App\Models\Embarque;
 use App\Models\OrdemPagamento;
 use App\Models\OrdemPagamentoItem;
+use App\Models\User;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\LegacySchema;
@@ -141,6 +143,30 @@ class OtherOrderItemsTest extends TestCase
 
         $this->assertSame([2, 2], [DB::table('instrucao_pagamento_outros')->count(), DB::table('instrucao_pagamento_item_outros')->count()]);
         $this->assertSame(300.0, (float) DB::table('instrucao_pagamento_item_outros')->where('ordem_pagamento_item_id', $insurance->getKey())->value('valor'));
+    }
+
+    public function test_only_the_admin_removes_an_item_that_is_in_no_instruction(): void
+    {
+        $this->booking();
+        $order = $this->order();
+        $free = $this->item($order, 10, unit: 1, rate: 1, index: 1, value: 1, status: 1, dueTo: 5);
+        $instructed = $this->item($order, 11, unit: 1, rate: 1, index: 1, value: 1, status: 1, dueTo: 8);
+        DB::table('instrucao_pagamento_item_outros')->insert(['instrucao_pagamento_outros_id' => 1, 'ordem_pagamento_item_id' => $instructed->getKey(), 'valor' => 1]);
+        $user = fn (string $credentials) => User::find(DB::table('usuario')->insertGetId(['nome' => 'Ana', 'login' => "ana-{$credentials}", 'senha' => 'x', 'status' => 1, 'credentials' => $credentials]));
+        $remove = function (OrdemPagamentoItem $item, string $credentials) use ($user): ?string {
+            try {
+                app(RemoveOtherOrderItem::class)($item, $user($credentials));
+
+                return null;
+            } catch (DomainException $e) {
+                return $e->getMessage();
+            }
+        };
+
+        $this->assertStringContainsString('Apenas administradores', $remove($free, 'financial'));
+        $this->assertStringContainsString('Instrução de Pagamento', $remove($instructed, 'admin'));
+        $this->assertNull($remove($free, 'admin,financial'));
+        $this->assertSame([$instructed->getKey()], DB::table('ordem_pagamento_item')->pluck('ordem_pagamento_item_id')->all());
     }
 
     public function test_recalculation_resolves_the_party_class_on_the_server_and_never_touches_another_table(): void
