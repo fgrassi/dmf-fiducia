@@ -430,43 +430,7 @@ class EmbarqueForm
                         'aa' => 'AIR TO AIR', 'ad' => 'AIR TO DOOR', 'da' => 'DOOR TO AIRPORT', 'dd' => 'DOOR TO DOOR', 'dp' => 'DOOR/PORT', 'pd' => 'PORT/DOOR',
                         'pp' => 'PORT/PORT', 'rd' => 'RAIL/DOOR', 'rp' => 'RAIL/PORT', 'te' => 'AIR FREIGHT', 'tt' => 'TRUCK/TRUCK',
                     ]),
-                Select::make('flag_fi')
-                    ->label('Freight Invoice')
-                    ->options([0 => 'Não', 1 => 'Sim'])
-                    ->live(),
-                Select::make('pessoa_id_pagador')
-                    ->label('Pagador')
-                    ->searchable()
-                    ->required()
-                    ->visible(fn (Get $get) => (int) $get('flag_fi') === 1)
-                    ->getSearchResultsUsing(fn (string $search) => Pessoa::query()
-                        ->where('nome', 'like', "%{$search}%")
-                        ->whereExists(fn (Builder $q) => $q->from('pessoa_tipo_pessoa as t')->whereColumn('t.pessoa_id', 'pessoa.pessoa_id')->where('t.tipo_pessoa_id', 3))
-                        ->orderBy('nome')
-                        ->limit(30)
-                        ->pluck('nome', 'pessoa_id'))
-                    ->getOptionLabelUsing(fn ($value) => Pessoa::query()->whereKey($value)->value('nome'))
-                    // pessoa/addPagadorShow (legado): o pagador novo entra como importador (tipo 3).
-                    ->createOptionModalHeading('Novo pagador')
-                    ->createOptionForm([
-                        TextInput::make('nome')
-                            ->label('Nome')
-                            ->required(),
-                        TextInput::make('razao_social')
-                            ->label('Razão social')
-                            ->required(),
-                        TextInput::make('cnpj')
-                            ->label('CNPJ'),
-                        TextInput::make('endereco')
-                            ->label('Endereço'),
-                        ...$this->location('paises_id', 'estados_id', 'cidades_id'),
-                    ])
-                    ->createOptionUsing(fn (array $data) => app(SaveCompany::class)([...$data, 'tipo_empresa' => [3]], auth()->id())->getKey()),
-                Select::make('recebedor_freight_invoice')
-                    ->label('Recebedor')
-                    ->required()
-                    ->visible(fn (Get $get) => (int) $get('flag_fi') === 1)
-                    ->options(['d' => 'DMF INTERNACIONAL', 'a' => 'AIC', 'j' => 'JADE']),
+                ...$this->freightInvoice(),
                 $this->note('place_of_receipt', 'Place of receipt'),
                 $this->port('porto_origem_id', 'Origem'),
                 $this->port('porto_destino_id', 'Destino'),
@@ -535,6 +499,56 @@ class EmbarqueForm
         return Section::make('Informações do embarque')
             ->columns(3)
             ->schema($components);
+    }
+
+    /**
+     * Freight Invoice, pagador e recebedor: no formulário da exportação marítima e na pergunta ao duplicar a reserva (que exige a
+     * resposta).
+     *
+     * @return list<Select>
+     */
+    public function freightInvoice(bool $answerRequired = false): array
+    {
+        return [
+            Select::make('flag_fi')
+                ->label('Freight Invoice')
+                ->options([0 => 'Não', 1 => 'Sim'])
+                ->required($answerRequired)
+                ->live(),
+            Select::make('pessoa_id_pagador')
+                ->label('Pagador')
+                ->searchable()
+                ->required()
+                ->visible(fn (Get $get) => (int) $get('flag_fi') === 1)
+                ->getSearchResultsUsing(fn (string $search) => Pessoa::query()
+                    ->where('nome', 'like', "%{$search}%")
+                    ->whereExists(fn (Builder $q) => $q->from('pessoa_tipo_pessoa as t')->whereColumn('t.pessoa_id', 'pessoa.pessoa_id')->where('t.tipo_pessoa_id', 3))
+                    ->orderBy('nome')
+                    ->limit(30)
+                    ->pluck('nome', 'pessoa_id'))
+                ->getOptionLabelUsing(fn ($value) => Pessoa::query()->whereKey($value)->value('nome'))
+                // pessoa/addPagadorShow (legado): o pagador novo entra como importador (tipo 3).
+                ->createOptionModalHeading('Novo pagador')
+                ->createOptionForm([
+                    TextInput::make('nome')
+                        ->label('Nome')
+                        ->required(),
+                    TextInput::make('razao_social')
+                        ->label('Razão social')
+                        ->required(),
+                    TextInput::make('cnpj')
+                        ->label('CNPJ'),
+                    TextInput::make('endereco')
+                        ->label('Endereço'),
+                    ...$this->location('paises_id', 'estados_id', 'cidades_id'),
+                ])
+                ->createOptionUsing(fn (array $data) => app(SaveCompany::class)([...$data, 'tipo_empresa' => [3]], auth()->id())->getKey()),
+            Select::make('recebedor_freight_invoice')
+                ->label('Recebedor')
+                ->required()
+                ->visible(fn (Get $get) => (int) $get('flag_fi') === 1)
+                ->options(['d' => 'DMF INTERNACIONAL', 'a' => 'AIC', 'j' => 'JADE']),
+        ];
     }
 
     /** "Transit Time" do legado: ETD + dias preenche o ETA. Não é gravado. Na importação marítima mostra os avisos do trecho. */

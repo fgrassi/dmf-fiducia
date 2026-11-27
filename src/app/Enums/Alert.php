@@ -54,6 +54,8 @@ enum Alert: string
     case ExpensesNotImported = 'alerta:matriz-despesas-nao-importadas';
     case QuotationValidityChanged = 'alerta:validade-cotacao-alterada';
     case InsurancePolicyUpdate = 'alerta:atualizar-apolice';
+    case BookingDeletedImport = 'alerta:reserva-excluida-importacao';
+    case BookingDeletedExport = 'alerta:reserva-excluida-exportacao';
 
     private const FINANCE = 'financeiro@dmflog.com.br';
 
@@ -116,6 +118,8 @@ enum Alert: string
             self::ExpensesNotImported => ['Reserva: despesas da matriz não importadas em reserva com despesas revisadas', [self::IMPORT, self::FINANCE]],
             self::QuotationValidityChanged => ['Reserva: data de validade da cotação alterada na exportação', [self::EXPORT]],
             self::InsurancePolicyUpdate => ['Reserva: ETD antecipado ou navio trocado em embarque com seguro', [self::EXPORT]],
+            self::BookingDeletedImport => ['Reserva: reserva de importação excluída', [self::IMPORT]],
+            self::BookingDeletedExport => ['Reserva: reserva de exportação excluída', [self::EXPORT]],
         };
     }
 

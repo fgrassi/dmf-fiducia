@@ -3,13 +3,16 @@
 namespace App\Filament\Resources\Embarques\Pages;
 
 use App\Actions\Booking\ChangeStatus;
+use App\Actions\Booking\DeleteBooking;
 use App\Actions\Booking\Documents\BillingInstructionPdf;
 use App\Actions\Booking\Documents\ExpenseStatement;
 use App\Actions\Booking\Documents\ExpenseStatementPdf;
+use App\Actions\Booking\DuplicateBooking;
 use App\Actions\Booking\ReleaseShipment;
 use App\Actions\Booking\UpdateEtd;
 use App\Actions\Seguro\AllowInsuranceCharge;
 use App\Filament\Resources\Embarques\EmbarqueResource;
+use App\Filament\Resources\Embarques\Schemas\EmbarqueForm;
 use App\Models\Embarque;
 use Carbon\Carbon;
 use DomainException;
@@ -96,11 +99,71 @@ class ViewEmbarque extends ViewRecord
                 $this->etdAction(),
                 $this->releaseAction(),
                 $this->allowInsuranceChargeAction(),
+                $this->duplicateAction(),
+                $this->deleteAction(),
             ])
                 ->label('Reserva')
                 ->icon(Heroicon::OutlinedCog6Tooth)
                 ->button(),
         ];
+    }
+
+    /** booking/duplicar e duplicarExpo (legado): abre a cópia. */
+    private function duplicateAction(): Action
+    {
+        return Action::make('duplicar')
+            ->label('Duplicar reserva')
+            ->icon(Heroicon::OutlinedDocumentDuplicate)
+            ->visible(fn (Embarque $record) => DuplicateBooking::allows($record, auth()->user()))
+            ->requiresConfirmation()
+            ->modalHeading('Duplicar reserva')
+            ->modalDescription('A cópia leva os dados e as despesas da reserva. Mercadorias, contatos e BLs não são copiados.')
+            ->schema(fn (Embarque $record): array => DuplicateBooking::asksFreightInvoice($record)
+                ? (new EmbarqueForm('e', 'm'))->freightInvoice(answerRequired: true)
+                : [])
+            ->action(function (Embarque $record, array $data) {
+                try {
+                    $copy = app(DuplicateBooking::class)($record, auth()->user(), $data);
+                } catch (DomainException $e) {
+                    return Notification::make()->title($e->getMessage())->danger()->send();
+                }
+
+                Notification::make()->title("Reserva duplicada: {$copy->booking}")->success()->send();
+
+                $this->redirect(EmbarqueResource::getUrl('view', ['record' => $copy]));
+            });
+    }
+
+    /** booking/delete (legado): só para erro de cadastro. Vale também para reserva cancelada. */
+    private function deleteAction(): Action
+    {
+        return Action::make('excluir')
+            ->label('Excluir reserva')
+            ->icon(Heroicon::OutlinedTrash)
+            ->color('danger')
+            ->visible(fn (Embarque $record) => DeleteBooking::allows($record, auth()->user()))
+            ->requiresConfirmation()
+            ->modalHeading('Excluir reserva')
+            ->modalDescription('Reservas só devem ser excluídas por erro de cadastro: prefira cancelar. Esta ação não pode ser desfeita.')
+            ->modalSubmitActionLabel('Sim, excluir')
+            ->schema([
+                Textarea::make('justificativa')
+                    ->label('Justificativa')
+                    ->helperText('Vai no e-mail de aviso da exclusão.')
+                    ->required()
+                    ->rows(4),
+            ])
+            ->action(function (Embarque $record, array $data) {
+                try {
+                    app(DeleteBooking::class)($record, $data['justificativa'], auth()->user());
+                } catch (DomainException $e) {
+                    return Notification::make()->title($e->getMessage())->danger()->persistent()->send();
+                }
+
+                Notification::make()->title('Reserva excluída')->success()->send();
+
+                $this->redirect(EmbarqueResource::getUrl($record->tipo_embarque === 's' ? 'seguros' : 'index'));
+            });
     }
 
     /** cancelarEmbarque, suspenderEmbarque e removerPendencia (legado): exigem justificativa, que vai para o rastreamento. */
