@@ -127,6 +127,10 @@ class BookingsReportPage extends Page
                                 ReportFields::person('exporter', 'Exportador'),
                                 ReportFields::person('importer', 'Importador'),
                                 ReportFields::person('client', 'Cliente'),
+                                Select::make('company_group')
+                                    ->label('Grupo de Empresa (clientes)')
+                                    ->searchable()
+                                    ->options(fn () => DB::table('grupo_empresa')->orderBy('nome')->pluck('nome', 'grupo_empresa_id')->all()),
                                 ReportFields::person('agent', 'Agente'),
                                 Select::make('broker')
                                     ->label('Despachante')
@@ -219,7 +223,7 @@ class BookingsReportPage extends Page
         $report = fn () => self::$reports[md5(json_encode($filters))] ??= app(BookingsReport::class)($filters);
         $rows = fn () => collect($report()[$section]['rows'])->keyBy('id')->all();
         $totals = fn () => $report()[$section]['totals'] ?? [];
-        $date = fn (string $name, string $label) => TextColumn::make($name)->label($label)->date('d/m/Y');
+        $date = fn (string $name, string $label) => TextColumn::make($name)->label($label)->date('d/m/y');
         $status = TextColumn::make('status')->label('Status')->formatStateUsing(fn (?string $state) => Embarque::STATUSES[$state] ?? $state);
         $booking = TextColumn::make('booking')->label('Booking')->url(fn (array $record) => EmbarqueResource::getUrl('view', ['record' => $record['id']]));
         $text = fn (string $name, string $label) => TextColumn::make($name)->label($label)->wrap();

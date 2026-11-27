@@ -68,6 +68,12 @@ class BookingsReportsTest extends TestCase
         $this->assertSame(['CAN1'], array_column(app(BookingsReport::class)(['from' => '2026-11-01', 'status' => 'c'])['maritime']['rows'], 'booking'));
         $this->assertSame(['FCL1'], array_column(app(BookingsReport::class)(['equipment' => ['40'], 'sellers' => [3]])['maritime']['rows'], 'booking'));
         $this->assertSame([], app(BookingsReport::class)(['sections' => ['air']])['maritime']['rows']);
+        // mais de um tipo marcado: basta ter um deles
+        $this->assertSame(['FCL1'], array_column(app(BookingsReport::class)(['equipment' => ['40', 'tank'], 'sellers' => [3]])['maritime']['rows'], 'booking'));
+        DB::table('embarque')->where('embarque_id', $fcl)->update(['cliente_id' => 2]);
+        DB::table('grupo_empresa_membro')->insert(['grupo_empresa_id' => 4, 'pessoa_id' => 2, 'created_at' => '2026-11-01', 'created_by' => 1]);
+        $group = app(BookingsReport::class)(['company_group' => 4]);
+        $this->assertSame([['FCL1'], []], [array_column($group['maritime']['rows'], 'booking'), $group['air']['rows']]);
     }
 
     public function test_bookings_report_lists_insurance_bookings_and_those_with_insurance_charged(): void

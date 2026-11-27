@@ -188,6 +188,7 @@ class BookingsReport
             ->when(filled($filters['invoice'] ?? null), fn ($q) => $q->where('e.invoice', 'like', "%{$filters['invoice']}%"))
             ->when($filters['operation'] ?? null, fn ($q, $value) => $q->where('e.impor_expor', $value))
             ->when(filled($filters['booking'] ?? null), fn ($q) => $q->where('e.booking', $filters['booking']))
+            ->when($filters['company_group'] ?? null, fn ($q, $id) => $q->whereIn('e.cliente_id', fn ($members) => $members->select('pessoa_id')->from('grupo_empresa_membro')->where('grupo_empresa_id', $id)))
             ->when($filters['sellers'] ?? null, fn ($q, array $ids) => $q->whereIn('e.vendedor_id', $ids))
             ->when($filters['exporter'] ?? null, fn ($q, $id) => $q->where('e.pessoa_id_cliente', $id))
             ->when($filters['agent'] ?? null, fn ($q, $id) => $q->where('e.pessoa_id_representante', $id))
@@ -199,9 +200,10 @@ class BookingsReport
             ->when(filled($filters['via'] ?? null), fn ($q) => $q->where('e.via', 'like', "%{$filters['via']}%"))
             ->when(filled($filters['place_of_delivery'] ?? null), fn ($q) => $q->where('e.place_of_delivery', 'like', "%{$filters['place_of_delivery']}%"));
 
-        foreach (array_intersect(self::GROUPS, $filters['equipment'] ?? []) as $group) {
+        // com mais de um tipo marcado, basta a reserva ter um deles
+        if ($groups = array_intersect(self::GROUPS, $filters['equipment'] ?? [])) {
             $query->whereExists(fn ($q) => $q->from('mercadoria as m')->join('tipo_container as t', 't.tipo_container_id', '=', 'm.tipo_container_id')
-                ->whereColumn('m.embarque_id', 'e.embarque_id')->where('t.tipo', $group));
+                ->whereColumn('m.embarque_id', 'e.embarque_id')->whereIn('t.tipo', $groups));
         }
     }
 
