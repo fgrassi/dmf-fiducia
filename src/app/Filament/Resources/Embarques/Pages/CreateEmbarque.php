@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Embarques\Pages;
 use App\Actions\Booking\Creation\CreateBooking;
 use App\Enums\OperationType;
 use App\Filament\Resources\Embarques\EmbarqueResource;
+use App\Filament\Resources\Embarques\Pages\Concerns\ConfirmsPickupLocations;
 use App\Filament\Resources\Embarques\Schemas\EmbarqueForm;
 use App\Models\Embarque;
 use DomainException;
@@ -18,6 +19,8 @@ use Livewire\Attributes\Locked;
 /** booking/create, createExpo, createImpoAereo e createExpoAereo (legado). */
 class CreateEmbarque extends CreateRecord
 {
+    use ConfirmsPickupLocations;
+
     protected static string $resource = EmbarqueResource::class;
 
     protected static bool $canCreateAnother = false;
@@ -68,21 +71,13 @@ class CreateEmbarque extends CreateRecord
         }
     }
 
-    /** O legado pede para conferir os locais de retirada e entrega antes de confirmar a exportação marítima. */
     protected function getCreateFormAction(): Action
     {
         $action = parent::getCreateFormAction();
 
-        if ($this->imporExpor !== 'e' || $this->modal !== 'm') {
-            return $action;
-        }
-
-        return $action
-            ->submit(null)
-            ->requiresConfirmation()
-            ->modalHeading('Os locais de retirada e entrega estão corretos?')
-            ->modalDescription(fn () => 'Retirada: '.(($this->data['local_retirada'] ?? null) ?: 'não informado').' · Entrega: '.(($this->data['local_entrega'] ?? null) ?: 'não informado'))
-            ->action(fn () => $this->create());
+        return $this->imporExpor === 'e' && $this->modal === 'm'
+            ? $this->confirmPickupLocations($action, fn () => $this->create())
+            : $action;
     }
 
     protected function getRedirectUrl(): string

@@ -8,9 +8,11 @@ use App\Actions\Booking\Creation\NextBookingNumber;
 use App\Actions\Booking\Creation\QuotationPrefill;
 use App\Actions\Booking\Creation\RegisterFinalDestination;
 use App\Actions\Booking\Creation\TransitTimeCheck;
+use App\Actions\Booking\UpdateBooking;
 use App\Actions\Companies\SaveCompany;
 use App\Filament\Support\ReportFields;
 use App\Models\Container;
+use App\Models\Embarque;
 use App\Models\Pessoa;
 use App\Models\Porto;
 use Closure;
@@ -18,6 +20,8 @@ use DomainException;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -33,8 +37,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\HtmlString;
 
 /**
- * Formulário da reserva nova: os quatro do legado (EmbarqueForm e EmbarqueAereoForm, importação e exportação).
- * `$operation`: i = importação, e = exportação; `$mode`: m = marítimo, a = aéreo.
+ * Formulário da reserva, na criação e na edição: os quatro do legado (EmbarqueForm e EmbarqueAereoForm, importação e exportação).
+ * `$operation`: i = importação, e = exportação; `$mode`: m = marítimo, a = aéreo; `$booking`: a reserva em edição.
+ *
+ * Na edição as listas aceitam o valor que a reserva já tem, mesmo que ele não entraria numa reserva nova.
  */
 class EmbarqueForm
 {
@@ -46,7 +52,64 @@ class EmbarqueForm
     /** DMF Logistics do Brasil como agente: sempre na lista da exportação e com BL direto. */
     private const DMF_AGENT = 3198;
 
-    public function __construct(private string $operation, private string $mode) {}
+    /** Colunas da mercadoria que a edição carrega no formulário. */
+    private const GOODS_FIELDS = [
+        'mercadoria_id', 'nome', 'quantidade', 'tipo_container_id', 'temperatura', 'gross_weight', 'net_weight', 'cubature',
+        'width', 'height', 'depth', 'free_time', 'quimico', 'carga_perigosa', 'super_testado',
+    ];
+
+    public function __construct(private string $operation, private string $mode, private ?Embarque $booking = null) {}
+
+    /**
+     * O que a reserva em edição põe no formulário. Os vazios do legado ('', data zerada e 0 nas chaves) entram como nulo.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    public function state(array $attributes): array
+    {
+        $blank = fn (mixed $value, string $column) => UpdateBooking::isEmpty($column, $value) ? null : $value;
+        $state = collect($attributes)->map($blank)->all();
+
+        $parties = app(BookingParties::class);
+        $id = $this->booking->getKey();
+
+        $state['contacts'] = collect(BookingParties::PARTIES)
+            ->map(fn (array $definition, string $party) => $parties->linkedContacts($this->booking, $party))
+            ->all();
+        $state['goods'] = DB::table('mercadoria')
+            ->where('embarque_id', $id)
+            ->orderBy('mercadoria_id')
+            ->get(self::GOODS_FIELDS)
+            ->map(fn (object $good) => collect((array) $good)->map($blank)->all())
+            ->all();
+        $state['instrucao_especial'] = DB::table('instrucao_especial_embarque')->where('embarque_id', $id)->orderBy('instrucao_especial_embarque_id')->value('instrucao');
+        $state['pais_id'] = $this->agentCountry();
+
+        $etd = $state['saida_prevista'] ?? null;
+        $eta = $state['chegada_prevista'] ?? null;
+        $transit = $etd && $eta ? (int) Carbon::parse($etd)->startOfDay()->diffInDays(Carbon::parse($eta)->startOfDay()) : null;
+        // Há reservas com ETA antes do ETD: o campo fica vazio em vez de travar o formulário.
+        $state['transit'] = $transit >= 0 && $transit <= 999 ? $transit : null;
+
+        return $state;
+    }
+
+    /** O "país de destino" não é gravado: o do porto de destino, se o agente atende; senão, o primeiro país do agente. */
+    private function agentCountry(): ?int
+    {
+        $destination = DB::table('porto')->where('porto_id', $this->booking->porto_destino_id)->value('ref_pais');
+        $served = DB::table('agente_pais')->where('agente_id', $this->booking->pessoa_id_representante)->where('restricao', 0)->orderBy('ordem')->pluck('pais_id');
+        $country = $served->contains($destination) ? $destination : ($served->first() ?? $destination);
+
+        return $country ? (int) $country : null;
+    }
+
+    /** O valor atual da reserva em edição, para a lista não recusar o que já está gravado (0 não casa com chave nenhuma). */
+    private function current(string $column): int|string
+    {
+        return $this->booking?->getAttribute($column) ?: 0;
+    }
 
     public function configure(Schema $schema): Schema
     {
@@ -66,7 +129,8 @@ class EmbarqueForm
 
     private function quotation(): ?Section
     {
-        $source = QuotationPrefill::source($this->operation, $this->mode);
+        // A edição do legado só mostra a cotação vinculada, não troca.
+        $source = $this->booking ? null : QuotationPrefill::source($this->operation, $this->mode);
 
         if (! $source) {
             return null;
@@ -114,7 +178,11 @@ class EmbarqueForm
                     ->label('Vendedor')
                     ->required()
                     ->searchable()
-                    ->options(fn () => DB::table('vendedor')->whereNull('deleted_at')->whereNotIn('vendedor_id', self::HIDDEN_SELLERS)->orderBy('nome')->pluck('nome', 'vendedor_id')),
+                    ->options(fn () => DB::table('vendedor')
+                        ->where(fn (Builder $q) => $q->whereNull('deleted_at')->whereNotIn('vendedor_id', self::HIDDEN_SELLERS))
+                        ->orWhere('vendedor_id', $this->current('vendedor_id'))
+                        ->orderBy('nome')
+                        ->pluck('nome', 'vendedor_id')),
                 DatePicker::make('data_topo')
                     ->label('Data de solicitação')
                     ->required()
@@ -130,7 +198,11 @@ class EmbarqueForm
                 ...($maritime && ! $export ? [
                     Select::make('escritorio_id')
                         ->label('Escritório do agente')
-                        ->options(fn (Get $get) => DB::table('escritorio')->where('pessoa_id', $get('pessoa_id_representante'))->orderBy('nome')->pluck('nome', 'escritorio_id')),
+                        ->options(fn (Get $get) => DB::table('escritorio')
+                            ->where('pessoa_id', $get('pessoa_id_representante'))
+                            ->orWhere('escritorio_id', $this->current('escritorio_id'))
+                            ->orderBy('nome')
+                            ->pluck('nome', 'escritorio_id')),
                 ] : []),
                 Select::make('de')
                     ->label($export ? 'Responsável pelo fechamento' : 'Responsável')
@@ -186,12 +258,15 @@ class EmbarqueForm
                     ]),
                     DatePicker::make('data_validade')
                         ->label('Validade da cotação')
-                        ->required($export),
+                        ->required($export)
+                        ->live(),
+                    ...$this->validityJustification(),
                     Select::make('consolidado')
                         ->label('Consolidado')
                         ->options(self::YES_NO)
                         ->default('n')
-                        ->selectablePlaceholder(false),
+                        // Reserva antiga sem resposta aparece em branco, não como a primeira opção.
+                        ->selectablePlaceholder((bool) $this->booking && blank($this->booking->consolidado)),
                     Select::make('tipo_frete')
                         ->label('Local de pagamento do frete')
                         ->options(['p' => 'PP', 'c' => 'CC', 'a' => 'ABROAD']),
@@ -203,6 +278,30 @@ class EmbarqueForm
                         ->columnSpanFull(),
                 ] : []),
             ]);
+    }
+
+    /** Edição da exportação marítima: trocar a validade pede justificativa, com o arquivo da negociação opcional. */
+    private function validityJustification(): array
+    {
+        if (! $this->booking || ! $this->isMaritimeExport()) {
+            return [];
+        }
+
+        $changed = fn (Get $get) => UpdateBooking::changesValidity($this->booking, $get('data_validade'));
+
+        return [
+            Textarea::make('justificativa_validade')
+                ->label('Justifique a alteração da data de validade')
+                ->required()
+                ->visible($changed)
+                ->columnSpanFull(),
+            FileUpload::make('arquivo_validade')
+                ->label('Arquivo da negociação')
+                ->storeFiles(false)
+                ->maxSize(20480)
+                ->visible($changed)
+                ->columnSpanFull(),
+        ];
     }
 
     /** Na importação o número vem do botão (legado: campo bloqueado); na exportação é o número do armador, digitado. */
@@ -255,7 +354,7 @@ class EmbarqueForm
         if ($this->isMaritimeExport()) {
             return $field->options(fn (Get $get) => DB::table('pessoa as p')
                 ->leftJoin('agente_pais as a', fn ($join) => $join->on('a.agente_id', '=', 'p.pessoa_id')->where('a.pais_id', $get('pais_id'))->where('a.restricao', 0))
-                ->where(fn (Builder $q) => $q->whereNotNull('a.agente_id')->orWhere('p.pessoa_id', self::DMF_AGENT))
+                ->where(fn (Builder $q) => $q->whereNotNull('a.agente_id')->orWhereIn('p.pessoa_id', [self::DMF_AGENT, $this->current('pessoa_id_representante')]))
                 ->orderBy('a.ordem')
                 ->orderBy('p.nome')
                 ->pluck('p.nome', 'p.pessoa_id'));
@@ -280,6 +379,8 @@ class EmbarqueForm
             ->orderBy('nome')
             ->pluck('nome')
             ->when($this->operation === 'i', fn ($names) => $names->push(auth()->user()->nome))
+            ->push($this->booking?->de)
+            ->filter()
             ->unique();
 
         return $names->combine($names)->all();
@@ -293,7 +394,7 @@ class EmbarqueForm
                     ->label('Cia aérea')
                     ->searchable()
                     ->options(fn () => DB::table('cia_aerea')->orderBy('name')->pluck('name', 'id')),
-                $this->date('saida_prevista', 'ETD'),
+                $this->etd(),
                 $this->transit(),
                 $this->date('chegada_prevista', 'ETA'),
                 $this->loadingType(),
@@ -318,7 +419,7 @@ class EmbarqueForm
                 ReportFields::ship('navio_id_destino', 'Navio de destino'),
                 TextInput::make('vg')
                     ->label('VG'),
-                $this->date('saida_prevista', 'ETD'),
+                $this->etd(),
                 $this->transit(),
                 $this->date('chegada_prevista', 'ETA'),
                 $this->incoterm(),
@@ -390,7 +491,7 @@ class EmbarqueForm
                 ReportFields::ship('navio_id_destino', 'Navio de destino'),
                 TextInput::make('vg')
                     ->label('VG'),
-                $this->date('saida_prevista', 'ETD'),
+                $this->etd(),
                 $this->transit(),
                 $this->date('chegada_prevista', 'ETA'),
                 $this->date('chegada_desejada', 'ETA desejado'),
@@ -475,6 +576,17 @@ class EmbarqueForm
             ->label($label);
     }
 
+    /** Depois da confirmação de embarque a saída prevista não muda mais. */
+    private function etd(): DatePicker
+    {
+        $confirmed = (bool) $this->booking?->departureConfirmations()->exists();
+
+        return $this->date('saida_prevista', 'ETD')
+            ->disabled($confirmed)
+            ->dehydrated()
+            ->helperText($confirmed ? 'O embarque já foi confirmado.' : null);
+    }
+
     private function note(string $name, string $label): Textarea
     {
         return Textarea::make($name)
@@ -508,7 +620,7 @@ class EmbarqueForm
 
         return Select::make('destino_final_id')
             ->label('Final destination')
-            ->options(fn (Get $get) => app(RegisterFinalDestination::class)->options($get('cliente_id')))
+            ->options(fn (Get $get) => app(RegisterFinalDestination::class)->options($get('cliente_id'), $this->booking?->destino_final_id))
             ->helperText('Escolha o cliente para ver e cadastrar os endereços dele.')
             ->createOptionModalHeading('Novo destino final')
             ->createOptionForm([
@@ -599,9 +711,12 @@ class EmbarqueForm
 
     private function insurance(): Select
     {
+        // No marítimo o legado deixa passar em branco; a edição não obriga a responder o que a reserva nunca respondeu.
+        $required = $this->mode === 'a' || ! $this->booking || filled($this->booking->insurance);
+
         return Select::make('insurance')
             ->label('Seguro contratado')
-            ->required()
+            ->required($required)
             ->options(self::YES_NO)
             ->default($this->mode === 'a' ? 'n' : null)
             ->live()
@@ -617,6 +732,7 @@ class EmbarqueForm
                 ['insurance' => $get('insurance'), 'cliente_id' => $get('cliente_id')],
                 $this->operation,
                 $this->mode,
+                $this->booking,
             ))
             ->columnSpanFull();
     }
@@ -627,6 +743,7 @@ class EmbarqueForm
             ->label($label)
             ->options(fn (Get $get) => DB::table($table)
                 ->whereIn("{$table}_id", DB::table($link)->where('pessoa_id', $get('cliente_id'))->select("{$table}_id"))
+                ->orWhere("{$table}_id", $this->current("{$table}_id"))
                 ->orderBy('nome')
                 ->pluck('nome', "{$table}_id"));
 
@@ -642,7 +759,8 @@ class EmbarqueForm
                     ->options(fn (Get $get) => DB::table('despachante')
                         ->where(fn (Builder $q) => $q
                             ->whereIn('despachante_id', DB::table('pessoa_despachante')->whereIn('pessoa_id', array_filter([$get('cliente_id'), $get('pessoa_id_importador')]))->select('despachante_id'))
-                            ->orWhereIn('despachante_id', DB::table('trading_despachante')->where('trading_id', $get('trading_id'))->select('despachante_id')))
+                            ->orWhereIn('despachante_id', DB::table('trading_despachante')->where('trading_id', $get('trading_id'))->select('despachante_id'))
+                            ->orWhere('despachante_id', $this->current('despachante_id')))
                         ->orderBy('nome')
                         ->pluck('nome', 'despachante_id')),
                 ...($this->isMaritimeExport() ? [] : [
@@ -683,7 +801,7 @@ class EmbarqueForm
             Select::make("contacts.{$party}")
                 ->label('Contatos')
                 ->multiple()
-                ->options(fn (Get $get) => app(BookingParties::class)->contactOptions($get($column), $this->operation)),
+                ->options(fn (Get $get) => app(BookingParties::class)->contactOptions($get($column), $this->operation, $this->booking, $party)),
         ];
     }
 
@@ -692,6 +810,7 @@ class EmbarqueForm
         $import = $this->operation === 'i';
         $maritime = $this->mode === 'm';
         $measures = $this->mode === 'a' || ! $import;
+        $isNew = fn (Get $get): bool => blank($get('mercadoria_id'));
         $number = fn (string $name, string $label) => TextInput::make($name)
             ->label($label)
             ->numeric();
@@ -703,22 +822,28 @@ class EmbarqueForm
                     ->addActionLabel('Adicionar mercadoria')
                     ->defaultItems(0)
                     ->columns(4)
+                    // As exigências de preenchimento valem para a mercadoria nova: a edição não obriga a completar as antigas.
                     ->schema([
+                        Hidden::make('mercadoria_id'),
                         TextInput::make('nome')
                             ->label('Mercadoria')
-                            ->required(),
+                            ->required($isNew),
                         TextInput::make('quantidade')
                             ->label('Quantidade')
-                            ->required()
-                            ->integer(),
+                            ->required($isNew)
+                            ->rule('integer', $isNew),
                         Select::make('tipo_container_id')
                             ->label('Equipamento')
-                            ->required()
+                            ->required($isNew)
                             ->live()
-                            ->options(fn () => DB::table('tipo_container')->where('tipo_embarque', $this->mode)->orderBy('nome')->pluck('nome', 'tipo_container_id')),
+                            ->options(fn (Get $get) => DB::table('tipo_container')
+                                ->where('tipo_embarque', $this->mode)
+                                ->when(! $isNew($get), fn (Builder $q) => $q->orWhere('tipo_container_id', (int) $get('tipo_container_id')))
+                                ->orderBy('nome')
+                                ->pluck('nome', 'tipo_container_id')),
                         Select::make('temperatura')
                             ->label('Temperatura')
-                            ->required()
+                            ->required($isNew)
                             ->visible(fn (Get $get) => $maritime && Container::isReefer($get('tipo_container_id')))
                             ->options(collect(range(25, -25))->mapWithKeys(fn (int $t) => [$t => "{$t}°"])->all()),
                         ...($measures ? [
@@ -734,12 +859,12 @@ class EmbarqueForm
                             ->integer(),
                         Select::make('quimico')
                             ->label('Químico?')
-                            ->required($import)
+                            ->required(fn (Get $get) => $import && $isNew($get))
                             ->live()
                             ->options([0 => 'NÃO', 1 => 'SIM']),
                         Select::make('carga_perigosa')
                             ->label('Carga perigosa (IMO)?')
-                            ->required($import)
+                            ->required(fn (Get $get) => $import && $isNew($get))
                             ->visible(fn (Get $get) => (string) $get('quimico') === '1')
                             ->options([0 => 'NÃO', 1 => 'SIM']),
                         ...($maritime ? [

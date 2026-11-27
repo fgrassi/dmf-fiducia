@@ -3,6 +3,7 @@
 namespace App\Actions\Booking\Creation;
 
 use App\Models\ConsultaCnpj;
+use App\Models\Embarque;
 use App\Models\Pessoa;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
@@ -18,12 +19,43 @@ class BookingParties
         'notify' => ['pessoa_id_notify', 'embarque_contato_notify', 'Notify'],
     ];
 
-    /** getUsuariosPessoa (legado): usuários ativos da empresa no tipo da operação. @return array<int, string> */
-    public function contactOptions(int|string|null $personId, string $operation): array
+    /**
+     * getUsuariosPessoa (legado): usuários ativos da empresa no tipo da operação. Na edição, enquanto a empresa da parte for a
+     * mesma, os contatos que a reserva já tem continuam valendo, mesmo que tenham saído do cadastro.
+     *
+     * @return array<int, string>
+     */
+    public function contactOptions(int|string|null $personId, string $operation, ?Embarque $booking = null, ?string $party = null): array
     {
-        return $personId
-            ? $this->contacts($personId, $operation)->orderBy('u.nome')->pluck('u.nome', 'u.usuario_id')->all()
-            : [];
+        if (! $personId) {
+            return [];
+        }
+
+        $options = $this->contacts($personId, $operation)->orderBy('u.nome')->pluck('u.nome', 'u.usuario_id')->all();
+
+        if ($booking && (int) $booking->{self::PARTIES[$party][0]} === (int) $personId) {
+            $options += DB::table('usuario')->whereIn('usuario_id', $this->linkedContacts($booking, $party))->pluck('nome', 'usuario_id')->all();
+        }
+
+        return $options;
+    }
+
+    /**
+     * Contatos que a reserva já tem naquela parte. O legado grava o mesmo contato repetido e deixa o vínculo de usuário apagado,
+     * que fica fora da lista (e continua no banco).
+     *
+     * @return list<int>
+     */
+    public function linkedContacts(Embarque $booking, string $party): array
+    {
+        return DB::table(self::PARTIES[$party][1])
+            ->where('embarque_id', $booking->getKey())
+            ->whereIn('usuario_id', DB::table('usuario')->select('usuario_id'))
+            ->pluck('usuario_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /** Pessoa::getContatoPadrao (legado): os que já entram na reserva quando a empresa é escolhida. @return list<int> */

@@ -51,6 +51,9 @@ enum Alert: string
     case BrokerRatesExport = 'alerta:taxas-despachante-exportacao';
     case ClientBoletoRemoved = 'alerta:prazo-negociado-removido';
     case FollowUpChanged = 'alerta:fup-alterado';
+    case ExpensesNotImported = 'alerta:matriz-despesas-nao-importadas';
+    case QuotationValidityChanged = 'alerta:validade-cotacao-alterada';
+    case InsurancePolicyUpdate = 'alerta:atualizar-apolice';
 
     private const FINANCE = 'financeiro@dmflog.com.br';
 
@@ -110,6 +113,9 @@ enum Alert: string
             self::BrokerRatesExport => ['Taxas do despachante alteradas (exportação)', ['export@dmflog.com.br']],
             self::ClientBoletoRemoved => ['Cliente: prazo negociado removido', [self::FINANCE]],
             self::FollowUpChanged => ['Follow up já enviado no relatório que foi alterado', ['priscila@dmflog.com.br', 'fernando@dmflog.com.br']],
+            self::ExpensesNotImported => ['Reserva: despesas da matriz não importadas em reserva com despesas revisadas', [self::IMPORT, self::FINANCE]],
+            self::QuotationValidityChanged => ['Reserva: data de validade da cotação alterada na exportação', [self::EXPORT]],
+            self::InsurancePolicyUpdate => ['Reserva: ETD antecipado ou navio trocado em embarque com seguro', [self::EXPORT]],
         };
     }
 

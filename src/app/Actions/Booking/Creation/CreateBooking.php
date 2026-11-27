@@ -13,6 +13,7 @@ use App\Models\Embarque;
 use App\Models\Mercadoria;
 use App\Models\User;
 use DomainException;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
@@ -27,16 +28,16 @@ use Illuminate\Support\Facades\DB;
  */
 class CreateBooking
 {
-    private const BL_DESCRIPTION = '“AS PER LOCAL PORT AUTHORITIES REGULATIONS, OR CUSTOMS AUTHORITIES MAY RELEASE THE CARGO TO NOTIFY PARTY OR CONSIGNEE AT DESTINATION WITHOUT PRODUCTION OF ORIGINAL BILL/S OF LADING AND NOT INFORMING THE AGENCIES, WE ARE NOT BE RESPONSIBLE FOR SUCH DELIVERY, AND DO NOT ACCEPT ANY LIABILITY”';
+    public const BL_DESCRIPTION = '“AS PER LOCAL PORT AUTHORITIES REGULATIONS, OR CUSTOMS AUTHORITIES MAY RELEASE THE CARGO TO NOTIFY PARTY OR CONSIGNEE AT DESTINATION WITHOUT PRODUCTION OF ORIGINAL BILL/S OF LADING AND NOT INFORMING THE AGENCIES, WE ARE NOT BE RESPONSIBLE FOR SUCH DELIVERY, AND DO NOT ACCEPT ANY LIABILITY”';
 
     /** Chaves do formulário que não são colunas de embarque. */
-    private const NOT_COLUMNS = ['contacts', 'goods', 'instrucao_especial', 'justificativa_seguro', 'pais_id'];
+    public const NOT_COLUMNS = ['contacts', 'goods', 'instrucao_especial', 'justificativa_seguro', 'pais_id'];
 
     /**
      * Em branco, o legado grava '' e não nulo nestas colunas. Há filtros (vários em crons que seguem no legado) que deixariam a
      * reserva com nulo de fora: `loading_type <> 'f'`, `insurance <> 's'`, `house_bl not like`, `ce_mercante = ''` e `master_bl is not null`.
      */
-    private const BLANK_AS_EMPTY = ['loading_type', 'insurance', 'house_bl', 'master_bl', 'ce_mercante'];
+    public const BLANK_AS_EMPTY = ['loading_type', 'insurance', 'house_bl', 'master_bl', 'ce_mercante'];
 
     public function __construct(
         private BookingParties $parties,
@@ -88,21 +89,36 @@ class CreateBooking
         });
     }
 
-    /** O cliente tem seguro obrigatório e a reserva não contrata: precisa justificar. */
-    public function needsInsuranceJustification(array $data, string $operation, string $mode): bool
+    /**
+     * O cliente tem seguro obrigatório e a reserva não contrata: precisa justificar. Na edição (`$current`), a reserva que já
+     * ficou sem seguro (ctr_seguro = -1) não pede de novo. O aéreo nunca marca essa coluna (o legado pedia a cada edição e não
+     * registrava): só pede quando o seguro ou o cliente mudam.
+     */
+    public function needsInsuranceJustification(array $data, string $operation, string $mode, ?Embarque $current = null): bool
     {
         $asked = $mode === 'a' || $operation === 'i';
 
+        if ($current && $mode === 'a' && ($data['insurance'] ?? null) === $current->insurance
+            && (int) ($data['cliente_id'] ?? 0) === (int) $current->cliente_id) {
+            return false;
+        }
+
         return $asked
+            && (int) $current?->ctr_seguro !== -1
             && ($data['insurance'] ?? null) !== 's'
             && DB::table('pessoa')->where('pessoa_id', $data['cliente_id'] ?? null)->value('seguro_obrigatorio') === 's';
     }
 
-    /** @throws DomainException */
-    private function validate(array $data, string $operation, string $mode, User $user): void
+    /**
+     * As validações da reserva, na criação e na edição. Na edição (`$current`), o que não mudou não é revalidado: número da
+     * importação, blacklist das partes e temperatura das mercadorias que já existiam.
+     *
+     * @throws DomainException
+     */
+    public function validate(array $data, string $operation, string $mode, User $user, ?Embarque $current = null): void
     {
         throw_unless(in_array($operation, ['i', 'e'], true) && in_array($mode, ['m', 'a'], true), DomainException::class, 'Tipo de reserva inválido.');
-        throw_if($user->onlyOperation() && $user->onlyOperation() !== $operation, DomainException::class, 'Seu usuário não pode criar reservas desta operação.');
+        throw_if($user->onlyOperation() && $user->onlyOperation() !== $operation, DomainException::class, 'Seu usuário não pode gravar reservas desta operação.');
 
         $maritimeExport = $operation === 'e' && $mode === 'm';
 
@@ -115,7 +131,10 @@ class CreateBooking
             'porto_destino_id' => 'É necessário informar o Destino.',
             ...($mode === 'm' ? ['pessoa_id_representante' => 'É necessário informar o Agente.'] : []),
             ...($mode === 'a' || $maritimeExport ? ['de' => 'É necessário informar o Responsável.'] : []),
-            ...($mode === 'a' || $operation === 'i' ? ['insurance' => 'Informe se haverá ou não contratação de seguro.'] : []),
+            // No marítimo o legado deixa passar em branco: a edição não obriga a responder o que a reserva nunca respondeu.
+            ...(($mode === 'a' || $operation === 'i') && ! ($current && $mode === 'm' && blank($current->insurance))
+                ? ['insurance' => 'Informe se haverá ou não contratação de seguro.']
+                : []),
             ...($maritimeExport ? [
                 'tipo_fechamento' => 'O tipo de fechamento não pode estar em branco.',
                 'armador_id' => 'É necessário informar o Armador.',
@@ -134,21 +153,24 @@ class CreateBooking
         }
 
         // Na importação o legado só bloqueia o campo na tela; aqui o número tem que ter saído do botão e ainda estar livre.
-        if ($operation === 'i') {
+        // Na edição, o número só é conferido quando muda: há reservas antigas que já dividem o número com outra.
+        $sameNumber = $current && trim((string) $data['booking']) === trim((string) $current->booking);
+
+        if ($operation === 'i' && ! $sameNumber) {
             throw_unless($this->numbers->wasIssued((string) $data['booking'], $mode), DomainException::class, 'Gere o número do booking pelo botão "Solicitar número".');
-            throw_if(DB::table('embarque')->where('booking', $data['booking'])->exists(), DomainException::class, 'Este número de reserva já foi utilizado.');
+            throw_if($this->otherBookings($current)->where('booking', $data['booking'])->exists(), DomainException::class, 'Este número de reserva já foi utilizado.');
         }
 
         foreach (BookingParties::PARTIES as [$column, , $label]) {
             throw_if(
-                filled($data[$column] ?? null) && $this->parties->isBlacklisted($data[$column]),
+                filled($data[$column] ?? null) && (int) $data[$column] !== (int) $current?->{$column} && $this->parties->isBlacklisted($data[$column]),
                 DomainException::class,
                 "O {$label} selecionado está na blacklist do sistema.",
             );
         }
 
         $hasContact = collect(['cliente', 'importador', 'exportador'])
-            ->contains(fn (string $party) => filled($this->contactsOf($data, $party, $operation)));
+            ->contains(fn (string $party) => filled($this->contactsOf($data, $party, $operation, $current)));
         throw_unless($hasContact, DomainException::class, 'É necessário informar pelo menos um contato do Cliente, Consignee ou Shipper.');
 
         if ($mode === 'm') {
@@ -159,33 +181,48 @@ class CreateBooking
         }
 
         if ($maritimeExport) {
+            // Na edição, só quando uma das duas datas muda: há reservas que já têm o ETD depois da validade.
+            $sameDates = $current && collect(['saida_prevista', 'data_validade'])
+                ->every(fn (string $column) => substr((string) ($data[$column] ?? ''), 0, 10) === substr((string) $current->{$column}, 0, 10));
+
             throw_if(
-                filled($data['saida_prevista'] ?? null) && substr((string) $data['saida_prevista'], 0, 10) > substr((string) $data['data_validade'], 0, 10),
+                ! $sameDates && filled($data['saida_prevista'] ?? null) && substr((string) $data['saida_prevista'], 0, 10) > substr((string) $data['data_validade'], 0, 10),
                 DomainException::class,
                 'A Saída Prevista não pode ser posterior à Data de Validade da cotação.',
             );
 
+            // Deixar de ser consolidada é a outra mudança que pode criar a duplicidade.
             throw_if(
-                ($data['consolidado'] ?? 'n') === 'n'
-                    && DB::table('embarque')->where('booking', $data['booking'])->where('finalizado', '<>', 'c')->where('consolidado', 'n')->exists(),
+                ! ($sameNumber && $current->consolidado !== 's')
+                    && ($data['consolidado'] ?? 'n') === 'n'
+                    && $this->otherBookings($current)->where('booking', $data['booking'])->where('finalizado', '<>', 'c')->where('consolidado', 'n')->exists(),
                 DomainException::class,
                 'Este número de reserva já foi utilizado. Não é possível ter reservas com números duplicados.',
             );
         }
 
+        $saved = $current ? DB::table('mercadoria')->where('embarque_id', $current->getKey())->pluck('tipo_container_id', 'mercadoria_id') : collect();
+
         foreach ($data['goods'] ?? [] as $good) {
+            $unchanged = filled($good['mercadoria_id'] ?? null) && (int) $saved->get($good['mercadoria_id']) === (int) ($good['tipo_container_id'] ?? 0);
+
             throw_if(
-                $mode === 'm' && Container::isReefer($good['tipo_container_id'] ?? null) && blank($good['temperatura'] ?? null),
+                $mode === 'm' && ! $unchanged && Container::isReefer($good['tipo_container_id'] ?? null) && blank($good['temperatura'] ?? null),
                 DomainException::class,
                 'É preciso informar a Temperatura para container REEFER.',
             );
         }
 
         throw_if(
-            $this->needsInsuranceJustification($data, $operation, $mode) && blank($data['justificativa_seguro'] ?? null),
+            $this->needsInsuranceJustification($data, $operation, $mode, $current) && blank($data['justificativa_seguro'] ?? null),
             DomainException::class,
             'Cliente com seguro obrigatório: justifique a não contratação.',
         );
+    }
+
+    private function otherBookings(?Embarque $current): Builder
+    {
+        return DB::table('embarque')->when($current, fn (Builder $q) => $q->where('embarque_id', '<>', $current->getKey()));
     }
 
     private function save(array $data, string $operation, string $mode, int $userId): Embarque
@@ -237,13 +274,13 @@ class CreateBooking
     }
 
     /** Só os contatos da empresa escolhida naquela parte. @return list<int> */
-    private function contactsOf(array $data, string $party, string $operation): array
+    public function contactsOf(array $data, string $party, string $operation, ?Embarque $current = null): array
     {
         $personId = $data[BookingParties::PARTIES[$party][0]] ?? null;
 
         return array_values(array_intersect(
             array_map('intval', $data['contacts'][$party] ?? []),
-            array_keys($this->parties->contactOptions($personId, $operation)),
+            array_keys($this->parties->contactOptions($personId, $operation, $current, $party)),
         ));
     }
 
@@ -302,7 +339,7 @@ class CreateBooking
         }
     }
 
-    private function justifyInsurance(Embarque $booking, string $justification, User $user): void
+    public function justifyInsurance(Embarque $booking, string $justification, User $user): void
     {
         $client = e((string) DB::table('pessoa')->where('pessoa_id', $booking->cliente_id)->value('nome'));
         $who = e($user->nome);
@@ -329,7 +366,7 @@ class CreateBooking
     }
 
     /** BookingBlDiretoNotification: BL direto com pagamento do frete em CC. */
-    private function warnDirectBl(Embarque $booking): void
+    public function warnDirectBl(Embarque $booking): void
     {
         $lines = [
             'Booking' => $booking->booking,

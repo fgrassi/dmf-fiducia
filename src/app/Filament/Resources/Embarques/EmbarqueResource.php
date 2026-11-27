@@ -2,7 +2,9 @@
 
 namespace App\Filament\Resources\Embarques;
 
+use App\Actions\Booking\UpdateBooking;
 use App\Filament\Resources\Embarques\Pages\CreateEmbarque;
+use App\Filament\Resources\Embarques\Pages\EditEmbarque;
 use App\Filament\Resources\Embarques\Pages\ListEmbarques;
 use App\Filament\Resources\Embarques\Pages\ListSeguros;
 use App\Filament\Resources\Embarques\Pages\ViewEmbarque;
@@ -37,10 +39,12 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use UnitEnum;
 
-/** Reserva (módulo booking do legado): lista, criação e as abas da reserva. */
+/** Reserva (módulo booking do legado): lista, criação, edição e as abas da reserva. */
 class EmbarqueResource extends Resource
 {
     protected static ?string $model = Embarque::class;
@@ -89,6 +93,16 @@ class EmbarqueResource extends Resource
                 ->isActiveWhen(fn () => request()->routeIs(static::getRouteBaseName().'.seguros'))
                 ->visible(static::canAccess()),
         ];
+    }
+
+    /** Mesma regra no botão "Editar", na página e na busca global. */
+    public static function getEditAuthorizationResponse(Model $record): Response
+    {
+        $user = auth()->user();
+
+        return $user && UpdateBooking::allows($record, $user)
+            ? Response::allow()
+            : Response::deny();
     }
 
     public static function infolist(Schema $schema): Schema
@@ -150,6 +164,7 @@ class EmbarqueResource extends Resource
             'seguros' => ListSeguros::route('/seguros'),
             'create' => CreateEmbarque::route('/nova/{operacao}/{tipo}'),
             'view' => ViewEmbarque::route('/{record}'),
+            'edit' => EditEmbarque::route('/{record}/editar'),
         ];
     }
 }

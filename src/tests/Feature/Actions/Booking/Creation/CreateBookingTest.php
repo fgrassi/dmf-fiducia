@@ -198,7 +198,7 @@ class CreateBookingTest extends TestCase
         DB::table('usuario')->where('usuario_id', $this->author->getKey())->update(['credentials' => 'booking,import']);
         $this->author->refresh();
 
-        $this->expectExceptionMessage('não pode criar reservas desta operação');
+        $this->expectExceptionMessage('não pode gravar reservas desta operação');
 
         $this->create($this->bookingData(), 'e');
     }

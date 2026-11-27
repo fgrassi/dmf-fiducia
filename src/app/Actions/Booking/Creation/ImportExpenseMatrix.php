@@ -11,11 +11,11 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * booking/importExpensesMatrix (legado): na criação da reserva marítima, lança as despesas da matriz do armador no porto, das
+ * booking/importExpensesMatrix (legado): ao salvar a reserva marítima, lança as despesas da matriz do armador no porto, das
  * matrizes do cliente, do agente e do despachante (uma vez por mercadoria) e o depósito de garantia da importação.
  *
- * Não portado: o ramo "despesas revisadas" (só e-mail, sem lançar). A reserva nova nasce sem revisão; ele entra quando a
- * edição da reserva for portada.
+ * Importação com as despesas revisadas: as das matrizes não são lançadas, só avisadas por e-mail (o depósito de garantia é
+ * lançado mesmo assim, como no legado).
  */
 class ImportExpenseMatrix
 {
@@ -53,7 +53,9 @@ class ImportExpenseMatrix
         }
 
         if ($created->isNotEmpty()) {
-            DB::afterCommit(fn () => $this->notifyAuthor($booking, $created));
+            DB::afterCommit(fn () => $this->isReviewed($booking)
+                ? $this->notifyNotImported($booking, $created)
+                : $this->notifyAuthor($booking, $created));
         }
 
         if ($booking->impor_expor === 'i' && $this->guarantee($booking, $goods, $userId)) {
@@ -103,7 +105,7 @@ class ImportExpenseMatrix
                 ->exists();
 
             if (! $exists) {
-                $created[] = $this->add($booking, $userId, [
+                $created[] = $this->fromMatrix($booking, $userId, [
                     'ref_expense' => $row->ref_expense,
                     'buying_rate' => $row->expense_value,
                     'ref_currency_br' => $row->ref_currency,
@@ -232,7 +234,7 @@ class ImportExpenseMatrix
                 ->exists();
 
             if (! $exists) {
-                $created[] = $this->add($booking, $userId, ['ref_expense' => $row->ref_expense, 'billing' => $row->billing, ...$values($row)]);
+                $created[] = $this->fromMatrix($booking, $userId, ['ref_expense' => $row->ref_expense, 'billing' => $row->billing, ...$values($row)]);
             }
         }
 
@@ -251,13 +253,13 @@ class ImportExpenseMatrix
                 continue;
             }
 
-            $this->add($booking, $userId, [
+            $this->make($booking, $userId, [
                 'ref_expense' => self::GUARANTEE_EXPENSE,
                 'ref_equipment' => $equipment,
                 'selling_rate' => $deposit->valor * $days,
                 'ref_currency_sr' => $deposit->ref_currency,
                 'billing' => 'c',
-            ]);
+            ])->save();
             $added = true;
         }
 
@@ -277,17 +279,28 @@ class ImportExpenseMatrix
         return ['ctrl' => $flag, 'ctrl2' => $flag];
     }
 
-    private function add(Embarque $booking, int $userId, array $values): FinExpensesValues
+    private function isReviewed(Embarque $booking): bool
     {
-        $expense = (new FinExpensesValues)->forceFill([
+        return $booking->impor_expor === 'i' && $booking->revisao_despesas === 's';
+    }
+
+    /** A despesa de uma matriz: com as despesas revisadas, volta sem ser gravada. */
+    private function fromMatrix(Embarque $booking, int $userId, array $values): FinExpensesValues
+    {
+        $expense = $this->make($booking, $userId, $values);
+        $this->isReviewed($booking) || $expense->save();
+
+        return $expense;
+    }
+
+    private function make(Embarque $booking, int $userId, array $values): FinExpensesValues
+    {
+        return (new FinExpensesValues)->forceFill([
             ...$values,
             'ref_embarque' => $booking->getKey(),
             'created_by' => $userId,
             'created_at' => today()->toDateString(),
         ]);
-        $expense->save();
-
-        return $expense;
     }
 
     /** @param  Collection<int, FinExpensesValues>  $created */
@@ -321,6 +334,38 @@ class ImportExpenseMatrix
             [$email],
             from: 'system@dmflog.com.br',
             fromName: 'DMF Logistics do Brasil - System Notification',
+        );
+    }
+
+    /** @param  Collection<int, FinExpensesValues>  $pending */
+    private function notifyNotImported(Embarque $booking, Collection $pending): void
+    {
+        $currency = fn (?int $id) => $id ? DB::table('cmn_currencies')->where('id', $id)->value('symbol') : '';
+        $money = fn (mixed $value) => filled($value) ? number_format((float) $value, 2, ',', '.') : '';
+
+        // Sem gravar, a mesma linha da matriz volta uma vez por mercadoria.
+        $rows = $pending
+            ->unique(fn (FinExpensesValues $expense) => json_encode($expense->getAttributes()))
+            ->map(fn (FinExpensesValues $expense) => '<tr>'.collect([
+                DB::table('fin_expenses')->where('id', $expense->ref_expense)->value('name'),
+                [self::DUE_TO_CARRIER => 'Armador', self::DUE_TO_BROKER => 'Despachante'][$expense->ref_due_to] ?? 'Cliente/Agente',
+                $currency($expense->ref_currency_br),
+                $money($expense->buying_rate),
+                $currency($expense->ref_currency_sr),
+                $money($expense->selling_rate),
+                DB::table('tipo_container')->where('tipo_container_id', $expense->ref_equipment)->value('nome'),
+                self::BILLINGS[$expense->billing] ?? '',
+            ])->map(fn ($value) => '<td>'.e((string) $value).'</td>')->implode('').'</tr>')
+            ->implode('');
+
+        $client = DB::table('pessoa')->where('pessoa_id', $booking->cliente_id)->value('nome');
+
+        Alert::ExpensesNotImported->send(
+            "Revisão de Reserva: {$booking->booking} - DESPESAS NÃO IMPORTADAS",
+            '<h3>Matriz de Despesas</h3><p>Prezado usuário.<br/>A reserva '.e("{$booking->booking} - {$client}")
+                .' está com status de Despesas Revisadas marcado como <strong>SIM</strong>, mas o sistema identificou as despesas abaixo na Matriz de Despesas e <strong>NÃO FORAM ADICIONADAS À RESERVA</strong>.<br/>É necessário verificar se elas devem ou não ser adicionadas.</p>'
+                .'<table border="1"><tr><th>Despesa</th><th>Matriz</th><th>Moeda B/R</th><th>B/R</th><th>Moeda S/R</th><th>S/R</th><th>Equipamento</th><th>Billing</th></tr>'.$rows.'</table>',
+            fn ($mail) => $mail->from('system@dmflog.com.br', 'DMF Logistics do Brasil - System Notification'),
         );
     }
 

@@ -15,6 +15,7 @@ use Carbon\Carbon;
 use DomainException;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
+use Filament\Actions\EditAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
@@ -68,6 +69,9 @@ class ViewEmbarque extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            EditAction::make()
+                ->label('Editar')
+                ->icon(Heroicon::OutlinedPencilSquare),
             ActionGroup::make([
                 Action::make('instrucaoCobranca')
                     ->label('Instrução de cobrança')
