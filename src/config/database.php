@@ -59,8 +59,11 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
+            // Texto no lugar do protocolo binário, como o legado: as colunas FLOAT(11,2) do financeiro voltam com 2 casas
+            // (no binário vêm como float32 aberto em double e as somas perdem centavos).
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                PDO::ATTR_EMULATE_PREPARES => true,
             ]) : [],
         ],
 
