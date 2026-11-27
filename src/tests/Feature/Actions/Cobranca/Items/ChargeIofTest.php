@@ -23,6 +23,15 @@ class ChargeIofTest extends TestCase
         $this->assertSame(35.0, app(ChargeIof::class)->amount($charge));
     }
 
+    public function test_bl_fee_pays_no_iof_even_outside_the_exemption_rule(): void
+    {
+        $charge = $this->charge();
+        $this->item($charge, currency: 2, value: 1000);
+        $this->item($charge, currency: 2, value: 200, expense: 951);
+
+        $this->assertSame(35.0, app(ChargeIof::class)->amount($charge));
+    }
+
     public function test_exempt_client_pays_no_iof(): void
     {
         $charge = $this->charge(client: ['isento_iof' => 1]);

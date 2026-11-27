@@ -2,6 +2,7 @@
 
 namespace App\Services\Cobranca;
 
+use App\Actions\Cobranca\Items\ChargeIof;
 use App\Models\FinCharges;
 use App\Models\FinChargesNfse;
 use Carbon\Carbon;
@@ -404,6 +405,7 @@ class ChargeDetails
     private function exemptFromIof(stdClass $i): bool
     {
         return (int) $i->ref_currency === 1
+            || in_array((int) $i->expense_value_expense, ChargeIof::BL_FEE_EXPENSES, true)
             || DB::table('regra_despesa_cobranca_item')->where('despesa_id', $i->expense_value_expense)->where('regra_despesa_cobranca_id', 10)->exists();
     }
 

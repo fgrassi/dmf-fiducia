@@ -16,6 +16,9 @@ class ChargeIof
     /** VIPAL: exportação sem IOF. */
     private const VIPAL_ID = 4392;
 
+    /** listDespesaIdsIsentosIof: BL Fee é isento mesmo fora da regra 10. */
+    public const BL_FEE_EXPENSES = [11, 951, 959, 734, 906, 863, 888, 1520, 1736, 1739, 1740, 1813];
+
     /** IOF que a cobrança deve ter: zero se não incide, o valor gravado se manual (ctr_valor_iof), senão base × alíquota. */
     public function amount(FinCharges $charge): float
     {
@@ -50,13 +53,14 @@ class ChargeIof
         return ! ($charge->embarque->impor_expor === 'e' && (int) $client->pessoa_id === self::VIPAL_ID);
     }
 
-    /** calculaBaseIof: soma dos itens não isentos (FinChargesItems::getIsentaIof: BRL ou despesa com a regra 10). */
+    /** calculaBaseIof: soma dos itens não isentos (FinChargesItems::getIsentaIof: BRL, BL Fee ou despesa com a regra 10). */
     public function base(FinCharges $charge): float
     {
         return (float) DB::table('fin_charges_items as i')
             ->join('fin_expenses_values as v', 'v.id', '=', 'i.ref_expense')
             ->where('i.ref_charge', $charge->id)
             ->where(fn (Builder $q) => $q->whereNull('i.ref_currency')->orWhere('i.ref_currency', '<>', 1))
+            ->whereNotIn('v.ref_expense', self::BL_FEE_EXPENSES)
             ->whereNotExists(fn (Builder $q) => $q->from('regra_despesa_cobranca_item as r')
                 ->whereColumn('r.despesa_id', 'v.ref_expense')
                 ->where('r.regra_despesa_cobranca_id', 10))
